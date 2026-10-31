@@ -113,11 +113,36 @@ class AssetPublisher:
     def publish(self) -> PublishedAssets:
         assets = self._copy_immutable_assets()
         published = PublishedAssets(assets)
+        self._write_i18n_manifest(published)
         self._write_lookup_manifest(published)
         self._write_web_manifests(published)
         if self.publish_service_worker:
             self._write_service_worker(published)
         return published
+
+    def _write_i18n_manifest(self, published: PublishedAssets) -> None:
+        """Write a stable index of the content-addressed i18n assets.
+
+        The locale packs and core loader are published as immutable (hashed)
+        assets; this manifest maps each locale to its hashed URL so the browser
+        can fetch only the active language at runtime. It lives at a stable,
+        unauthenticated URL (``/assets/i18n-manifest.json``).
+        """
+        locales = {}
+        for code in SUPPORTED_LOCALES:
+            url = published.assets.get(f'i18n/{code}.json')
+            if url:
+                locales[code] = url
+        manifest = {
+            'core': published.assets.get('i18n/i18n-core.js'),
+            'locales': locales,
+        }
+        target = self.output_dir / 'assets' / 'i18n-manifest.json'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(manifest, ensure_ascii=False, separators=(',', ':')),
+            encoding='utf-8',
+        )
 
     def _copy_immutable_assets(self) -> dict[str, str]:
         source_contents = {

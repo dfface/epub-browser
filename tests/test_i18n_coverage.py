@@ -1,6 +1,24 @@
+import json
 import re
 import unittest
 from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+I18N_DIR = PROJECT_ROOT / 'epub_browser' / 'assets' / 'i18n'
+SUPPORTED_LOCALES = [
+    'en', 'zh-CN', 'zh-TW', 'ko', 'ja',
+    'es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms',
+]
+
+
+def load_locale(code):
+    return json.loads((I18N_DIR / f'{code}.json').read_text(encoding='utf-8'))
+
+
+EN = load_locale('en')
+EN_KEYS = set(EN.keys())
+KNOWN_TRANSLATION_KEYS = EN_KEYS
 
 
 FIRST_PARTY = [
@@ -44,12 +62,6 @@ TRANSLATION_KEY_ARGUMENT = re.compile(
     r"(?P<function>(?<![\w.$])i18n\s*\.\s*t|(?<![\w.$])(?:bookT|tr|t|localized|translate))\s*\(\s*$"
 )
 DICTIONARY_KEY = re.compile(r"^\s*'(?P<key>[^']+)':", re.MULTILINE)
-KNOWN_TRANSLATION_KEYS = {
-    match.group('key')
-    for match in DICTIONARY_KEY.finditer(
-        Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
-    )
-}
 TR_NAMESPACES = {
     'bookshelf.js': 'bookshelf.',
     'annotation.js': 'annotations.',
@@ -196,15 +208,76 @@ def iter_set_attribute_values(source):
         yield source[value_start:value_end], value_start
 
 
+def _mask_js_comments(source):
+    """Replace JS comment contents with spaces, preserving length and positions.
+
+    Comment text must not be scanned as visible UI copy (it frequently contains
+    fragments such as ``<code>`` that look like markup).
+    """
+    out = []
+    i = 0
+    n = len(source)
+    quote = None
+    in_line = False
+    in_block = False
+    while i < n:
+        ch = source[i]
+        two = source[i:i + 2]
+        if in_line:
+            out.append(' ')
+            if ch == '\n':
+                in_line = False
+            i += 1
+            continue
+        if in_block:
+            out.append(' ')
+            if two == '*/':
+                out.append(' ')
+                i += 2
+                in_block = False
+                continue
+            i += 1
+            continue
+        if quote:
+            out.append(ch)
+            if ch == quote and source[i - 1] != '\\':
+                quote = None
+            i += 1
+            continue
+        if two == '//':
+            in_line = True
+            out.append(' ')
+            out.append(' ')
+            i += 2
+            continue
+        if two == '/*':
+            in_block = True
+            out.append(' ')
+            out.append(' ')
+            i += 2
+            continue
+        if ch in '"\'`':
+            quote = ch
+            out.append(ch)
+            i += 1
+            continue
+        out.append(ch)
+        i += 1
+    return ''.join(out)
+
+
 def find_literal_ui_sinks_text(source, path):
     failures = []
     for number, line in enumerate(source.splitlines(), 1):
         if 'i18n-allow-literal' in line and not VALID_LITERAL_EXCEPTION.search(line):
             failures.append(f'{path}:{number}: invalid i18n literal exception: {line.strip()}')
 
+    # Comment text must not be scanned as visible UI copy; mask it for the
+    # structural scan but keep the raw source for the line-based exception check.
+    scan = _mask_js_comments(source) if (path and getattr(path, 'suffix', '') == '.js') else source
     for pattern in DIRECT_SINKS:
-        for match in pattern.finditer(source):
-            add_failure(failures, source, path, match.start(), 'literal UI sink')
+        for match in pattern.finditer(scan):
+            add_failure(failures, scan, path, match.start(), 'literal UI sink')
 
     for assignment in PROPERTY_ASSIGNMENT.finditer(source):
         literal = first_visible_literal(assignment.group('value'), path)
@@ -217,18 +290,18 @@ def find_literal_ui_sinks_text(source, path):
                 'literal UI sink',
             )
 
-    for value, value_start in iter_set_attribute_values(source):
+    for value, value_start in iter_set_attribute_values(scan):
         literal = first_visible_literal(value, path)
         if literal:
-            add_failure(failures, source, path, value_start + literal.start(), 'literal UI sink')
+            add_failure(failures, scan, path, value_start + literal.start(), 'literal UI sink')
 
-    for tag in HTML_TAG.finditer(source):
+    for tag in HTML_TAG.finditer(scan):
         attributes = tag.group('attributes')
         for match in HTML_ATTRIBUTE.finditer(attributes):
             if not has_localized_attribute_binding(attributes, match.group('attribute')):
                 add_failure(
                     failures,
-                    source,
+                    scan,
                     path,
                     tag.start('attributes') + match.start(),
                     'unlocalized HTML attribute',
@@ -236,13 +309,13 @@ def find_literal_ui_sinks_text(source, path):
 
         if tag.group('name').lower() in VISIBLE_HTML_EXCLUSIONS:
             continue
-        next_tag = source.find('<', tag.end())
-        text = source[tag.end():len(source) if next_tag == -1 else next_tag]
+        next_tag = scan.find('<', tag.end())
+        text = scan[tag.end():len(scan) if next_tag == -1 else next_tag]
         visible = re.match(r'\s*[A-Za-z]', text)
         if visible and '{' not in text and not re.search(r'\bdata-i18n\s*=', attributes):
             add_failure(
                 failures,
-                source,
+                scan,
                 path,
                 tag.end() + visible.start(),
                 'unlocalized visible HTML text',
@@ -254,10 +327,32 @@ def find_literal_ui_sinks(path):
     return find_literal_ui_sinks_text(path.read_text(encoding='utf-8'), path)
 
 
-class I18nCoverageTests(unittest.TestCase):
-    def test_pdf_page_and_degradation_copy_exists_in_every_locale(self):
-        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
+def _is_translated(en_val, loc_val):
+    if isinstance(en_val, dict) and isinstance(loc_val, dict):
+        return any(loc_val.get(key) != en_val.get(key) for key in en_val)
+    return loc_val != en_val
 
+
+def translation_ratio(code):
+    loc = load_locale(code)
+    total = 0
+    translated = 0
+    for key in EN:
+        if key not in loc:
+            continue
+        total += 1
+        if _is_translated(EN[key], loc[key]):
+            translated += 1
+    return translated / total if total else 1.0
+
+
+class I18nCoverageTests(unittest.TestCase):
+    def test_every_locale_contains_every_key(self):
+        for code in SUPPORTED_LOCALES:
+            keys = set(load_locale(code).keys())
+            self.assertEqual(EN_KEYS - keys, set(), f'missing keys in {code}')
+
+    def test_pdf_page_and_degradation_copy_exists_in_every_locale(self):
         for key in (
             'pdf.page',
             'pdf.pageOf',
@@ -265,7 +360,8 @@ class I18nCoverageTests(unittest.TestCase):
             'pdf.textUnavailable',
             'pdf.passwordRequired',
         ):
-            self.assertEqual(source.count("'" + key + "'"), 17, key)
+            for code in SUPPORTED_LOCALES:
+                self.assertIn(key, load_locale(code), f'{key} missing in {code}')
 
     def test_account_and_administration_copy_exists_in_both_locales(self):
         required = {
@@ -442,10 +538,10 @@ class I18nCoverageTests(unittest.TestCase):
             'admin.ai.jobs.error.no_reading_material',
             'admin.ai.jobs.error.unknown',
         }
-        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
-        keys = set(DICTIONARY_KEY.findall(source))
-
-        self.assertEqual(required - keys, set())
+        english = set(load_locale('en').keys())
+        chinese = set(load_locale('zh-CN').keys())
+        self.assertEqual(required - english, set())
+        self.assertEqual(required - chinese, set())
 
     def test_feynman_learning_copy_exists_in_both_locales(self):
         required = {
@@ -454,22 +550,20 @@ class I18nCoverageTests(unittest.TestCase):
             'ai.teachAnalogy',
             'ai.teachCheck',
         }
-        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
-        english = source[source.index('en: {'):source.index("'zh-CN': {")]
-        chinese = source[source.index("'zh-CN': {"):]
-
-        self.assertEqual(required - set(DICTIONARY_KEY.findall(english)), set())
-        self.assertEqual(required - set(DICTIONARY_KEY.findall(chinese)), set())
+        english = set(load_locale('en').keys())
+        chinese = set(load_locale('zh-CN').keys())
+        self.assertEqual(required - english, set())
+        self.assertEqual(required - chinese, set())
 
     def test_image_notes_vocabulary_and_toc_location_are_localized(self):
-        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
         for key in (
             'annotations.addImageNote',
             'annotations.imageNote',
             'ai.annotation.vocabulary',
             'reader.locateCurrentChapter',
         ):
-            self.assertEqual(source.count("'" + key + "'"), 17, key)
+            for code in SUPPORTED_LOCALES:
+                self.assertIn(key, load_locale(code), f'{key} missing in {code}')
 
     def test_generation_stage_and_task_limit_copy_exists_in_both_locales(self):
         required = {
@@ -479,16 +573,24 @@ class I18nCoverageTests(unittest.TestCase):
             'admin.ai.dailyLimit',
             'admin.ai.dailyLimitHelp',
         }
-        source = Path('epub_browser/assets/i18n.js').read_text(encoding='utf-8')
-        english = source[source.index('en: {'):source.index("'zh-CN': {")]
-        chinese = source[source.index("'zh-CN': {"):]
-
-        self.assertEqual(required - set(DICTIONARY_KEY.findall(english)), set())
-        self.assertEqual(required - set(DICTIONARY_KEY.findall(chinese)), set())
+        english = set(load_locale('en').keys())
+        chinese = set(load_locale('zh-CN').keys())
+        self.assertEqual(required - english, set())
+        self.assertEqual(required - chinese, set())
         self.assertIn(
-            'AI reading tasks each authorized member may start per day', english,
+            'daily AI reading task limit',
+            load_locale('en')['admin.ai.dailyLimit'],
         )
-        self.assertIn('several backend model calls', english)
+        self.assertIn('several backend model calls', load_locale('en')['admin.ai.dailyLimitHelp'])
+
+    def test_every_non_english_locale_is_fully_translated(self):
+        for code in SUPPORTED_LOCALES:
+            if code == 'en':
+                continue
+            ratio = translation_ratio(code)
+            self.assertGreaterEqual(
+                ratio, 0.9, f'{code} only {ratio:.0%} translated (expected >= 90%)'
+            )
 
     def test_first_party_ui_sinks_do_not_embed_english_copy(self):
         failures = []
@@ -566,3 +668,7 @@ class I18nCoverageTests(unittest.TestCase):
         self.assertEqual(len(failures), 2)
         self.assertIn('invalid i18n literal exception', failures[0])
         self.assertIn('literal UI sink', failures[1])
+
+
+if __name__ == '__main__':
+    unittest.main()

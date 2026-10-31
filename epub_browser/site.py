@@ -9,6 +9,7 @@ from typing import Optional, Sequence, Tuple
 from types import SimpleNamespace
 
 from .asset_publisher import PublishedAssets, rewrite_asset_urls
+from .i18n_bundles import render_i18n_runtime_and_inline
 from .server_chrome import (
     SERVER_ACCOUNT_CONTROL,
     SERVER_ACCOUNT_PANEL,
@@ -342,7 +343,7 @@ def render_library_shell(
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="EPUB Browser">
 <title data-i18n="library.pageTitle">EPUB Library</title>
-<script src="/assets/i18n.js"></script>
+{I18N_RUNTIME_BOOTSTRAP}
 <script>window.EpubBrowserI18n.init();</script>
 <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
 <link rel="stylesheet" href="/assets/vendor/fontawesome/css/all.min.css">
@@ -589,6 +590,10 @@ htmlElement.classList.add(theme + "-mode");
     library_html = library_html.replace("{reading_insights_navigation}", reading_insights_navigation)
     library_html = library_html.replace("{ai_reading_script}", ai_reading_script)
     library_html = library_html.replace("{SERVER_LOCALE_SCRIPT}", SERVER_LOCALE_SCRIPT)
+    library_html = library_html.replace(
+        "{I18N_RUNTIME_BOOTSTRAP}",
+        render_i18n_runtime_and_inline(urls.base_path, deployment_mode=deployment_mode),
+    )
     library_html = rewrite_asset_urls(library_html, self.asset_manifest)
     library_html = rewrite_root_urls(library_html, urls)
     library_html = library_html.replace(

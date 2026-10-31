@@ -1,6 +1,5 @@
 # epub_browser/setup.py
 import re
-from pathlib import Path
 
 from setuptools import setup, find_packages
 
@@ -9,12 +8,6 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 with open("epub_browser/version.py", "r", encoding="utf-8") as fh:
     version = re.search(r'^VERSION = ["\']([^"\']+)', fh.read(), re.MULTILINE).group(1)
-
-vendor_package_data = [
-    path.relative_to("epub_browser").as_posix()
-    for path in sorted(Path("epub_browser/assets/vendor").rglob("*"))
-    if path.is_file()
-]
 
 setup(
     name="epub-browser",  # 在PyPI上显示的项目名称
@@ -34,10 +27,10 @@ setup(
     packages=find_packages(exclude=("tests", "tests.*")),
     package_data={
         "epub_browser": [
-            "assets/*",
-            "assets/vendor/**/*",
+            # Recursive: assets/*.js, *.css, *.png AND nested dirs such as
+            # assets/i18n (locale packs + i18n-core.js) and assets/vendor.
+            "assets/**/*",
             "prompt_templates/*.json",
-            *vendor_package_data,
         ]
     },
     data_files=[("share/doc/epub-browser", ["THIRD_PARTY_NOTICES.md"])],

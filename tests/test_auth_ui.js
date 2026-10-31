@@ -3,7 +3,15 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const AuthModule = require('../epub_browser/assets/auth.js');
-const { createRuntime, dictionaries } = require('../epub_browser/assets/i18n.js');
+const { createRuntime } = require('../epub_browser/assets/i18n/i18n-core.js');
+
+const SUPPORTED = ['en', 'zh-CN', 'zh-TW', 'ko', 'ja', 'es', 'de', 'fr', 'ru', 'it', 'pt-BR', 'ar', 'id', 'hi', 'vi', 'th', 'ms'];
+const dictionaries = {};
+SUPPORTED.forEach(code => {
+  dictionaries[code] = JSON.parse(
+    fs.readFileSync(path.join(__dirname, '..', 'epub_browser', 'assets', 'i18n', code + '.json'), 'utf8')
+  );
+});
 
 function response(status, payload) {
   return {
@@ -1273,6 +1281,7 @@ test('account settings and administration open as separate surfaces', async () =
     '/api/admin/ai/settings',
     '/api/admin/ai/tags',
     '/api/admin/oidc/settings',
+    '/api/admin/general-settings',
     '/api/admin/ai/jobs?page=1&page_size=20',
     '/api/admin/webhooks',
     '/api/admin/webhooks/deliveries',

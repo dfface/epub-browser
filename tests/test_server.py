@@ -495,7 +495,7 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         fixed_auth = self.client.get("/assets/auth.js")
         self.assertEqual(fixed_auth.status_code, 200)
         self.assertNotIn("generated auth asset", fixed_auth.text)
-        self.assertEqual(self.client.get("/assets/i18n.js").status_code, 200)
+        self.assertEqual(self.client.get("/assets/i18n-manifest.json").status_code, 200)
         self.assertEqual(self.client.get("/assets/theme.css").status_code, 200)
         self.assertEqual(
             self.client.get("/assets/theme-bootstrap.js").status_code,
@@ -1145,7 +1145,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             '/assets/api-docs.css',
             '/assets/api-docs.js',
             '/assets/auth.js',
-            '/assets/i18n.js',
+            '/assets/i18n-manifest.json',
             '/assets/logo-mark-color.png',
             '/assets/theme-bootstrap.js',
             '/assets/theme.css',
@@ -1336,7 +1336,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
         self.assertIn('<option value="zh-CN" selected', chinese.text)
         self.assertIn('data-i18n="account.username">Username', english.text)
         self.assertIn('data-i18n="account.username">用户名', chinese.text)
-        self.assertIn('src="/assets/i18n.js"', english.text)
+        self.assertRegex(english.text, r'src="/assets/immutable/i18n/i18n-core\.[0-9a-f]{12}\.js"')
         self.assertIn('window.EpubBrowserI18n.init()', english.text)
         self.assertIn('i18n.setLocale(localeSelect.value)', english.text)
         self.assertGreater(
@@ -1361,7 +1361,7 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             'name="next" value="/book/id/chapter_0.html"',
             chinese.text,
         )
-        self.assertEqual(self.client.get('/assets/i18n.js').status_code, 200)
+        self.assertEqual(self.client.get('/assets/i18n-manifest.json').status_code, 200)
         stylesheet = self.client.get('/assets/account.css')
         self.assertEqual(stylesheet.status_code, 200)
         self.assertIn('text/css', stylesheet.headers['content-type'])

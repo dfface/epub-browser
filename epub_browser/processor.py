@@ -25,6 +25,7 @@ from .asset_publisher import (
     SERVER_ONLY_ASSET_PREFIXES,
     rewrite_asset_urls,
 )
+from .i18n_bundles import render_i18n_runtime_and_inline
 from .epub_parsing import (
     EPUBParseError,
     allowed_entity_name,
@@ -242,7 +243,7 @@ function kClickTurn(e) {
 
 
 # Kindle minimal-page UI strings, resolved server-side against the book's
-# language so legacy e-Ink Kindles never have to load i18n.js.  Keys mirror
+# language so legacy e-Ink Kindles never have to load i18n-core.js.  Keys mirror
 # the on-page [data-i18n] attributes; "previous"/"next" keep the arrows that
 # the template renders inline.
 _KINDLE_READER_I18N = {
@@ -2323,7 +2324,7 @@ class EPUBProcessor:
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
     <title>{book_title_text}</title>
-    <script src="/assets/i18n.js"></script>
+    {render_i18n_runtime_and_inline(self.urls.base_path, deployment_mode=self.deployment_mode)}
     <script>window.EpubBrowserI18n.init();</script>
     {ai_feature_assets}
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
@@ -3720,7 +3721,7 @@ document.addEventListener('DOMContentLoaded', function() {{
     <meta name="apple-mobile-web-app-title" content="EPUB Browser">
     <title>{chapter_title_text} - {book_title_text}</title>
     {reading_session_context}
-    <script src="/assets/i18n.js"></script>
+    {render_i18n_runtime_and_inline(self.urls.base_path, deployment_mode=self.deployment_mode)}
     <script>window.EpubBrowserI18n.init();</script>
     {pdf_config_script}
     {ai_feature_assets}

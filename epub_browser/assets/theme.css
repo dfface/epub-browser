@@ -1,5 +1,14 @@
 /* Theme Styles */
 /* Light Theme (Default) */
+
+/* Keep translatable text hidden until i18n-core.js applies the active locale,
+   so the UI never flashes English before switching to the user's language.
+   The runtime removes `i18n-boot` (see i18n-core.js reveal()) once translated. */
+.i18n-boot [data-i18n],
+.i18n-boot [data-i18n-content] {
+    visibility: hidden;
+}
+
 :root {
     --primary: #4361ee;
     --secondary: #4cc9f0;

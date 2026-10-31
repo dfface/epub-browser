@@ -1629,7 +1629,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             for name in (
                 "cache-boundary.js",
                 "library.js",
-                "i18n.js",
+                "i18n/i18n-core.js",
                 "bookshelf.js",
                 "chapter.js",
                 "annotation-hub.js",
@@ -1640,7 +1640,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             "EpubBrowserURL.publicPath('/sw.js')",
             scripts["cache-boundary.js"],
         )
-        self.assertIn("publicPath('/assets/manifest.'", scripts["i18n.js"])
+        self.assertIn("publicPath('/assets/manifest.'", scripts["i18n/i18n-core.js"])
         self.assertGreaterEqual(
             scripts["bookshelf.js"].count("EpubBrowserURL.publicPath('/book/"),
             1,
@@ -1695,9 +1695,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
     def test_all_generated_pages_bootstrap_shared_i18n_before_ui_scripts(self):
         for html in (self._library_html(), self._book_html(), self._chapter_html()):
-            self.assertRegex(html, r'/assets/immutable/i18n\.[0-9a-f]{12}\.js')
+            self.assertRegex(html, r'/assets/immutable/i18n/i18n-core\.[0-9a-f]{12}\.js')
             self.assertIn('window.EpubBrowserI18n.init()', html)
-            self.assertLess(html.index('window.EpubBrowserI18n.init()'), html.index('/assets/immutable/theme.'))
+            self.assertIn('window.EpubBrowserI18n.registerDictionary("en"', html)
+            self.assertLess(
+                html.index('/assets/immutable/i18n/i18n-core.'),
+                html.index('window.EpubBrowserI18n.init()'),
+            )
             self.assertNotIn('/assets/manifest.json', html)
             self.assertRegex(
                 html,

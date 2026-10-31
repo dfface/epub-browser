@@ -5,4 +5,4 @@ include tools/sync_vendor_assets.py
 include tools/verify_release_artifacts.py
 recursive-include third_party *.json *.md
 recursive-include epub_browser/prompt_templates *.json
-recursive-include epub_browser/assets/vendor *
+recursive-include epub_browser/assets *

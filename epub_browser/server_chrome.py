@@ -5,6 +5,7 @@ from datetime import datetime
 from .asset_publisher import PublishedAssets
 from .locales import LOCALE_NATIVE_NAMES
 from .urls import SiteURLs
+from .i18n_bundles import render_i18n_bootstrap
 from .version import render_footer
 
 SERVER_ACCOUNT_STYLESHEET = '<link rel="stylesheet" href="/assets/account.css">'
@@ -401,8 +402,8 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
 <meta name="theme-color" content="#244548">
 <meta name="description" content="Private reading insights" data-i18n-content="readingInsights.description">
 <title data-i18n="readingInsights.pageTitle">Reading insights · EPUB Browser</title>
-<script src="/assets/i18n.js"></script>
-<script>window.EpubBrowserBasePath={urls.base_path!r};window.EpubBrowserMode="server";window.EpubBrowserI18n.init();</script>
+{render_i18n_bootstrap(None, None, core_url=assets.url_for('i18n/i18n-core.js'))}
+<script>window.EpubBrowserBasePath={urls.base_path!r};window.EpubBrowserMode="server";</script>
 <link rel="stylesheet" href="/assets/vendor/fontawesome/css/all.min.css">
 <link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="stylesheet" href="/assets/theme.css">
