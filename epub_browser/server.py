@@ -14,7 +14,7 @@ import re
 import secrets
 import sqlite3
 
-from .i18n_bundles import i18n_core_immutable_url, render_i18n_bootstrap
+from .i18n_bundles import i18n_core_immutable_url, render_i18n_bootstrap, resolve_request_locale
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
@@ -3919,7 +3919,7 @@ window.location.assign(payload.redirect||'/');
         return response(openapi_document(), cache_control='public, max-age=300')
 
     async def api_docs(request):
-        markup = render_api_docs(public_api_operations())
+        markup = render_api_docs(public_api_operations(), locale=resolve_request_locale(request))
         try:
             markup = rewrite_asset_urls(markup, current_published_assets())
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):

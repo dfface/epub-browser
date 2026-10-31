@@ -3,7 +3,7 @@
 import html
 import json
 
-from .i18n_bundles import render_i18n_runtime_and_inline
+from .i18n_bundles import i18n_core_immutable_url, render_i18n_bootstrap
 
 
 _GROUPS = (
@@ -44,7 +44,7 @@ def _operation_markup(operation):
     )
 
 
-def render_api_docs(operations):
+def render_api_docs(operations, locale=None):
     operations = tuple(operations)
     grouped = {key: [] for key, _translation, _fallback in _GROUPS}
     for operation in operations:
@@ -76,7 +76,7 @@ def render_api_docs(operations):
         ))
 
     count = len(operations)
-    return '''<!doctype html>
+    api_docs_html = '''<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -124,5 +124,10 @@ def render_api_docs(operations):
     )
     return api_docs_html.replace(
         '<script src="/assets/i18n.js" defer></script>',
-        render_i18n_runtime_and_inline('/', deployment_mode='server'),
+        render_i18n_bootstrap(
+            locale,
+            None,
+            core_url=i18n_core_immutable_url(),
+            deployment_mode='server',
+        ),
     )
