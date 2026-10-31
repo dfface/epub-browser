@@ -3,6 +3,8 @@
 import html
 import json
 
+from .i18n_bundles import i18n_core_immutable_url, render_i18n_bootstrap
+
 
 _GROUPS = (
     ("library", "apiDocs.group.library", "Library"),
@@ -42,7 +44,7 @@ def _operation_markup(operation):
     )
 
 
-def render_api_docs(operations):
+def render_api_docs(operations, locale=None):
     operations = tuple(operations)
     grouped = {key: [] for key, _translation, _fallback in _GROUPS}
     for operation in operations:
@@ -74,7 +76,7 @@ def render_api_docs(operations):
         ))
 
     count = len(operations)
-    return '''<!doctype html>
+    api_docs_html = '''<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -112,9 +114,20 @@ def render_api_docs(operations):
     <footer class="api-footer"><span>EPUB Browser API · OpenAPI 3.1</span><a href="#apiDocsTop" data-i18n="apiDocs.backToTop">Back to top</a></footer>
 </main>
 </body>
-</html>'''.format(
+</html>'''
+
+    api_docs_html = api_docs_html.format(
         count=count,
         result_params=_i18n_params(count=count),
         navigation="".join(navigation),
         sections="".join(sections),
+    )
+    return api_docs_html.replace(
+        '<script src="/assets/i18n.js" defer></script>',
+        render_i18n_bootstrap(
+            locale,
+            None,
+            core_url=i18n_core_immutable_url(),
+            deployment_mode='server',
+        ),
     )

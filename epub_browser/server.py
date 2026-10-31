@@ -13,6 +13,8 @@ import posixpath
 import re
 import secrets
 import sqlite3
+
+from .i18n_bundles import i18n_core_immutable_url, render_i18n_bootstrap, resolve_request_locale
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
@@ -152,7 +154,7 @@ PUBLIC_UNAUTHENTICATED_ASSETS = frozenset({
     '/assets/api-docs.js',
     '/assets/auth.js',
     '/assets/favicon.png',
-    '/assets/i18n.js',
+    '/assets/i18n/i18n-core.js',
     '/assets/logo-mark-color.png',
     '/assets/theme-bootstrap.js',
     '/assets/theme.css',
@@ -450,6 +452,7 @@ def route_is_public_unauthenticated(path):
         path in PUBLIC_UNAUTHENTICATED_ENDPOINTS
         or path in PUBLIC_UNAUTHENTICATED_ASSETS
         or path in PUBLIC_WEB_MANIFESTS
+        or path == '/assets/i18n-manifest.json'
     )
 
 
@@ -801,6 +804,14 @@ def create_app(
             return '/assets/' + logical_name
 
     def is_public_unauthenticated_asset(path):
+        if path == '/assets/i18n-manifest.json':
+            return True
+        # i18n locale packs and the runtime loader are non-sensitive UI text and
+        # are required for the localized login/setup surface, so they must stay
+        # reachable (including before first-run setup) even when the asset
+        # publisher has not run yet.
+        if path.startswith('/assets/i18n/') or path.startswith('/assets/immutable/i18n/'):
+            return True
         if path in PUBLIC_UNAUTHENTICATED_ASSETS:
             return True
         try:
@@ -1319,9 +1330,8 @@ def create_app(
 <link rel="stylesheet" href="/assets/account.css">
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
-<script src="/assets/i18n.js"></script>
+{render_i18n_bootstrap(locale, locale if locale_explicit else None, core_url=i18n_core_immutable_url())}
 <script src="/assets/version-check.js" defer></script>
-<script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
 </head><body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card setup-card">
 <header class="auth-card-header">{brand_markup}
 <label class="auth-language setup-language"><span class="auth-language-label" data-i18n="common.language">{copy['language']}</span>
@@ -1518,9 +1528,8 @@ if(localeField)localeField.value=localeSelect.value;
 <link rel="stylesheet" href="/assets/account.css">
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
-<script src="/assets/i18n.js"></script>
+{render_i18n_bootstrap(locale, locale if locale_explicit else None, core_url=i18n_core_immutable_url())}
 <script src="/assets/version-check.js" defer></script>
-<script>window.EpubBrowserI18n.init();{'window.EpubBrowserI18n.setLocale(' + json.dumps(locale) + ');' if locale_explicit else ''}</script>
 </head><body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
 <header class="auth-card-header">{brand_markup}
 <label class="auth-language login-language"><span class="auth-language-label" data-i18n="common.language">{copy['language']}</span>
@@ -1619,7 +1628,7 @@ window.location.assign(payload.redirect||'/');
 <link rel="stylesheet" href="/assets/account.css">
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
-<script src="/assets/i18n.js"></script><script>window.EpubBrowserI18n.init();</script></head>
+{render_i18n_bootstrap(locale, None, core_url=i18n_core_immutable_url())}</head>
 <body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
 <header class="auth-card-header">{auth_brand_markup()}</header>
 <div class="auth-intro">
@@ -1662,7 +1671,7 @@ window.location.assign(payload.redirect||'/');
 <link rel="stylesheet" href="/assets/account.css">
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
-<script src="/assets/i18n.js"></script><script>window.EpubBrowserI18n.init();</script></head>
+{render_i18n_bootstrap(locale, None, core_url=i18n_core_immutable_url())}</head>
 <body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
 <header class="auth-card-header">{auth_brand_markup()}</header>
 <div class="auth-intro">
@@ -3910,7 +3919,7 @@ window.location.assign(payload.redirect||'/');
         return response(openapi_document(), cache_control='public, max-age=300')
 
     async def api_docs(request):
-        markup = render_api_docs(public_api_operations())
+        markup = render_api_docs(public_api_operations(), locale=resolve_request_locale(request))
         try:
             markup = rewrite_asset_urls(markup, current_published_assets())
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
@@ -4044,6 +4053,25 @@ window.location.assign(payload.redirect||'/');
             path = normalize_public_path(request.path_params['path'])
         except ValueError:
             return response(error_payload('not_found', 'Not Found'), 404)
+        if path == 'assets/i18n-manifest.json' or '/' + path == '/assets/i18n-manifest.json':
+            from .i18n_bundles import build_i18n_manifest
+
+            return JSONResponse(
+                build_i18n_manifest(),
+                headers={'Cache-Control': 'no-cache'},
+            )
+        if path.startswith('assets/i18n/') or path.startswith('assets/immutable/i18n/'):
+            from .i18n_bundles import read_i18n_asset
+
+            result = read_i18n_asset(path)
+            if result is None:
+                return response(error_payload('not_found', 'Not Found'), 404)
+            content, media_type = result
+            return Response(
+                content,
+                media_type=media_type,
+                headers={'Cache-Control': 'public, max-age=31536000, immutable'},
+            )
         if '/' + path in PUBLIC_UNAUTHENTICATED_ASSETS:
             return FileResponse(
                 os.path.join(os.path.dirname(__file__), path),

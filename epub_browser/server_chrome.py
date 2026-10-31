@@ -5,6 +5,7 @@ from datetime import datetime
 from .asset_publisher import PublishedAssets
 from .locales import LOCALE_NATIVE_NAMES
 from .urls import SiteURLs
+from .i18n_bundles import render_i18n_bootstrap
 from .version import render_footer
 
 SERVER_ACCOUNT_STYLESHEET = '<link rel="stylesheet" href="/assets/account.css">'
@@ -28,7 +29,7 @@ SERVER_ACCOUNT_CONTROL = '''<button type="button" class="library-meta-action app
         <i class="fas fa-user-shield" aria-hidden="true"></i><span data-i18n="admin.menu">Administration</span>
     </button>
     <button type="button" class="library-meta-action app-nav-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel" aria-label="Account" data-i18n-aria-label="account.menu">
-        <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue" data-i18n="account.menu">Account</span>
+        <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue">Account</span>
     </button>'''
 SERVER_ACCOUNT_PANEL = '''
 <div class="bookshelf-modal account-modal" id="accountPanel" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="accountTitle">
@@ -401,8 +402,8 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
 <meta name="theme-color" content="#244548">
 <meta name="description" content="Private reading insights" data-i18n-content="readingInsights.description">
 <title data-i18n="readingInsights.pageTitle">Reading insights · EPUB Browser</title>
-<script src="/assets/i18n.js"></script>
-<script>window.EpubBrowserBasePath={urls.base_path!r};window.EpubBrowserMode="server";window.EpubBrowserI18n.init();</script>
+{render_i18n_bootstrap(None, None, core_url=assets.url_for('i18n/i18n-core.js'))}
+<script>window.EpubBrowserBasePath={urls.base_path!r};window.EpubBrowserMode="server";</script>
 <link rel="stylesheet" href="/assets/vendor/fontawesome/css/all.min.css">
 <link rel="icon" type="image/png" href="/assets/favicon.png">
 <link rel="stylesheet" href="/assets/theme.css">
