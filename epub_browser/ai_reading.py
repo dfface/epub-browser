@@ -19,6 +19,7 @@ from .prompt_templates import (
     profile_system_prompt,
     template_for,
 )
+from .server_concurrency import run_db, run_render
 from .state import (
     StateStore,
     _AIRetrySnapshotChanged,
@@ -950,10 +951,17 @@ class AIReadingService:
 
     async def submit(self, principal: Principal, request: ReadingRequest) -> dict:
         validate_reading_request(request)
-        settings = self.store._get_ai_provider_settings()
+
+        def _authorize():
+            return (
+                self.store._get_ai_provider_settings(),
+                self.store.can_use_ai(principal),
+            )
+
+        settings, authorized = await run_db(_authorize)
         if not settings["enabled"]:
             raise AIReadingError("ai_disabled")
-        if not self.store.can_use_ai(principal):
+        if not authorized:
             raise AIReadingError("ai_not_authorized")
         (
             material,
@@ -964,8 +972,8 @@ class AIReadingService:
             _profile_selection,
             template,
             cache_key,
-        ) = self._prepare_reading_request(principal, request)
-        cached = self.store.get_current_ai_reading_result(cache_key)
+        ) = await run_render(self._prepare_reading_request, principal, request)
+        cached = await run_db(self.store.get_current_ai_reading_result, cache_key)
         if cached is not None and not request.force:
             return {"status": "complete", "cached": True, "result": cached}
 
@@ -979,14 +987,17 @@ class AIReadingService:
             "mode": request.mode,
             "language": request.language,
             "force": request.force,
-            "reading_boundary": self._reading_boundary(principal, request),
+            "reading_boundary": await run_db(
+                self._reading_boundary, principal, request
+            ),
         }
         job_cache_key = (
             self._force_job_cache_key(cache_key, job_id)
             if request.force
             else cache_key
         )
-        job, created = self.store.create_or_get_active_ai_job(
+        job, created = await run_db(
+            self.store.create_or_get_active_ai_job,
             job_id,
             principal.user_id,
             request.book_id,
@@ -1007,10 +1018,13 @@ class AIReadingService:
         # A previous task can finish after the first cache lookup but before
         # this request acquires the single-flight lock. Prefer its result over
         # another Provider request.
-        cached = self.store.get_current_ai_reading_result(cache_key)
+        cached = await run_db(self.store.get_current_ai_reading_result, cache_key)
         if cached is not None and not request.force:
-            self.store.start_ai_job(job_id)
-            self.store.finish_ai_job(job_id, result_id=cached["id"])
+            def _complete_from_cache():
+                self.store.start_ai_job(job_id)
+                self.store.finish_ai_job(job_id, result_id=cached["id"])
+
+            await run_db(_complete_from_cache)
             return {"status": "complete", "cached": True, "result": cached}
         await self.start_worker()
         self.wake_worker()
@@ -1026,7 +1040,7 @@ class AIReadingService:
     ) -> dict:
         if getattr(administrator, "role", None) != "admin":
             raise AIReadingError("ai_not_authorized")
-        source = self.store.get_ai_job_for_retry(source_job_id)
+        source = await run_db(self.store.get_ai_job_for_retry, source_job_id)
         if source is None:
             raise AIReadingError("ai_job_not_found")
         if source.get("status") not in {"failed", "interrupted"}:
@@ -1039,21 +1053,28 @@ class AIReadingService:
         if request.book_id != source.get("book_id"):
             raise AIReadingError("ai_job_not_retryable")
         for snapshot_attempt in range(_ADMIN_RETRY_SNAPSHOT_ATTEMPTS):
-            try:
-                owner = self.store.get_user(source["owner_user_id"])
-            except (KeyError, TypeError):
-                raise AIReadingError("ai_not_authorized") from None
+            def _owner_state():
+                try:
+                    owner = self.store.get_user(source["owner_user_id"])
+                except (KeyError, TypeError):
+                    raise AIReadingError("ai_not_authorized") from None
+                settings = self.store._get_ai_provider_settings()
+                return (
+                    owner,
+                    settings,
+                    self.store.can_use_ai(owner.principal),
+                    self.store.can_read_book(
+                        owner.user_id, owner.role, request.book_id
+                    ),
+                )
+
+            owner, settings, owner_can_use_ai, owner_can_read = await run_db(
+                _owner_state
+            )
             owner_principal = owner.principal
-            settings = self.store._get_ai_provider_settings()
             if not settings["enabled"]:
                 raise AIReadingError("ai_disabled")
-            if (
-                not owner.enabled
-                or not self.store.can_use_ai(owner_principal)
-                or not self.store.can_read_book(
-                    owner.user_id, owner.role, request.book_id
-                )
-            ):
+            if not owner.enabled or not owner_can_use_ai or not owner_can_read:
                 raise AIReadingError("ai_not_authorized")
 
             (
@@ -1065,8 +1086,12 @@ class AIReadingService:
                 profile_selection,
                 template,
                 cache_key,
-            ) = self._prepare_reading_request(owner_principal, request)
-            cached = self.store.get_current_ai_reading_result(cache_key)
+            ) = await run_render(
+                self._prepare_reading_request, owner_principal, request
+            )
+            cached = await run_db(
+                self.store.get_current_ai_reading_result, cache_key
+            )
             reusable_cached = cached is not None and (
                 cached.get("cache_key") == cache_key
                 and cached.get("config_revision") == settings["config_revision"]
@@ -1080,8 +1105,8 @@ class AIReadingService:
                 "mode": request.mode,
                 "language": request.language,
                 "force": True,
-                "reading_boundary": self._reading_boundary(
-                    owner_principal, request
+                "reading_boundary": await run_db(
+                    self._reading_boundary, owner_principal, request
                 ),
             }
             job_id = hashlib.sha256(
@@ -1093,7 +1118,8 @@ class AIReadingService:
                 ).encode()
             ).hexdigest()[:32]
             try:
-                job, created = self.store.create_or_get_admin_retry_ai_job(
+                job, created = await run_db(
+                    self.store.create_or_get_admin_retry_ai_job,
                     source_job_id=source_job_id,
                     job_id=job_id,
                     retried_by_user_id=administrator.user_id,
@@ -1177,15 +1203,15 @@ class AIReadingService:
 
     async def _worker_loop(self, state: _WorkerState) -> None:
         while not state.stopping:
-            chat_turn = self.store.claim_next_ai_book_chat_turn()
+            chat_turn = await run_db(self.store.claim_next_ai_book_chat_turn)
             if chat_turn is not None:
                 await self._run_queued_book_chat_turn(chat_turn)
                 continue
-            followup = self.store.claim_next_ai_followup()
+            followup = await run_db(self.store.claim_next_ai_followup)
             if followup is not None:
                 await self._run_queued_followup(followup)
                 continue
-            job = self.store.claim_next_ai_reading_job()
+            job = await run_db(self.store.claim_next_ai_reading_job)
             if job is not None:
                 await self._run_queued_job(job)
                 continue
@@ -1199,14 +1225,20 @@ class AIReadingService:
         try:
             payload = json.loads(job["request_json"])
             request = reading_request_from_job_payload(payload)
-            principal = self.store.get_user(job["owner_user_id"]).principal
-            material, metadata, _total, full_book_segments = self._material_for_request(principal, request)
+            principal = (
+                await run_db(self.store.get_user, job["owner_user_id"])
+            ).principal
+            material, metadata, _total, full_book_segments = await run_render(
+                self._material_for_request, principal, request
+            )
             if not material:
                 raise AIReadingError("no_reading_material")
             template = template_for(request.scope, request.mode)
             if template["id"] != job.get("template_id") or template["version"] != job.get("template_version"):
                 raise AIReadingError("ai_template_unavailable")
-            profile = job.get("profile") or self.store.get_book_ai_profile(request.book_id)
+            profile = job.get("profile") or await run_db(
+                self.store.get_book_ai_profile, request.book_id
+            )
             # EPUB-derived material is intentionally read again when the
             # durable job runs. Its digest, rather than the enqueue-time
             # snapshot, is therefore the only safe identity for a result.
@@ -1216,63 +1248,87 @@ class AIReadingService:
                 if self._is_force_job_cache_key(job["cache_key"], job["id"])
                 else cache_key
             )
-            if not self.store.rekey_running_ai_job(job["id"], job_cache_key):
+            if not await run_db(
+                self.store.rekey_running_ai_job, job["id"], job_cache_key
+            ):
                 raise AIReadingError("ai_generation_failed")
-            cached = self.store.get_current_ai_reading_result(cache_key)
+            cached = await run_db(
+                self.store.get_current_ai_reading_result, cache_key
+            )
             if cached is not None and not request.force:
-                self.store.finish_ai_job(job["id"], result_id=cached["id"])
+                await run_db(
+                    self.store.finish_ai_job, job["id"], result_id=cached["id"]
+                )
                 return
-            settings = self.store._get_ai_provider_settings()
+            settings = await run_db(self.store._get_ai_provider_settings)
             if not settings["enabled"]:
                 raise AIReadingError("ai_disabled")
-            self._reserve_generation_task(
-                job.get("retry_root_job_id") or job["id"], principal, request
+            await run_db(
+                self._reserve_generation_task,
+                job.get("retry_root_job_id") or job["id"], principal, request,
             )
             await self._run_generation(
                 job["id"], principal, request, metadata, material, full_book_segments,
                 profile, settings, cache_key, template,
-                self._reading_boundary(principal, request), already_started=True,
+                await run_db(self._reading_boundary, principal, request),
+                already_started=True,
             )
         except AIReadingError as error:
-            self.store.finish_ai_job(job["id"], error_code=error.code)
+            await run_db(self.store.finish_ai_job, job["id"], error_code=error.code)
         except (KeyError, TypeError, ValueError, json.JSONDecodeError, OSError):
-            self.store.finish_ai_job(job["id"], error_code="ai_generation_failed")
+            await run_db(
+                self.store.finish_ai_job,
+                job["id"],
+                error_code="ai_generation_failed",
+            )
 
     async def _run_queued_followup(self, followup: dict) -> None:
         try:
-            result = self.store.get_ai_reading_result(followup["result_id"])
+            result = await run_db(
+                self.store.get_ai_reading_result, followup["result_id"]
+            )
             if result is None:
                 raise AIReadingError("ai_result_not_found")
-            principal = self.store.get_user(followup["owner_user_id"]).principal
-            settings = self.store._get_ai_provider_settings()
+            principal = (
+                await run_db(self.store.get_user, followup["owner_user_id"])
+            ).principal
+            settings = await run_db(self.store._get_ai_provider_settings)
             await self._run_followup(
                 principal, followup, result, settings, followup.get("language", "en"),
                 already_started=True,
             )
         except AIReadingError as error:
-            self.store.finish_ai_followup(
-                followup["id"], followup["owner_user_id"], error_code=error.code
+            await run_db(
+                self.store.finish_ai_followup,
+                followup["id"], followup["owner_user_id"], error_code=error.code,
             )
         except (KeyError, TypeError, ValueError, OSError):
-            self.store.finish_ai_followup(
-                followup["id"], followup["owner_user_id"], error_code="ai_generation_failed"
+            await run_db(
+                self.store.finish_ai_followup,
+                followup["id"], followup["owner_user_id"],
+                error_code="ai_generation_failed",
             )
 
     async def _run_queued_book_chat_turn(self, turn: dict) -> None:
         """Answer one durable, book-scoped question with its exact chapter context."""
         try:
-            principal = self.store.get_user(turn['owner_user_id']).principal
-            settings = self.store._get_ai_provider_settings()
+            principal = (
+                await run_db(self.store.get_user, turn['owner_user_id'])
+            ).principal
+            settings = await run_db(self.store._get_ai_provider_settings)
             await self._run_book_chat_turn(
                 principal, turn, settings, turn.get('language', 'en'), already_started=True,
             )
         except AIReadingError as error:
-            self.store.finish_ai_book_chat_turn(
+            await run_db(
+                self.store.finish_ai_book_chat_turn,
                 turn['id'], turn['owner_user_id'], error_code=error.code,
             )
         except (KeyError, TypeError, ValueError, OSError):
-            self.store.finish_ai_book_chat_turn(
-                turn['id'], turn['owner_user_id'], error_code='ai_generation_failed',
+            await run_db(
+                self.store.finish_ai_book_chat_turn,
+                turn['id'], turn['owner_user_id'],
+                error_code='ai_generation_failed',
             )
 
     async def _provider_call(
@@ -1293,17 +1349,25 @@ class AIReadingService:
                 condition, active_calls = self._call_controls[loop]
             self._call_controls[loop] = (condition, active_calls + 1)
         try:
-            self._live_provider_principal(principal.user_id, book_id)
+            await run_db(
+                self._live_provider_principal, principal.user_id, book_id
+            )
             client = self._client_factory(config)
             retry_index = 0
             while True:
-                live_principal = self._live_provider_principal(
-                    principal.user_id, book_id
+                live_principal = await run_db(
+                    self._live_provider_principal, principal.user_id, book_id
                 )
                 usage_day = date.today().isoformat()
                 if task_scoped:
-                    self.store.record_ai_provider_call(live_principal, usage_day)
-                elif not self.store.reserve_ai_usage(live_principal, usage_day):
+                    await run_db(
+                        self.store.record_ai_provider_call,
+                        live_principal,
+                        usage_day,
+                    )
+                elif not await run_db(
+                    self.store.reserve_ai_usage, live_principal, usage_day
+                ):
                     raise AIReadingError("ai_quota_exhausted")
                 try:
                     return await asyncio.to_thread(
@@ -1362,6 +1426,7 @@ class AIReadingService:
         *,
         source_representation: str = "complete EPUB source",
         system_prompt: Optional[str] = None,
+        book_tags=(),
     ) -> list[dict]:
         language = prompt_language_name(request.language)
         scope_name = "chapter" if request.scope == "chapter" else request.mode
@@ -1394,7 +1459,7 @@ class AIReadingService:
                         {
                             "title": metadata.get("title"),
                             "authors": metadata.get("authors"),
-                            "tags": self.store.effective_book_tags(request.book_id),
+                            "tags": list(book_tags),
                         },
                         ensure_ascii=False,
                     ),
@@ -1411,6 +1476,7 @@ class AIReadingService:
         material: str,
         source_representation: str,
         system_prompt: str,
+        book_tags=(),
     ) -> list[dict]:
         language = prompt_language_name(request.language)
         return [
@@ -1430,7 +1496,7 @@ class AIReadingService:
                         {
                             "title": metadata.get("title"),
                             "authors": metadata.get("authors"),
-                            "tags": self.store.effective_book_tags(request.book_id),
+                            "tags": list(book_tags),
                         },
                         ensure_ascii=False,
                     ),
@@ -1448,6 +1514,7 @@ class AIReadingService:
         core_synopsis: str,
         source_representation: str,
         system_prompt: str,
+        book_tags=(),
     ) -> list[dict]:
         language = prompt_language_name(request.language)
         return [
@@ -1473,7 +1540,7 @@ class AIReadingService:
                         {
                             "title": metadata.get("title"),
                             "authors": metadata.get("authors"),
-                            "tags": self.store.effective_book_tags(request.book_id),
+                            "tags": list(book_tags),
                         },
                         ensure_ascii=False,
                     ),
@@ -1569,6 +1636,7 @@ class AIReadingService:
         source_representation: str,
         budget: _ModelTokenBudget,
         model: str,
+        book_tags=(),
     ) -> Callable[[str], list[dict]]:
         """Prefer the richer contract, falling back only when its fixed envelope cannot fit."""
         for system_prompt in (
@@ -1586,6 +1654,7 @@ class AIReadingService:
                     template,
                     source_representation=source_representation,
                     system_prompt=selected_system,
+                    book_tags=book_tags,
                 )
 
             if self._request_fits_budget(
@@ -1602,6 +1671,7 @@ class AIReadingService:
         source_representation: str,
         budget: _ModelTokenBudget,
         model: str,
+        book_tags=(),
     ) -> Callable[[str], list[dict]]:
         template = chapter_core_template()
         for system_prompt in (
@@ -1618,6 +1688,7 @@ class AIReadingService:
                     value,
                     source_representation,
                     selected_system,
+                    book_tags,
                 )
 
             if self._request_fits_budget(
@@ -1634,6 +1705,7 @@ class AIReadingService:
         source_representation: str,
         budget: _ModelTokenBudget,
         model: str,
+        book_tags=(),
     ) -> Callable[[str, str], list[dict]]:
         template = chapter_grounding_template()
         compact_prompt = _COMPACT_CHAPTER_GROUNDING_SYSTEM + " Profile: " + _COMPACT_PROFILE_GUIDANCE.get(
@@ -1662,6 +1734,7 @@ class AIReadingService:
                     core_synopsis,
                     source_representation,
                     selected_system,
+                    book_tags,
                 )
 
             if self._request_fits_budget(
@@ -1789,7 +1862,9 @@ class AIReadingService:
                 budget, prototype, config.model, part_output_tokens
             )
             parts = _split_text_by_token_budget(source, source_budget, config.model)
-            labels = self._render_part_analyses([""] * len(parts))
+            labels = await run_render(
+                self._render_part_analyses, [""] * len(parts)
+            )
             available = final_source_budget - _estimate_tokens(labels, config.model) - 16
             allowed_per_part = available // max(1, len(parts))
             if allowed_per_part < 1:
@@ -1806,8 +1881,9 @@ class AIReadingService:
 
         progress_current = 0
         progress_total = len(parts) + 2
-        self.store.update_ai_job_progress(
-            job_id, progress_current, progress_total, "preparing_source"
+        await run_db(
+            self.store.update_ai_job_progress,
+            job_id, progress_current, progress_total, "preparing_source",
         )
         analyses = []
         for position, part in enumerate(parts, start=1):
@@ -1830,11 +1906,12 @@ class AIReadingService:
                 _truncate_tokens(analysis, part_output_tokens, config.model)
             )
             progress_current += 1
-            self.store.update_ai_job_progress(
-                job_id, progress_current, progress_total, "preparing_source"
+            await run_db(
+                self.store.update_ai_job_progress,
+                job_id, progress_current, progress_total, "preparing_source",
             )
 
-        rendered = self._render_part_analyses(analyses)
+        rendered = await run_render(self._render_part_analyses, analyses)
         for builder in final_message_builders:
             if not self._request_fits_budget(
                 builder(rendered), budget, config.model, budget.output_tokens
@@ -1967,7 +2044,9 @@ class AIReadingService:
         reading_boundary: Optional[int],
         already_started: bool = False,
     ) -> None:
-        if not already_started and not self.store.start_ai_job(job_id):
+        if not already_started and not await run_db(
+            self.store.start_ai_job, job_id
+        ):
             return
         try:
             config = ProviderConfig.from_settings(settings)
@@ -1975,6 +2054,9 @@ class AIReadingService:
                 settings.get("model_context_window", 32768)
             )
             source_material = material
+            book_tags = await run_db(
+                self.store.effective_book_tags, request.book_id
+            )
             progress_current = 0
             progress_total = 1
             if request.mode == "full_review":
@@ -2030,14 +2112,16 @@ class AIReadingService:
                         )
                     )
                     progress_current = position
-                    self.store.update_ai_job_progress(
-                        job_id, progress_current, progress_total
+                    await run_db(
+                        self.store.update_ai_job_progress,
+                        job_id, progress_current, progress_total,
                     )
                 material = self._bounded_book_bridges(bridges)
             if request.scope == "chapter":
                 progress_total = 2
-                self.store.update_ai_job_progress(
-                    job_id, progress_current, progress_total, "preparing_source"
+                await run_db(
+                    self.store.update_ai_job_progress,
+                    job_id, progress_current, progress_total, "preparing_source",
                 )
                 source_representation = "complete EPUB source"
                 core_messages = self._chapter_core_prompt_builder(
@@ -2047,6 +2131,7 @@ class AIReadingService:
                     source_representation,
                     budget,
                     config.model,
+                    book_tags,
                 )
                 grounding_messages = self._chapter_grounding_prompt_builder(
                     request,
@@ -2055,6 +2140,7 @@ class AIReadingService:
                     source_representation,
                     budget,
                     config.model,
+                    book_tags,
                 )
                 synopsis_limit = max(192, min(2048, budget.context_window // 6))
                 synopsis_probe = "x" * synopsis_limit
@@ -2077,6 +2163,7 @@ class AIReadingService:
                         source_representation,
                         budget,
                         config.model,
+                        book_tags,
                     )
                     grounding_messages = self._chapter_grounding_prompt_builder(
                         request,
@@ -2085,6 +2172,7 @@ class AIReadingService:
                         source_representation,
                         budget,
                         config.model,
+                        book_tags,
                     )
                     grounding_probe = lambda value: grounding_messages(
                         value, synopsis_probe
@@ -2105,8 +2193,9 @@ class AIReadingService:
                     core_call_messages, budget, config.model, budget.output_tokens
                 ):
                     raise AIReadingError("ai_generation_failed")
-                self.store.update_ai_job_progress(
-                    job_id, progress_current, progress_total, "generating_core"
+                await run_db(
+                    self.store.update_ai_job_progress,
+                    job_id, progress_current, progress_total, "generating_core",
                 )
                 core_raw = await self._provider_call(
                     principal,
@@ -2119,8 +2208,9 @@ class AIReadingService:
                 core = _normalize_core_result(core_raw)
                 if not _has_chapter_learning_core(core):
                     progress_total += 1
-                    self.store.update_ai_job_progress(
-                        job_id, progress_current, progress_total, "generating_core"
+                    await run_db(
+                        self.store.update_ai_job_progress,
+                        job_id, progress_current, progress_total, "generating_core",
                     )
                     repair_messages = core_call_messages + [{
                         "role": "user",
@@ -2147,8 +2237,9 @@ class AIReadingService:
                     if not _has_chapter_learning_core(core):
                         raise AIReadingError("ai_generation_failed")
                 progress_current += 1
-                self.store.update_ai_job_progress(
-                    job_id, progress_current, progress_total, "grounding_source"
+                await run_db(
+                    self.store.update_ai_job_progress,
+                    job_id, progress_current, progress_total, "grounding_source",
                 )
                 core_synopsis = self._compact_core_synopsis(
                     core, budget, config.model
@@ -2188,6 +2279,7 @@ class AIReadingService:
                     source_representation,
                     budget,
                     config.model,
+                    book_tags,
                 )
                 final_call_messages = final_messages(material)
                 if not self._request_fits_budget(
@@ -2224,7 +2316,8 @@ class AIReadingService:
                 content = self._validate_learning_layer(
                     _normalize_result(raw), request, source_material
                 )
-            result = self.store.store_ai_reading_result(
+            result = await run_db(
+                self.store.store_ai_reading_result,
                 cache_key=cache_key,
                 book_id=request.book_id,
                 chapter_index=request.chapter_index,
@@ -2240,28 +2333,41 @@ class AIReadingService:
                 reading_boundary=reading_boundary,
             )
             progress_current += 1
-            self.store.update_ai_job_progress(
+            await run_db(
+                self.store.update_ai_job_progress,
                 job_id,
                 progress_current,
                 progress_total,
                 "grounding_source" if request.scope == "chapter" else None,
             )
-            self.store.finish_ai_job(job_id, result_id=result["id"])
+            await run_db(
+                self.store.finish_ai_job, job_id, result_id=result["id"]
+            )
         except AIReadingError as error:
-            self.store.finish_ai_job(job_id, error_code=error.code)
+            await run_db(
+                self.store.finish_ai_job, job_id, error_code=error.code
+            )
         except (ValueError, OSError):
-            self.store.finish_ai_job(job_id, error_code="ai_generation_failed")
+            await run_db(
+                self.store.finish_ai_job,
+                job_id,
+                error_code="ai_generation_failed",
+            )
 
     async def follow_up(
         self, principal: Principal, result_id: str, question: str, language: str
     ) -> dict:
-        settings = self.store._get_ai_provider_settings()
-        if not settings["enabled"] or not self.store.can_use_ai(principal):
-            raise AIReadingError("ai_not_authorized")
-        result = self.store.get_ai_reading_result(result_id)
+        def _authorize_followup():
+            settings = self.store._get_ai_provider_settings()
+            if not settings["enabled"] or not self.store.can_use_ai(principal):
+                raise AIReadingError("ai_not_authorized")
+            return self.store.get_ai_reading_result(result_id)
+
+        result = await run_db(_authorize_followup)
         if result is None:
             raise AIReadingError("ai_result_not_found")
-        followup = self.store.create_ai_followup(
+        followup = await run_db(
+            self.store.create_ai_followup,
             result_id=result_id, owner_user_id=principal.user_id, question=question,
             language=language,
         )
@@ -2285,10 +2391,18 @@ class AIReadingService:
         self, principal: Principal, *, book_id: str, chapter_index: Optional[int],
         question: str, language: str, context_mode: str,
     ) -> dict:
-        settings = self.store._get_ai_provider_settings()
-        if not settings['enabled'] or not self.store.can_use_ai(principal):
-            raise AIReadingError('ai_not_authorized')
-        if not self.store.can_read_book(principal.user_id, principal.role, book_id):
+        def _authorize_chat():
+            settings = self.store._get_ai_provider_settings()
+            if not settings['enabled'] or not self.store.can_use_ai(principal):
+                return None
+            if not self.store.can_read_book(
+                principal.user_id, principal.role, book_id
+            ):
+                return None
+            return settings
+
+        settings = await run_db(_authorize_chat)
+        if settings is None:
             raise AIReadingError('ai_not_authorized')
         if context_mode not in {'shared_layer', 'chapter_source', 'book_overview'}:
             raise AIReadingError('invalid_ai_chat')
@@ -2301,7 +2415,9 @@ class AIReadingService:
         else:
             if chapter_index is None:
                 raise AIReadingError('invalid_ai_chat')
-            result = self._current_chapter_layer(book_id, chapter_index, language)
+            result = await run_db(
+                self._current_chapter_layer, book_id, chapter_index, language
+            )
             stored_mode = context_mode
             stored_chapter_index = chapter_index
         if context_mode == 'shared_layer' and result is None:
@@ -2309,11 +2425,13 @@ class AIReadingService:
         # Validate source availability at submission time. It prevents a user
         # waiting for a queued turn that cannot possibly be answered.
         if context_mode == 'chapter_source':
-            self._material_for_request(
+            await run_render(
+                self._material_for_request,
                 principal,
                 ReadingRequest('chapter', book_id, stored_chapter_index, language=language),
             )
-        turn = self.store.create_ai_book_chat_turn(
+        turn = await run_db(
+            self.store.create_ai_book_chat_turn,
             book_id=book_id, chapter_index=stored_chapter_index,
             owner_user_id=principal.user_id, question=question, language=language,
             context_mode=stored_mode, result_id=result['id'] if result else None,
@@ -2329,9 +2447,21 @@ class AIReadingService:
     ) -> None:
         if not settings.get('enabled'):
             raise AIReadingError('ai_disabled')
-        if not self.store.can_use_ai(principal):
-            raise AIReadingError('ai_not_authorized')
-        result = self.store.get_ai_reading_result(turn['result_id']) if turn.get('result_id') else None
+
+        def _chat_inputs():
+            if not self.store.can_use_ai(principal):
+                raise AIReadingError('ai_not_authorized')
+            result = (
+                self.store.get_ai_reading_result(turn['result_id'])
+                if turn.get('result_id') else None
+            )
+            return (
+                result,
+                list(self.store.effective_book_tags(turn['book_id'])),
+                self.store.get_book_ai_profile(turn['book_id']),
+            )
+
+        result, tags, ai_profile = await run_db(_chat_inputs)
         is_book_context = bool(turn.get('book_context'))
         config = ProviderConfig.from_settings(settings)
         budget = _ModelTokenBudget.from_context_window(
@@ -2340,17 +2470,21 @@ class AIReadingService:
         if not is_book_context and turn['context_mode'] == 'shared_layer' and result is None:
             raise AIReadingError('ai_reading_required')
         if is_book_context:
-            source = self._book_learning_layer_digest(turn['book_id'], language)
+            source = await run_db(
+                self._book_learning_layer_digest, turn['book_id'], language
+            )
         elif result is not None:
             source = 'Shared reading layer:\n' + json.dumps(result['content'], ensure_ascii=False)
         else:
-            material, metadata, _total, _segments = self._material_for_request(
+            material, metadata, _total, _segments = await run_render(
+                self._material_for_request,
                 principal,
                 ReadingRequest('chapter', turn['book_id'], int(turn['chapter_index']), language=language),
             )
             source = 'Chapter source:\n<UNTRUSTED_EPUB_CONTENT>\n' + material + '\n</UNTRUSTED_EPUB_CONTENT>'
-        metadata = self._book_metadata(turn['book_id'])
-        history_text = self._book_chat_history_context(
+        metadata = await run_db(self._book_metadata, turn['book_id'])
+        history_text = await run_db(
+            self._book_chat_history_context,
             turn, language, config.model, max(180, budget.input_tokens() // 4),
         )
         book_context = {
@@ -2358,8 +2492,8 @@ class AIReadingService:
             'authors': metadata.get('authors'),
             'description': _safe_text(metadata.get('description'), 700),
             'language': metadata.get('language'),
-            'tags': list(self.store.effective_book_tags(turn['book_id'])),
-            'ai_reading_profile': self.store.get_book_ai_profile(turn['book_id']),
+            'tags': tags,
+            'ai_reading_profile': ai_profile,
         }
         try:
             def build_messages(
@@ -2413,11 +2547,20 @@ class AIReadingService:
                 principal, config, messages,
                 book_id=turn['book_id'], max_tokens=budget.output_tokens,
             )
-            self.store.finish_ai_book_chat_turn(turn['id'], principal.user_id, answer=answer)
+            await run_db(
+                self.store.finish_ai_book_chat_turn,
+                turn['id'], principal.user_id, answer=answer,
+            )
         except AIReadingError as error:
-            self.store.finish_ai_book_chat_turn(turn['id'], principal.user_id, error_code=error.code)
+            await run_db(
+                self.store.finish_ai_book_chat_turn,
+                turn['id'], principal.user_id, error_code=error.code,
+            )
         except (ValueError, OSError):
-            self.store.finish_ai_book_chat_turn(turn['id'], principal.user_id, error_code='ai_generation_failed')
+            await run_db(
+                self.store.finish_ai_book_chat_turn,
+                turn['id'], principal.user_id, error_code='ai_generation_failed',
+            )
 
     @staticmethod
     def _chat_turn_record(turn: dict, *, question_limit: int, answer_limit: int) -> dict:
@@ -2510,7 +2653,9 @@ class AIReadingService:
         self, principal: Principal, followup: dict, result: dict, settings: dict, language: str,
         *, already_started: bool = False,
     ) -> None:
-        if not already_started and not self.store.start_ai_followup(followup["id"], principal.user_id):
+        if not already_started and not await run_db(
+            self.store.start_ai_followup, followup["id"], principal.user_id
+        ):
             return
         try:
             config = ProviderConfig.from_settings(settings)
@@ -2548,14 +2693,18 @@ class AIReadingService:
                 book_id=result["book_id"],
                 max_tokens=budget.output_tokens,
             )
-            self.store.finish_ai_followup(
-                followup["id"], principal.user_id, answer=answer
+            await run_db(
+                self.store.finish_ai_followup,
+                followup["id"], principal.user_id, answer=answer,
             )
         except AIReadingError as error:
-            self.store.finish_ai_followup(
-                followup["id"], principal.user_id, error_code=error.code
+            await run_db(
+                self.store.finish_ai_followup,
+                followup["id"], principal.user_id, error_code=error.code,
             )
         except (ValueError, OSError):
-            self.store.finish_ai_followup(
-                followup["id"], principal.user_id, error_code="ai_generation_failed"
+            await run_db(
+                self.store.finish_ai_followup,
+                followup["id"], principal.user_id,
+                error_code="ai_generation_failed",
             )

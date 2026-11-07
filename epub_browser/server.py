@@ -89,13 +89,20 @@ from .public_api import (
     public_api_operations,
     public_api_routes,
 )
+from .server_api_docs import render_api_docs
+from .server_concurrency import (
+    SetupStateMonitor,
+    StatKeyedCache,
+    run_db,
+    run_io,
+    run_render,
+)
 from .server_library import (
     PDF_METADATA_SCHEMA_VERSION,
     PDF_OUTPUT_REVISION,
     PDF_OUTPUT_REVISION_FILE,
     library_metadata,
 )
-from .server_api_docs import render_api_docs
 from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import EPUB_FORMAT, PDF_FORMAT, is_supported_source
 from .site import LibraryBook, render_kindle_library_page, render_library_shell
@@ -787,15 +794,27 @@ def create_app(
             headers=response_headers,
         )
 
-    def current_published_assets():
-        manifest_path = Path(base_directory, 'assets', 'asset-manifest.json')
-        manifest = json.loads(manifest_path.read_text(encoding='utf-8'))
+    asset_manifest_path = Path(base_directory, 'assets', 'asset-manifest.json')
+
+    def _load_published_assets():
+        manifest = json.loads(asset_manifest_path.read_text(encoding='utf-8'))
         if not isinstance(manifest, dict) or not all(
             isinstance(key, str) and isinstance(value, str)
             for key, value in manifest.items()
         ):
             raise ValueError('Invalid asset manifest')
         return PublishedAssets(manifest)
+
+    asset_manifest_cache = StatKeyedCache(asset_manifest_path, _load_published_assets)
+    # One startup probe; afterwards the middleware and the background task keep
+    # the cached value fresh without touching SQLite on every request.
+    setup_state = SetupStateMonitor(
+        store.has_administrator,
+        initial_ready=store.has_administrator(),
+    )
+
+    def current_published_assets():
+        return asset_manifest_cache.get()
 
     def current_asset_url(logical_name):
         try:
@@ -853,6 +872,18 @@ def create_app(
         ] = reader_content_security_policy(markup, inline_scripts=inline_scripts)
         target_response.headers['X-Content-Type-Options'] = 'nosniff'
         return target_response
+
+    async def apply_security_headers(
+        target_response, file_path=None, markup=None, inline_scripts=False
+    ):
+        """Apply CSP scanning off the event loop; reading markup may hit disk."""
+        return await run_render(
+            apply_reader_security_headers,
+            target_response,
+            file_path=file_path,
+            markup=markup,
+            inline_scripts=inline_scripts,
+        )
 
     def request_session_token(request):
         return request.scope.get(
@@ -1376,13 +1407,15 @@ if(localeField)localeField.value=localeSelect.value;
         )
         locale_explicit = 'lang' in request.query_params
         if request.method in {'GET', 'HEAD'}:
-            if store.has_administrator():
+            if await run_db(store.has_administrator):
+                setup_state.mark_complete()
                 return RedirectResponse(
                     '/' if request.scope.get(PRINCIPAL_SCOPE_KEY) is not None else '/login',
                     status_code=303,
                     headers={'Cache-Control': 'no-store'},
                 )
-            return setup_form(
+            return await run_render(
+                setup_form,
                 locale=requested_locale,
                 locale_explicit=locale_explicit,
             )
@@ -1402,7 +1435,8 @@ if(localeField)localeField.value=localeSelect.value;
             or not secrets.compare_digest(cookie_nonce, submitted_nonce)
         ):
             return invalid_setup_request()
-        if store.has_administrator():
+        if await run_db(store.has_administrator):
+            setup_state.mark_complete()
             completed = RedirectResponse(
                 '/login',
                 status_code=303,
@@ -1423,25 +1457,29 @@ if(localeField)localeField.value=localeSelect.value;
             or not password
             or not isinstance(confirmation, str)
         ):
-            return setup_form(
+            return await run_render(
+                setup_form,
                 error='invalid',
                 status_code=400,
                 locale=submitted_locale,
                 locale_explicit=True,
             )
         if password != confirmation:
-            return setup_form(
+            return await run_render(
+                setup_form,
                 error='password_mismatch',
                 status_code=400,
                 locale=submitted_locale,
                 locale_explicit=True,
             )
         try:
-            raw_session, _ = auth_service.complete_setup(
+            raw_session, _ = await run_db(
+                auth_service.complete_setup,
                 username,
                 password,
                 **session_client_metadata(request),
             )
+            setup_state.mark_complete()
         except SetupAlreadyCompleteError:
             completed = RedirectResponse(
                 '/login',
@@ -1451,14 +1489,16 @@ if(localeField)localeField.value=localeSelect.value;
             delete_setup_nonce_cookie(completed)
             return completed
         except sqlite3.IntegrityError:
-            return setup_form(
+            return await run_render(
+                setup_form,
                 error='username_unavailable',
                 status_code=409,
                 locale=submitted_locale,
                 locale_explicit=True,
             )
         except ValueError:
-            return setup_form(
+            return await run_render(
+                setup_form,
                 error='invalid',
                 status_code=400,
                 locale=submitted_locale,
@@ -1704,19 +1744,22 @@ window.location.assign(payload.redirect||'/');
             raise OIDCError('configuration_invalid')
         return settings
 
-    def complete_local_session(request, principal, next_path):
+    async def complete_local_session(request, principal, next_path):
         current_principal = request.scope.get(PRINCIPAL_SCOPE_KEY)
         current_session = request_session_token(request)
+        metadata = session_client_metadata(request)
         if current_principal is not None and current_session:
-            raw_session, _ = auth_service.replace_session(
+            raw_session, _ = await run_db(
+                auth_service.replace_session,
                 principal,
                 current_session,
-                **session_client_metadata(request),
+                **metadata,
             )
         else:
-            raw_session, _ = auth_service.create_session(
+            raw_session, _ = await run_db(
+                auth_service.create_session,
                 principal,
-                **session_client_metadata(request),
+                **metadata,
             )
         completed = RedirectResponse(
             next_path,
@@ -1730,7 +1773,7 @@ window.location.assign(payload.redirect||'/');
 
     async def oidc_start(request):
         try:
-            settings = oidc_settings()
+            settings = await run_db(oidc_settings)
         except OIDCError:
             return oidc_error_page(request, status_code=404)
         next_path = _safe_relative_path(request.query_params.get('next', '/'))
@@ -1776,7 +1819,7 @@ window.location.assign(payload.redirect||'/');
             delete_oidc_browser_cookie(failed)
             return failed
         try:
-            settings = oidc_settings()
+            settings = await run_db(oidc_settings)
             completion = await oidc_service.complete(
                 settings,
                 state=values['state'],
@@ -1801,7 +1844,8 @@ window.location.assign(payload.redirect||'/');
                     or current_principal.user_id != transaction.expected_user_id
                 ):
                     raise RuntimeError('OIDC link session changed')
-                store.link_oidc_identity(
+                await run_db(
+                    store.link_oidc_identity,
                     current_principal.user_id,
                     issuer=claims.issuer,
                     subject=claims.subject,
@@ -1811,12 +1855,14 @@ window.location.assign(payload.redirect||'/');
                 )
                 principal = current_principal
             else:
-                principal = store.principal_for_oidc_identity(
+                principal = await run_db(
+                    store.principal_for_oidc_identity,
                     claims.issuer,
                     claims.subject,
                 )
                 if principal is not None:
-                    store.link_oidc_identity(
+                    await run_db(
+                        store.link_oidc_identity,
                         principal.user_id,
                         issuer=claims.issuer,
                         subject=claims.subject,
@@ -1825,7 +1871,8 @@ window.location.assign(payload.redirect||'/');
                         email=claims.email,
                     )
                 elif settings['auto_create_users']:
-                    principal = store.provision_oidc_member(
+                    principal = await run_db(
+                        store.provision_oidc_member,
                         issuer=claims.issuer,
                         subject=claims.subject,
                         username_base=claims.username,
@@ -1835,7 +1882,8 @@ window.location.assign(payload.redirect||'/');
                     )
                 else:
                     association_token = secrets.token_urlsafe(32)
-                    store.stage_oidc_association(
+                    await run_db(
+                        store.stage_oidc_association,
                         association_token=association_token,
                         browser_token=request.cookies.get(OIDC_BROWSER_COOKIE, ''),
                         issuer=claims.issuer,
@@ -1856,17 +1904,18 @@ window.location.assign(payload.redirect||'/');
             failed = oidc_error_page(request, status_code=403)
             delete_oidc_browser_cookie(failed)
             return failed
-        return complete_local_session(request, principal, transaction.next_path)
+        return await complete_local_session(request, principal, transaction.next_path)
 
     async def oidc_associate(request):
         try:
-            settings = oidc_settings()
+            settings = await run_db(oidc_settings)
         except OIDCError:
             return oidc_error_page(request, status_code=404)
         browser_token = request.cookies.get(OIDC_BROWSER_COOKIE, '')
         if request.method == 'GET':
             association_token = request.query_params.get('token', '')
-            transaction = store.get_oidc_association(
+            transaction = await run_db(
+                store.get_oidc_association,
                 association_token,
                 browser_token,
                 settings['config_revision'],
@@ -1891,7 +1940,8 @@ window.location.assign(payload.redirect||'/');
             )
         ):
             return oidc_error_page(request, status_code=403)
-        transaction = store.get_oidc_association(
+        transaction = await run_db(
+            store.get_oidc_association,
             association_token,
             browser_token,
             settings['config_revision'],
@@ -1899,16 +1949,22 @@ window.location.assign(payload.redirect||'/');
         if transaction is None:
             return oidc_error_page(request, status_code=400)
         client_key = request.client.host if request.client is not None else 'unknown'
-        principal = auth_service.authenticate_password(
-            data.get('username', ''),
-            data.get('password', ''),
-            client_key,
-            allow_member=True,
-        )
+
+        def _authenticate_association():
+            authenticated = auth_service.authenticate_password(
+                data.get('username', ''),
+                data.get('password', ''),
+                client_key,
+                allow_member=True,
+            )
+            if authenticated is None:
+                return None, 429 if auth_service.login_retry_after_seconds(
+                    client_key, data.get('username', '')
+                ) else 401
+            return authenticated, 0
+
+        principal, status_code = await run_db(_authenticate_association)
         if principal is None:
-            status_code = 429 if auth_service.login_retry_after_seconds(
-                client_key, data.get('username', '')
-            ) else 401
             return oidc_association_form(
                 request,
                 association_token,
@@ -1916,7 +1972,8 @@ window.location.assign(payload.redirect||'/');
                 status_code=status_code,
             )
         try:
-            identity = store.complete_oidc_association(
+            identity = await run_db(
+                store.complete_oidc_association,
                 association_token,
                 browser_token,
                 settings['config_revision'],
@@ -1926,7 +1983,7 @@ window.location.assign(payload.redirect||'/');
             return oidc_error_page(request, status_code=409)
         if identity is None:
             return oidc_error_page(request, status_code=400)
-        return complete_local_session(request, principal, transaction.next_path)
+        return await complete_local_session(request, principal, transaction.next_path)
 
     async def login(request):
         requested_next = _safe_relative_path(request.query_params.get('next', '/'))
@@ -1938,7 +1995,8 @@ window.location.assign(payload.redirect||'/');
         if request.method == 'GET':
             if request.scope.get(PRINCIPAL_SCOPE_KEY) is not None:
                 return RedirectResponse(requested_next, status_code=303)
-            return login_form(
+            return await run_render(
+                login_form,
                 requested_next,
                 locale=requested_locale,
                 locale_explicit=locale_explicit,
@@ -1981,21 +2039,40 @@ window.location.assign(payload.redirect||'/');
                 return public_json_error(parse_error)
         next_path = _safe_relative_path(data.get('next') or requested_next)
         client_key = request.client.host if request.client is not None else 'unknown'
-        current_oidc_settings = store.get_oidc_settings()
-        principal = auth_service.authenticate_password(
-            data.get('username', ''),
-            data.get('password', ''),
-            client_key,
-            allow_member=(
-                not current_oidc_settings.enabled
-                or current_oidc_settings.allow_member_password_login
-            ),
-        )
-        if principal is None:
-            retry_after_seconds = auth_service.login_retry_after_seconds(
-                client_key,
+        current_session = request_session_token(request)
+        metadata = session_client_metadata(request)
+
+        def _authenticate_login():
+            settings = store.get_oidc_settings()
+            authenticated = auth_service.authenticate_password(
                 data.get('username', ''),
+                data.get('password', ''),
+                client_key,
+                allow_member=(
+                    not settings.enabled
+                    or settings.allow_member_password_login
+                ),
             )
+            if authenticated is None:
+                return None, auth_service.login_retry_after_seconds(
+                    client_key,
+                    data.get('username', ''),
+                ), None
+            if current_principal is not None and current_session:
+                session, _ = auth_service.replace_session(
+                    authenticated,
+                    current_session,
+                    **metadata,
+                )
+            else:
+                session, _ = auth_service.create_session(
+                    authenticated,
+                    **metadata,
+                )
+            return authenticated, 0, session
+
+        principal, retry_after_seconds, raw_session = await run_db(_authenticate_login)
+        if principal is None:
             if retry_after_seconds:
                 locale = normalize_login_locale(data.get('locale') or requested_locale)
                 minutes = max(1, math.ceil(retry_after_seconds / 60))
@@ -2016,18 +2093,6 @@ window.location.assign(payload.redirect||'/');
                 cache_control='no-store',
             )
 
-        current_session = request_session_token(request)
-        if current_principal is not None and current_session:
-            raw_session, _ = auth_service.replace_session(
-                principal,
-                current_session,
-                **session_client_metadata(request),
-            )
-        else:
-            raw_session, _ = auth_service.create_session(
-                principal,
-                **session_client_metadata(request),
-            )
         logged_in = response(
             {'redirect': next_path},
             cache_control='no-store',
@@ -2037,7 +2102,7 @@ window.location.assign(payload.redirect||'/');
         return logged_in
 
     async def logout(request):
-        auth_service.revoke_session(request.cookies.get(SESSION_COOKIE))
+        await run_db(auth_service.revoke_session, request.cookies.get(SESSION_COOKIE))
         redirect = RedirectResponse(
             '/login',
             status_code=303,
@@ -2049,9 +2114,14 @@ window.location.assign(payload.redirect||'/');
     async def session(request):
         principal = require_principal(request)
         raw_session = request_session_token(request)
-        user = store.get_user(principal.user_id)
-        oidc_settings = store.get_oidc_settings()
-        oidc_identities = user_oidc_identities(user)
+
+        def _session_state():
+            user = store.get_user(principal.user_id)
+            settings = store.get_oidc_settings()
+            identities = user_oidc_identities(user)
+            return settings, identities
+
+        oidc_settings, oidc_identities = await run_db(_session_state)
         return response(
             {
                 'user': {
@@ -2106,34 +2176,44 @@ window.location.assign(payload.redirect||'/');
                 error_payload('invalid_password', 'Invalid password'),
                 400,
             )
-        authenticated = auth_service.authenticate_password(
-            principal.username,
-            current_password,
-            client_key(request),
-        )
-        if authenticated is None or authenticated.user_id != principal.user_id:
+
+        def _change_password():
+            authenticated = auth_service.authenticate_password(
+                principal.username,
+                current_password,
+                client_key(request),
+            )
+            if authenticated is None or authenticated.user_id != principal.user_id:
+                return False
+            store.set_password_hash_and_revoke_sessions(
+                principal.user_id,
+                hash_password(new_password),
+            )
+            return True
+
+        if not await run_db(_change_password):
             return response(
                 error_payload('invalid_credentials', 'Invalid username or password'),
                 401,
             )
-        store.set_password_hash_and_revoke_sessions(
-            principal.user_id,
-            hash_password(new_password),
-        )
         changed = response({'message': 'Password changed'})
         delete_session_cookie(changed)
         return changed
 
     async def list_own_sessions(request):
         principal = require_principal(request)
-        current_session_id = store.session_id_from_token(
-            request_session_token(request),
-            user_id=principal.user_id,
-        )
-        sessions = store.list_sessions(
-            principal.user_id,
-            active_only=True,
-        )
+
+        def _list_sessions():
+            current_session_id = store.session_id_from_token(
+                request_session_token(request),
+                user_id=principal.user_id,
+            )
+            return current_session_id, store.list_sessions(
+                principal.user_id,
+                active_only=True,
+            )
+
+        current_session_id, sessions = await run_db(_list_sessions)
         return response(
             {
                 'sessions': [
@@ -2146,11 +2226,19 @@ window.location.assign(payload.redirect||'/');
     async def revoke_own_session(request):
         principal = require_principal(request)
         session_id = request.path_params['session_id']
-        current_session_id = store.session_id_from_token(
-            request_session_token(request),
-            user_id=principal.user_id,
-        )
-        if not store.revoke_user_session(principal.user_id, session_id):
+
+        def _revoke_session():
+            current_session_id = store.session_id_from_token(
+                request_session_token(request),
+                user_id=principal.user_id,
+            )
+            return current_session_id, store.revoke_user_session(
+                principal.user_id,
+                session_id,
+            )
+
+        current_session_id, revoked_ok = await run_db(_revoke_session)
+        if not revoked_ok:
             return response(error_payload('not_found', 'Session not found'), 404)
         revoked = response({'message': 'Session revoked'})
         if session_id == current_session_id:
@@ -2177,12 +2265,14 @@ window.location.assign(payload.redirect||'/');
     async def own_personal_access_tokens(request):
         principal = require_principal(request)
         if request.method == 'GET':
+            tokens = await run_db(
+                store.list_personal_access_tokens,
+                principal.user_id,
+            )
             return response({
                 'personal_access_tokens': [
                     personal_access_token_data(record)
-                    for record in store.list_personal_access_tokens(
-                        principal.user_id
-                    )
+                    for record in tokens
                 ]
             })
         data = await json_object(request)
@@ -2202,31 +2292,41 @@ window.location.assign(payload.redirect||'/');
                 error_payload('invalid_personal_access_token', 'Invalid personal access token'),
                 400,
             )
-        authenticated = auth_service.authenticate_password(
-            principal.username,
-            current_password,
-            client_key(request),
-        )
-        if authenticated is None or authenticated.user_id != principal.user_id:
-            return response(
-                error_payload('invalid_credentials', 'Invalid username or password'),
-                401,
-            )
-        if 'admin:data:read' in scopes and principal.role != 'admin':
-            return response(error_payload('forbidden', 'Forbidden'), 403)
         expires_at = (
             None
             if expires_in_days is None
             else time.time() + expires_in_days * 24 * 60 * 60
         )
-        try:
-            issued = store.create_personal_access_token(
-                principal.user_id,
-                name,
-                scopes,
-                expires_at=expires_at,
+
+        def _issue_token():
+            authenticated = auth_service.authenticate_password(
+                principal.username,
+                current_password,
+                client_key(request),
             )
-        except ValueError:
+            if authenticated is None or authenticated.user_id != principal.user_id:
+                return 'invalid_credentials', None
+            if 'admin:data:read' in scopes and principal.role != 'admin':
+                return 'forbidden', None
+            try:
+                return 'ok', store.create_personal_access_token(
+                    principal.user_id,
+                    name,
+                    scopes,
+                    expires_at=expires_at,
+                )
+            except ValueError:
+                return 'invalid_token', None
+
+        outcome, issued = await run_db(_issue_token)
+        if outcome == 'invalid_credentials':
+            return response(
+                error_payload('invalid_credentials', 'Invalid username or password'),
+                401,
+            )
+        if outcome == 'forbidden':
+            return response(error_payload('forbidden', 'Forbidden'), 403)
+        if outcome == 'invalid_token':
             return response(
                 error_payload('invalid_personal_access_token', 'Invalid personal access token'),
                 400,
@@ -2238,7 +2338,8 @@ window.location.assign(payload.redirect||'/');
 
     async def revoke_own_personal_access_token(request):
         principal = require_principal(request)
-        if not store.revoke_personal_access_token(
+        if not await run_db(
+            store.revoke_personal_access_token,
             principal.user_id,
             request.path_params['token_id'],
         ):
@@ -2248,7 +2349,7 @@ window.location.assign(payload.redirect||'/');
     async def admin_oidc_settings(request):
         require_admin(request)
         if request.method == 'GET':
-            settings = store.get_oidc_settings()
+            settings = await run_db(store.get_oidc_settings)
             suggestion = str(request.base_url).rstrip('/') + '/auth/oidc/callback'
             return response(
                 {
@@ -2306,7 +2407,7 @@ window.location.assign(payload.redirect||'/');
                 400,
                 'private, no-store',
             )
-        current = store._get_oidc_provider_settings()
+        current = await run_db(store._get_oidc_provider_settings)
         candidate_secret = (
             ''
             if clear_secret
@@ -2331,7 +2432,8 @@ window.location.assign(payload.redirect||'/');
                 if not candidate_secret or candidate is None:
                     raise OIDCError('configuration_invalid')
                 await oidc_service.validate_configuration(candidate)
-            saved = store.replace_oidc_settings(
+            saved = await run_db(
+                store.replace_oidc_settings,
                 enabled=data['enabled'],
                 provider_name=data['provider_name'],
                 issuer_url=data['issuer_url'],
@@ -2369,12 +2471,19 @@ window.location.assign(payload.redirect||'/');
         if data is None or not set(data) <= {'next'}:
             return response(error_payload('invalid_oidc_link', 'Invalid OIDC link request'), 400)
         next_path = _safe_relative_path(data.get('next', '/account'), '/account')
-        settings = store.get_oidc_settings()
+
+        def _oidc_link_state():
+            return (
+                store.get_oidc_settings(),
+                store.list_oidc_identities(principal.user_id),
+            )
+
+        settings, identities = await run_db(_oidc_link_state)
         if not settings.enabled:
             return response(error_payload('oidc_disabled', 'OIDC is disabled'), 409)
         if any(
             identity.issuer == settings.issuer_url
-            for identity in store.list_oidc_identities(principal.user_id)
+            for identity in identities
         ):
             return response(error_payload('oidc_already_linked', 'OIDC identity is already linked'), 409)
         target = (
@@ -2400,60 +2509,79 @@ window.location.assign(payload.redirect||'/');
 
     async def account_oidc_identity(request):
         principal = require_principal(request)
-        settings = store.get_oidc_settings()
-        issuer = selected_identity_issuer(
-            principal.user_id,
-            settings,
-            request.query_params.get('issuer'),
-        )
-        if issuer is None:
-            return response(error_payload('oidc_identity_not_found', 'OIDC identity not found'), 404)
-        try:
-            removed = store.unlink_oidc_identity(
+        requested_issuer = request.query_params.get('issuer')
+
+        def _unlink_identity():
+            settings = store.get_oidc_settings()
+            issuer = selected_identity_issuer(
                 principal.user_id,
-                issuer,
-                allow_member_password_login=(
-                    not settings.enabled or settings.allow_member_password_login
-                ),
+                settings,
+                requested_issuer,
             )
-        except RuntimeError:
+            if issuer is None:
+                return 'not_found'
+            try:
+                removed = store.unlink_oidc_identity(
+                    principal.user_id,
+                    issuer,
+                    allow_member_password_login=(
+                        not settings.enabled or settings.allow_member_password_login
+                    ),
+                )
+            except RuntimeError:
+                return 'last_login_method'
+            return 'ok' if removed else 'not_found'
+
+        outcome = await run_db(_unlink_identity)
+        if outcome == 'last_login_method':
             return response(
                 error_payload('oidc_last_login_method', 'Cannot remove the only login method'),
                 409,
             )
-        if not removed:
+        if outcome == 'not_found':
             return response(error_payload('oidc_identity_not_found', 'OIDC identity not found'), 404)
         return Response(status_code=204)
 
     async def admin_user_oidc_identity(request):
         require_admin(request)
-        try:
-            user = store.get_user_by_username(request.path_params['username'])
-        except ValueError:
-            user = None
-        if user is None:
+        username = request.path_params['username']
+        requested_issuer = request.query_params.get('issuer')
+
+        def _unlink_identity():
+            try:
+                user = store.get_user_by_username(username)
+            except ValueError:
+                user = None
+            if user is None:
+                return 'user_not_found'
+            settings = store.get_oidc_settings()
+            issuer = selected_identity_issuer(
+                user.user_id,
+                settings,
+                requested_issuer,
+            )
+            if issuer is None:
+                return 'identity_not_found'
+            removed = store.unlink_oidc_identity(
+                user.user_id,
+                issuer,
+                allow_member_password_login=True,
+                force=True,
+            )
+            return 'ok' if removed else 'identity_not_found'
+
+        outcome = await run_db(_unlink_identity)
+        if outcome == 'user_not_found':
             return response(error_payload('not_found', 'User not found'), 404)
-        settings = store.get_oidc_settings()
-        issuer = selected_identity_issuer(
-            user.user_id,
-            settings,
-            request.query_params.get('issuer'),
-        )
-        if issuer is None or not store.unlink_oidc_identity(
-            user.user_id,
-            issuer,
-            allow_member_password_login=True,
-            force=True,
-        ):
+        if outcome != 'ok':
             return response(error_payload('oidc_identity_not_found', 'OIDC identity not found'), 404)
         return Response(status_code=204)
 
     async def admin_users(request):
         require_admin(request)
         if request.method == 'GET':
-            return response(
-                {'users': [user_data(user) for user in store.list_users()]}
-            )
+            users = await run_db(store.list_users)
+            return response({'users': [user_data(user) for user in users]})
         data = await json_object(request)
         if data is None:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
@@ -2471,31 +2599,44 @@ window.location.assign(payload.redirect||'/');
                 error_payload('invalid_user', 'Invalid user data'),
                 400,
             )
-        try:
-            principal = store.create_user(
+        def _create_user():
+            return store.create_user(
                 username,
                 hash_password(password),
                 role=role,
             )
+
+        try:
+            created = await run_db(_create_user)
         except (ValueError, sqlite3.IntegrityError):
             return response(
                 error_payload('username_unavailable', 'Username is unavailable'),
                 409,
             )
+        setup_state.request_revalidate()
+        refreshed = await run_db(store.get_user_by_username, created.username)
         return response(
-            {'user': user_data(store.get_user_by_username(principal.username))},
+            {'user': user_data(refreshed)},
             201,
         )
 
     async def admin_user_deletion_impact(request):
         principal = require_admin(request)
-        try:
-            user = store.get_user_by_username(request.path_params['username'])
-        except ValueError:
-            user = None
-        if user is None:
+        username = request.path_params['username']
+
+        def _deletion_impact():
+            try:
+                target = store.get_user_by_username(username)
+            except ValueError:
+                return 'not_found', None, None
+            if target.user_id == principal.user_id:
+                return 'self', None, None
+            return 'ok', target, store.user_deletion_impact(target.user_id)
+
+        outcome, user, impact = await run_db(_deletion_impact)
+        if outcome == 'not_found':
             return response(error_payload('not_found', 'User not found'), 404)
-        if user.user_id == principal.user_id:
+        if outcome == 'self':
             return response(
                 error_payload(
                     'self_deletion_forbidden',
@@ -2503,15 +2644,19 @@ window.location.assign(payload.redirect||'/');
                 ),
                 409,
             )
-        return response({'impact': store.user_deletion_impact(user.user_id)})
+        return response({'impact': impact})
 
     async def admin_user(request):
         principal = require_admin(request)
         username = request.path_params['username']
-        try:
-            user = store.get_user_by_username(username)
-        except ValueError:
-            user = None
+
+        def _get_user():
+            try:
+                return store.get_user_by_username(username)
+            except ValueError:
+                return None
+
+        user = await run_db(_get_user)
         if user is None:
             return response(error_payload('not_found', 'User not found'), 404)
         data = await json_object(request)
@@ -2524,7 +2669,8 @@ window.location.assign(payload.redirect||'/');
                     error_payload('invalid_user', 'Invalid user data'), 400
                 )
             try:
-                store.delete_user(
+                await run_db(
+                    store.delete_user,
                     user.user_id,
                     replacement_user_id=principal.user_id,
                     confirmation=confirmation,
@@ -2534,6 +2680,7 @@ window.location.assign(payload.redirect||'/');
                 if error.impact is not None:
                     payload['impact'] = error.impact
                 return response(payload, 409)
+            setup_state.request_revalidate()
             return Response(status_code=204)
         supported = {'enabled', 'role', 'revoke_sessions'}
         if not supported.intersection(data):
@@ -2548,7 +2695,8 @@ window.location.assign(payload.redirect||'/');
         ):
             return response(error_payload('invalid_user', 'Invalid user data'), 400)
         try:
-            updated = store.update_user(
+            updated = await run_db(
+                store.update_user,
                 user.user_id,
                 enabled=enabled if 'enabled' in data else None,
                 role=role if 'role' in data else None,
@@ -2562,15 +2710,20 @@ window.location.assign(payload.redirect||'/');
                 ),
                 409,
             )
+        setup_state.request_revalidate()
         return response({'user': user_data(updated)})
 
     async def admin_reset_password(request):
         require_admin(request)
         username = request.path_params['username']
-        try:
-            user = store.get_user_by_username(username)
-        except ValueError:
-            user = None
+
+        def _get_user():
+            try:
+                return store.get_user_by_username(username)
+            except ValueError:
+                return None
+
+        user = await run_db(_get_user)
         if user is None:
             return response(error_payload('not_found', 'User not found'), 404)
         data = await json_object(request)
@@ -2580,18 +2733,21 @@ window.location.assign(payload.redirect||'/');
                 error_payload('invalid_password', 'Invalid password'),
                 400,
             )
-        updated = store.set_password_hash_and_revoke_sessions(
-            user.user_id,
-            hash_password(password),
-            revoke_personal_access_tokens=True,
-        )
+
+        def _reset_password():
+            return store.set_password_hash_and_revoke_sessions(
+                user.user_id,
+                hash_password(password),
+                revoke_personal_access_tokens=True,
+            )
+
+        updated = await run_db(_reset_password)
         return response({'user': user_data(updated)})
 
     async def admin_books(request):
         require_admin(request)
-        return response(
-            {'books': [admin_book_data(book) for book in store.active_books()]}
-        )
+        books = await run_db(store.active_books)
+        return response({'books': [admin_book_data(book) for book in books]})
 
     async def admin_books_upload(request):
         require_admin(request)
@@ -2612,35 +2768,51 @@ window.location.assign(payload.redirect||'/');
             return response(
                 error_payload("book_source_exists", "A book source with this name already exists"), 409
             )
+        def _read_upload_head(path):
+            with path.open('rb') as probe:
+                return probe.read(5)
+
         temp = upload_sources_dir / (".upload-" + secrets.token_urlsafe(24))
+        output = None
         try:
-            with temp.open("xb") as output:
-                async for chunk in request.stream():
-                    output.write(chunk)
-            with temp.open("rb") as probe:
-                head = probe.read(5)
+            output = await run_io(temp.open, 'xb')
+            buffer = bytearray()
+            async for chunk in request.stream():
+                buffer.extend(chunk)
+                if len(buffer) >= 1024 * 1024:
+                    payload = bytes(buffer)
+                    buffer.clear()
+                    await run_io(output.write, payload)
+            if buffer:
+                await run_io(output.write, bytes(buffer))
+            await run_io(output.close)
+            output = None
+            head = await run_io(_read_upload_head, temp)
             if not _is_valid_book_magic(head, filename):
                 return response(
                     error_payload("unsupported_source", "The uploaded file is not a valid EPUB or PDF"), 400
                 )
-            os.replace(temp, target)
+            await run_io(os.replace, temp, target)
         except OSError:
             return response(
                 error_payload("source_upload_failed", "Failed to store the uploaded file"), 400
             )
         finally:
-            temp.unlink(missing_ok=True)
+            if output is not None:
+                try:
+                    await run_io(output.close)
+                except OSError:
+                    pass
+            await run_io(temp.unlink, missing_ok=True)
         if library_manager is not None:
             library_manager.queue_path(target)
         return response({"filename": filename}, 201)
 
     async def admin_book_index(request):
         require_admin(request)
+        summaries = await run_db(store.list_admin_book_summaries)
         return response({
-            'books': [
-                admin_book_summary_data(book)
-                for book in store.list_admin_book_summaries()
-            ]
+            'books': [admin_book_summary_data(book) for book in summaries]
         })
 
     async def admin_bulk_books(request):
@@ -2666,11 +2838,13 @@ window.location.assign(payload.redirect||'/');
             ))
         ):
             return response(error_payload('invalid_bulk_book_update', 'Invalid bulk book update'), 400)
-        try:
+        def _bulk_update():
             if operation == 'restrict':
-                updated_book_ids = store.bulk_set_book_visibility(book_ids, 'restricted')
-            else:
-                updated_book_ids = store.bulk_grant_book_access(book_ids, user_ids)
+                return store.bulk_set_book_visibility(book_ids, 'restricted')
+            return store.bulk_grant_book_access(book_ids, user_ids)
+
+        try:
+            updated_book_ids = await run_db(_bulk_update)
         except (KeyError, ValueError):
             return response(error_payload('invalid_bulk_book_update', 'Invalid bulk book update'), 400)
         return response({'operation': operation, 'updated_count': len(updated_book_ids)})
@@ -2680,7 +2854,7 @@ window.location.assign(payload.redirect||'/');
         book_id = request.path_params['book_id']
         if request.method in {'GET', 'HEAD'}:
             try:
-                book = store.get_admin_book_detail(book_id)
+                book = await run_db(store.get_admin_book_detail, book_id)
             except KeyError:
                 return response(error_payload('not_found', 'Book not found'), 404)
             return response({'book': admin_book_detail_data(book)})
@@ -2694,7 +2868,7 @@ window.location.assign(payload.redirect||'/');
                 400,
             )
         try:
-            book = store.set_book_visibility(book_id, visibility)
+            book = await run_db(store.set_book_visibility, book_id, visibility)
         except KeyError:
             return response(error_payload('not_found', 'Book not found'), 404)
         return response({'book': admin_book_data(book)})
@@ -2758,19 +2932,21 @@ window.location.assign(payload.redirect||'/');
                 400,
             )
         try:
-            store.get_admin_book_detail(book_id)
+            await run_db(store.get_admin_book_detail, book_id)
         except KeyError:
             return response(error_payload('not_found', 'Book not found'), 404)
+        settings = {
+            'visibility': visibility,
+            'user_ids': user_ids,
+            'tag_ids': tag_ids,
+            'profile': profile,
+        }
+        if 'title' in data:
+            settings.update({'title': title, 'authors': authors})
         try:
-            settings = {
-                'visibility': visibility,
-                'user_ids': user_ids,
-                'tag_ids': tag_ids,
-                'profile': profile,
-            }
-            if 'title' in data:
-                settings.update({'title': title, 'authors': authors})
-            book, summary = store.update_admin_book_settings(book_id, **settings)
+            book, summary = await run_db(
+                store.update_admin_book_settings, book_id, **settings
+            )
         except (KeyError, ValueError):
             return response(
                 error_payload(
@@ -2837,11 +3013,11 @@ window.location.assign(payload.redirect||'/');
         book_id = request.path_params['book_id']
         user_id = request.path_params['user_id']
         try:
-            store.get_book(book_id)
+            await run_db(store.get_book, book_id)
         except KeyError:
             return response(error_payload('not_found', 'Book not found'), 404)
         try:
-            user = store.get_user(user_id)
+            user = await run_db(store.get_user, user_id)
         except (KeyError, ValueError):
             return response(error_payload('not_found', 'User not found'), 404)
         if not user.enabled:
@@ -2850,10 +3026,10 @@ window.location.assign(payload.redirect||'/');
                 400,
             )
         if request.method == 'PUT':
-            store.grant_book_access(book_id, user_id)
+            await run_db(store.grant_book_access, book_id, user_id)
             granted = True
         else:
-            store.revoke_book_access(book_id, user_id)
+            await run_db(store.revoke_book_access, book_id, user_id)
             granted = False
         return response(
             {
@@ -2882,7 +3058,7 @@ window.location.assign(payload.redirect||'/');
                 400,
             )
         try:
-            grants = store.replace_book_grants(book_id, user_ids)
+            grants = await run_db(store.replace_book_grants, book_id, user_ids)
         except KeyError:
             return response(
                 error_payload('not_found', 'Book or user not found'),
@@ -2905,7 +3081,8 @@ window.location.assign(payload.redirect||'/');
     async def admin_ai_settings(request):
         require_admin(request)
         if request.method == 'GET':
-            return response({'settings': store.get_ai_settings()})
+            settings = await run_db(store.get_ai_settings)
+            return response({'settings': settings})
         data = await json_object(request)
         if data is None:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
@@ -2917,7 +3094,7 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('invalid_ai_settings', 'Invalid AI settings'), 400)
         api_key = data.get('api_key') if 'api_key' in data else None
         clear_api_key = data.get('clear_api_key', False)
-        current_settings = store.get_ai_settings()
+        current_settings = await run_db(store.get_ai_settings)
         model_context_window = data.get(
             'model_context_window',
             data.get('chat_context_tokens', current_settings['model_context_window']),
@@ -2941,7 +3118,8 @@ window.location.assign(payload.redirect||'/');
         try:
             if data['enabled']:
                 validate_provider_base_url(data['base_url'])
-            settings = store.set_ai_settings(
+            settings = await run_db(
+                store.set_ai_settings,
                 enabled=data['enabled'],
                 base_url=data['base_url'],
                 api_key=api_key,
@@ -2959,7 +3137,8 @@ window.location.assign(payload.redirect||'/');
     async def admin_general_settings(request):
         require_admin(request)
         if request.method == 'GET':
-            return response({'settings': store.get_general_settings()})
+            settings = await run_db(store.get_general_settings)
+            return response({'settings': settings})
         data = await json_object(request)
         if data is None:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
@@ -2969,7 +3148,8 @@ window.location.assign(payload.redirect||'/');
                 400,
             )
         try:
-            settings = store.set_general_settings(
+            settings = await run_db(
+                store.set_general_settings,
                 recent_reading_limit=data['recent_reading_limit'],
             )
         except ValueError:
@@ -2982,14 +3162,19 @@ window.location.assign(payload.redirect||'/');
     async def admin_ai_user_access(request):
         require_admin(request)
         user_id = request.path_params['user_id']
-        try:
-            user = store.get_user(user_id)
-        except (KeyError, ValueError):
-            user = None
+
+        def _get_user():
+            try:
+                return store.get_user(user_id)
+            except (KeyError, ValueError):
+                return None
+
+        user = await run_db(_get_user)
         if user is None:
             return response(error_payload('not_found', 'User not found'), 404)
         if request.method == 'GET':
-            return response({'access': store.get_ai_user_access(user_id)})
+            access = await run_db(store.get_ai_user_access, user_id)
+            return response({'access': access})
         data = await json_object(request)
         limit = data.get('daily_limit') if isinstance(data, dict) else None
         if (
@@ -3003,25 +3188,28 @@ window.location.assign(payload.redirect||'/');
         ):
             return response(error_payload('invalid_ai_access', 'Invalid AI access'), 400)
         try:
-            store.set_ai_user_access(
+            await run_db(
+                store.set_ai_user_access,
                 user_id,
                 enabled=data['enabled'],
                 daily_limit=limit if 'daily_limit' in data else None,
             )
         except ValueError:
             return response(error_payload('invalid_ai_access', 'Invalid AI access'), 400)
-        return response({'access': store.get_ai_user_access(user_id)})
+        access = await run_db(store.get_ai_user_access, user_id)
+        return response({'access': access})
 
     async def admin_ai_tags(request):
         require_admin(request)
         if request.method == 'GET':
-            return response({'tags': list(store.list_ai_tags())})
+            tags = await run_db(store.list_ai_tags)
+            return response({'tags': list(tags)})
         data = await json_object(request)
         name = data.get('name') if isinstance(data, dict) else None
         if not isinstance(name, str):
             return response(error_payload('invalid_ai_tag', 'Invalid tag'), 400)
         try:
-            tag = store.create_ai_tag(name)
+            tag = await run_db(store.create_ai_tag, name)
         except ValueError:
             return response(error_payload('invalid_ai_tag', 'Invalid tag'), 400)
         return response({'tag': tag}, 201)
@@ -3030,7 +3218,7 @@ window.location.assign(payload.redirect||'/');
         require_admin(request)
         tag_id = request.path_params['tag_id']
         if request.method == 'DELETE':
-            if not store.delete_ai_tag(tag_id):
+            if not await run_db(store.delete_ai_tag, tag_id):
                 return response(error_payload('not_found', 'Tag not found'), 404)
             return response({'message': 'Tag deleted'})
         data = await json_object(request)
@@ -3038,7 +3226,7 @@ window.location.assign(payload.redirect||'/');
         if not isinstance(name, str):
             return response(error_payload('invalid_ai_tag', 'Invalid tag'), 400)
         try:
-            tag = store.rename_ai_tag(tag_id, name)
+            tag = await run_db(store.rename_ai_tag, tag_id, name)
         except KeyError:
             return response(error_payload('not_found', 'Tag not found'), 404)
         except ValueError:
@@ -3049,14 +3237,22 @@ window.location.assign(payload.redirect||'/');
         require_admin(request)
         book_id = request.path_params['book_id']
         try:
-            store.get_book(book_id)
+            await run_db(store.get_book, book_id)
         except KeyError:
             return response(error_payload('not_found', 'Book not found'), 404)
         if request.method in {'GET', 'HEAD'}:
+            def _book_ai_state():
+                return (
+                    store.get_book_ai_profile(book_id),
+                    store.book_ai_tags(book_id),
+                    store.effective_book_tags(book_id),
+                )
+
+            profile, tags, effective_tags = await run_db(_book_ai_state)
             return response({
-                'profile': store.get_book_ai_profile(book_id),
-                'tags': list(store.book_ai_tags(book_id)),
-                'effective_tags': list(store.effective_book_tags(book_id)),
+                'profile': profile,
+                'tags': list(tags),
+                'effective_tags': list(effective_tags),
             })
         data = await json_object(request)
         if data is None:
@@ -3076,7 +3272,8 @@ window.location.assign(payload.redirect||'/');
         ):
             return response(error_payload('invalid_book_ai', 'Invalid book AI settings'), 400)
         try:
-            current_profile, current_tags = store.update_book_ai_settings(
+            current_profile, current_tags = await run_db(
+                store.update_book_ai_settings,
                 book_id,
                 profile=profile if has_profile else None,
                 tag_ids=tag_ids if has_tag_ids else None,
@@ -3101,13 +3298,14 @@ window.location.assign(payload.redirect||'/');
             or (revision is not None and (isinstance(revision, bool) or not isinstance(revision, int)))
         ):
             return response(error_payload('invalid_ai_cache_scope', 'Invalid AI cache scope'), 400)
-        if book_id is not None and store.book_by_id(book_id) is None:
+        if book_id is not None and await run_db(store.book_by_id, book_id) is None:
             return response(error_payload('not_found', 'Book not found'), 404)
-        return response({
-            'deleted': store.clear_ai_reading_results(
-                book_id=book_id, config_revision=revision
-            )
-        })
+        deleted = await run_db(
+            store.clear_ai_reading_results,
+            book_id=book_id,
+            config_revision=revision,
+        )
+        return response({'deleted': deleted})
 
     def admin_ai_job_query(request):
         query = request.query_params
@@ -3148,8 +3346,11 @@ window.location.assign(payload.redirect||'/');
         require_admin(request)
         try:
             status, page, page_size = admin_ai_job_query(request)
-            jobs, total = store.list_admin_ai_jobs(
-                status=status, page=page, page_size=page_size
+            jobs, total = await run_db(
+                store.list_admin_ai_jobs,
+                status=status,
+                page=page,
+                page_size=page_size,
             )
         except ValueError:
             return response(
@@ -3209,25 +3410,42 @@ window.location.assign(payload.redirect||'/');
 
     async def ai_status(request):
         principal = require_principal(request)
-        settings = store.get_ai_settings()
+
+        def _ai_status():
+            settings = store.get_ai_settings()
+            authorized = settings['enabled'] and store.can_use_ai(principal)
+            return settings, authorized, (
+                store.ai_daily_limit(principal) if authorized else None
+            )
+
+        settings, authorized, daily_limit = await run_db(_ai_status)
         return response({
             'enabled': settings['enabled'],
-            'authorized': settings['enabled'] and store.can_use_ai(principal),
-            'daily_limit': store.ai_daily_limit(principal) if store.can_use_ai(principal) else None,
+            'authorized': authorized,
+            'daily_limit': daily_limit,
         })
 
     async def book_effective_metadata(request):
         principal = require_principal(request)
         book_id = request.path_params['book_id']
-        if not store.can_read_book(principal.user_id, principal.role, book_id):
+
+        def _effective_metadata():
+            if not store.can_read_book(
+                principal.user_id, principal.role, book_id
+            ):
+                return None
+            metadata = store.managed_book_metadata(book_id)
+            return {
+                'title': metadata['title'],
+                'authors': list(metadata['authors']),
+                'tags': list(metadata['tags']),
+                'ai_profile': store.get_book_ai_profile(book_id),
+            }
+
+        metadata = await run_db(_effective_metadata)
+        if metadata is None:
             return response(error_payload('forbidden', 'Forbidden'), 403)
-        metadata = store.managed_book_metadata(book_id)
-        return response({
-            'title': metadata['title'],
-            'authors': list(metadata['authors']),
-            'tags': list(metadata['tags']),
-            'ai_profile': store.get_book_ai_profile(book_id),
-        })
+        return response(metadata)
 
     def book_language(book_id):
         book = store.book_by_id(book_id)
@@ -3243,13 +3461,15 @@ window.location.assign(payload.redirect||'/');
     async def dictionary_lookup(request):
         principal = require_principal(request)
         book_id = request.path_params["book_id"]
-        if book_access_denied(principal, book_id):
+        if await run_db(book_access_denied, principal, book_id):
             return forbidden_book_response()
         data, error = await bounded_public_json_object(request, maximum_size=2048)
         if error or not isinstance(data.get("text"), str) or not isinstance(data.get("dictionary_id"), str):
             return response(error_payload("invalid_dictionary_query", "Invalid dictionary query"), 400, "private, no-store")
         try:
-            result = dictionary_service.lookup(data["dictionary_id"], data["text"])
+            result = await run_io(
+                dictionary_service.lookup, data["dictionary_id"], data["text"]
+            )
         except DictionaryServiceError as error:
             status = 404 if error.code == "dictionary_unavailable" else 400
             return response(error_payload(error.code, "Dictionary lookup failed"), status, "private, no-store")
@@ -3270,28 +3490,44 @@ window.location.assign(payload.redirect||'/');
     async def dictionary_choices(request):
         principal = require_principal(request)
         book_id = request.path_params["book_id"]
-        if book_access_denied(principal, book_id):
+        if await run_db(book_access_denied, principal, book_id):
             return forbidden_book_response()
-        available = list(dictionary_service.list_available())
-        default = dictionary_service.store.get_global_dictionary_default()
-        default_dictionary_id = default.id if default and any(
-            record.id == default.id for record in available
-        ) else None
-        if default_dictionary_id:
-            available.sort(key=lambda record: record.id != default_dictionary_id)
-        return response({"default_dictionary_id": default_dictionary_id, "dictionaries": [
-            {"id": record.id, "display_name": record.display_name, "entry_count": record.entry_count}
-            for record in available
-        ]}, cache_control="private, no-store")
+
+        def _dictionary_choices():
+            available = list(dictionary_service.list_available())
+            default = dictionary_service.store.get_global_dictionary_default()
+            default_dictionary_id = default.id if default and any(
+                record.id == default.id for record in available
+            ) else None
+            if default_dictionary_id:
+                available.sort(
+                    key=lambda record: record.id != default_dictionary_id
+                )
+            return default_dictionary_id, [
+                {
+                    "id": record.id,
+                    "display_name": record.display_name,
+                    "entry_count": record.entry_count,
+                }
+                for record in available
+            ]
+
+        default_dictionary_id, dictionaries = await run_io(_dictionary_choices)
+        return response({
+            "default_dictionary_id": default_dictionary_id,
+            "dictionaries": dictionaries,
+        }, cache_control="private, no-store")
 
     async def dictionary_media(request):
         principal = require_principal(request)
         book_id = request.path_params["book_id"]
-        if book_access_denied(principal, book_id):
+        if await run_db(book_access_denied, principal, book_id):
             return forbidden_book_response()
         try:
-            media = dictionary_service.get_media(
-                request.path_params["dictionary_id"], request.path_params["media_id"],
+            media = await run_io(
+                dictionary_service.get_media,
+                request.path_params["dictionary_id"],
+                request.path_params["media_id"],
             )
         except DictionaryServiceError:
             return response(error_payload("not_found", "Not Found"), 404, "private, no-store")
@@ -3303,11 +3539,13 @@ window.location.assign(payload.redirect||'/');
     async def dictionary_asset(request):
         principal = require_principal(request)
         book_id = request.path_params["book_id"]
-        if book_access_denied(principal, book_id):
+        if await run_db(book_access_denied, principal, book_id):
             return forbidden_book_response()
         try:
-            asset = dictionary_service.get_asset(
-                request.path_params["dictionary_id"], request.path_params["asset_path"],
+            asset = await run_io(
+                dictionary_service.get_asset,
+                request.path_params["dictionary_id"],
+                request.path_params["asset_path"],
             )
         except DictionaryServiceError:
             return response(error_payload("not_found", "Not Found"), 404, "private, no-store")
@@ -3319,13 +3557,14 @@ window.location.assign(payload.redirect||'/');
     async def encyclopedia_lookup(request):
         principal = require_principal(request)
         book_id = request.path_params["book_id"]
-        if book_access_denied(principal, book_id):
+        if await run_db(book_access_denied, principal, book_id):
             return forbidden_book_response()
         data, error = await bounded_public_json_object(request, maximum_size=2048)
         if error or not isinstance(data.get("text"), str):
             return response(error_payload("invalid_encyclopedia_query", "Invalid encyclopedia query"), 400, "private, no-store")
         try:
-            result = await asyncio.to_thread(encyclopedia.lookup, book_language(book_id), data["text"])
+            language = await run_db(book_language, book_id)
+            result = await asyncio.to_thread(encyclopedia.lookup, language, data["text"])
         except EncyclopediaError as error:
             status = 429 if error.code == "encyclopedia_rate_limited" else 400
             return response(error_payload(error.code, "Encyclopedia lookup failed"), status, "private, no-store")
@@ -3352,14 +3591,18 @@ window.location.assign(payload.redirect||'/');
     async def admin_dictionaries(request):
         principal = require_admin(request)
         if request.method == "GET":
-            default = dictionary_service.store.get_global_dictionary_default()
-            default_dictionary_id = default.id if default else None
+            def _list_dictionaries():
+                default = dictionary_service.store.get_global_dictionary_default()
+                default_id = default.id if default else None
+                return default_id, [
+                    dictionary_record_data(item, default_id)
+                    for item in dictionary_service.store.list_dictionaries()
+                ]
+
+            default_dictionary_id, dictionaries = await run_io(_list_dictionaries)
             return response({
                 "default_dictionary_id": default_dictionary_id,
-                "dictionaries": [
-                    dictionary_record_data(item, default_dictionary_id)
-                    for item in dictionary_service.store.list_dictionaries()
-                ],
+                "dictionaries": dictionaries,
             })
         if not runtime_status.is_ready():
             return response(error_payload("not_ready", "Server is not ready"), 503)
@@ -3367,18 +3610,32 @@ window.location.assign(payload.redirect||'/');
         display_name = unquote(request.headers.get("x-epub-browser-dictionary-name", ""))
         dictionary_format = request.headers.get("x-epub-browser-dictionary-format", "")
         upload = dictionary_service.dictionary_directory / (".upload-" + secrets.token_urlsafe(24))
+        output = None
         try:
-            with upload.open("xb") as output:
-                async for chunk in request.stream():
-                    output.write(chunk)
+            output = await run_io(upload.open, "xb")
+            buffer = bytearray()
+            async for chunk in request.stream():
+                buffer.extend(chunk)
+                if len(buffer) >= 1024 * 1024:
+                    payload = bytes(buffer)
+                    buffer.clear()
+                    await run_io(output.write, payload)
+            if buffer:
+                await run_io(output.write, bytes(buffer))
+            await run_io(output.close)
+            output = None
             if dictionary_format == "mdict":
-                record = dictionary_service.install_mdict_package_file(
-                    upload, filename, created_by_user_id=principal.user_id,
+                record = await run_io(
+                    dictionary_service.install_mdict_package_file,
+                    upload, filename,
+                    created_by_user_id=principal.user_id,
                     display_name=display_name,
                 )
             elif dictionary_format == "stardict":
-                record = dictionary_service.install_stardict_package_file(
-                    upload, filename, created_by_user_id=principal.user_id,
+                record = await run_io(
+                    dictionary_service.install_stardict_package_file,
+                    upload, filename,
+                    created_by_user_id=principal.user_id,
                     display_name=display_name,
                 )
             else:
@@ -3387,8 +3644,13 @@ window.location.assign(payload.redirect||'/');
             code = error.code if isinstance(error, DictionaryServiceError) else "invalid_dictionary_archive"
             return response(error_payload(code, "Dictionary installation failed"), 400)
         finally:
-            upload.unlink(missing_ok=True)
-        default = dictionary_service.store.get_global_dictionary_default()
+            if output is not None:
+                try:
+                    await run_io(output.close)
+                except OSError:
+                    pass
+            await run_io(upload.unlink, missing_ok=True)
+        default = await run_io(dictionary_service.store.get_global_dictionary_default)
         return response({"dictionary": dictionary_record_data(
             record, default.id if default else None,
         )}, 201)
@@ -3397,8 +3659,10 @@ window.location.assign(payload.redirect||'/');
         principal = require_admin(request)
         dictionary_id = request.path_params["dictionary_id"]
         try:
-            record = dictionary_service.store.set_global_dictionary_default(
-                dictionary_id, principal.user_id,
+            record = await run_db(
+                dictionary_service.store.set_global_dictionary_default,
+                dictionary_id,
+                principal.user_id,
             )
         except KeyError:
             return response(error_payload("not_found", "Not Found"), 404)
@@ -3409,7 +3673,7 @@ window.location.assign(payload.redirect||'/');
         dictionary_id = request.path_params["dictionary_id"]
         if request.method == "DELETE":
             try:
-                dictionary_service.delete(dictionary_id)
+                await run_io(dictionary_service.delete, dictionary_id)
             except KeyError:
                 return response(error_payload("not_found", "Not Found"), 404)
             return Response(status_code=204, headers={"Cache-Control": "no-cache"})
@@ -3419,38 +3683,48 @@ window.location.assign(payload.redirect||'/');
         if "display_name" in data:
             if not isinstance(data["display_name"], str):
                 return response(error_payload("invalid_dictionary_name", "Invalid dictionary name"), 400)
-            try:
+            def _rename_dictionary():
                 record = dictionary_service.rename(dictionary_id, data["display_name"])
+                default = dictionary_service.store.get_global_dictionary_default()
+                return dictionary_record_data(record, default.id if default else None)
+
+            try:
+                payload = await run_io(_rename_dictionary)
             except KeyError:
                 return response(error_payload("not_found", "Not Found"), 404)
             except ValueError:
                 return response(error_payload("invalid_dictionary_name", "Invalid dictionary name"), 400)
-            default = dictionary_service.store.get_global_dictionary_default()
-            return response({"dictionary": dictionary_record_data(
-                record, default.id if default else None,
-            )})
+            return response({"dictionary": payload})
         if "allow_scripts" in data:
             if not isinstance(data["allow_scripts"], bool):
                 return response(error_payload("invalid_dictionary_update", "Invalid dictionary update"), 400)
-            try:
+
+            def _set_dictionary_scripts():
                 record = dictionary_service.set_script_execution_enabled(
                     dictionary_id, data["allow_scripts"],
                 )
+                default = dictionary_service.store.get_global_dictionary_default()
+                return dictionary_record_data(record, default.id if default else None)
+
+            try:
+                payload = await run_io(_set_dictionary_scripts)
             except KeyError:
                 return response(error_payload("not_found", "Not Found"), 404)
             except DictionaryServiceError:
                 return response(error_payload("dictionary_unavailable", "Dictionary unavailable"), 400)
-            default = dictionary_service.store.get_global_dictionary_default()
-            return response({"dictionary": dictionary_record_data(
-                record, default.id if default else None,
-            )})
+            return response({"dictionary": payload})
         if not isinstance(data.get("enabled"), bool):
             return response(error_payload("invalid_dictionary_update", "Invalid dictionary update"), 400)
-        try:
+
+        def _set_dictionary_enabled():
             record = dictionary_service.set_enabled(dictionary_id, data["enabled"])
+            return dictionary_record_data(record)
+
+        try:
+            payload = await run_io(_set_dictionary_enabled)
         except KeyError:
             return response(error_payload("not_found", "Not Found"), 404)
-        return response({"dictionary": dictionary_record_data(record)})
+        return response({"dictionary": payload})
 
     async def admin_dictionary_resources(request):
         require_admin(request)
@@ -3458,18 +3732,36 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload("not_ready", "Server is not ready"), 503)
         filename = unquote(request.headers.get("x-epub-browser-dictionary-filename", ""))
         upload = dictionary_service.dictionary_directory / (".resource-upload-" + secrets.token_urlsafe(24) + ".mdd")
+        output = None
         try:
-            with upload.open("xb") as output:
-                async for chunk in request.stream():
-                    output.write(chunk)
-            dictionary_service.attach_mdict_resources_file(
-                request.path_params["dictionary_id"], upload, filename,
+            output = await run_io(upload.open, "xb")
+            buffer = bytearray()
+            async for chunk in request.stream():
+                buffer.extend(chunk)
+                if len(buffer) >= 1024 * 1024:
+                    payload = bytes(buffer)
+                    buffer.clear()
+                    await run_io(output.write, payload)
+            if buffer:
+                await run_io(output.write, bytes(buffer))
+            await run_io(output.close)
+            output = None
+            await run_io(
+                dictionary_service.attach_mdict_resources_file,
+                request.path_params["dictionary_id"],
+                upload,
+                filename,
             )
         except (DictionaryServiceError, OSError, ValueError) as error:
             code = error.code if isinstance(error, DictionaryServiceError) else "invalid_mdict_resource"
             return response(error_payload(code, "Dictionary resource installation failed"), 400)
         finally:
-            upload.unlink(missing_ok=True)
+            if output is not None:
+                try:
+                    await run_io(output.close)
+                except OSError:
+                    pass
+            await run_io(upload.unlink, missing_ok=True)
         return Response(status_code=204, headers={"Cache-Control": "no-cache"})
 
     async def ai_reading_request(request):
@@ -3490,8 +3782,11 @@ window.location.assign(payload.redirect||'/');
             validate_reading_request(reading_request)
         except AIReadingError:
             return response(error_payload('invalid_ai_reading_request', 'Invalid AI reading request'), 400)
-        if not store.can_read_book(
-            principal.user_id, principal.role, reading_request.book_id
+        if not await run_db(
+            store.can_read_book,
+            principal.user_id,
+            principal.role,
+            reading_request.book_id,
         ):
             return response(error_payload('forbidden', 'Forbidden'), 403)
         try:
@@ -3502,23 +3797,35 @@ window.location.assign(payload.redirect||'/');
 
     async def ai_job(request):
         principal = require_principal(request)
-        job = store.get_ai_job(request.path_params['job_id'])
-        if job is None:
+        job_id = request.path_params['job_id']
+
+        def _job_state():
+            job = store.get_ai_job(job_id)
+            if job is None:
+                return 'not_found', None, None
+            if job.get('book_id'):
+                if not store.can_read_book(
+                    principal.user_id, principal.role, job['book_id']
+                ):
+                    return 'forbidden', None, None
+            elif job['owner_user_id'] != principal.user_id:
+                # Rows created before the shared-job migration lack the book
+                # reference required for authorization, keep them owner-only.
+                return 'not_found', None, None
+            result = (
+                store.get_ai_reading_result(job['result_id'])
+                if job.get('result_id') else None
+            )
+            if result is not None and not store.can_read_book(
+                principal.user_id, principal.role, result['book_id']
+            ):
+                return 'forbidden', None, None
+            return 'ok', job, result
+
+        outcome, job, result = await run_db(_job_state)
+        if outcome == 'not_found':
             return response(error_payload('not_found', 'AI job not found'), 404)
-        if job.get('book_id'):
-            if not store.can_read_book(principal.user_id, principal.role, job['book_id']):
-                return response(error_payload('forbidden', 'Forbidden'), 403)
-        elif job['owner_user_id'] != principal.user_id:
-            # Rows created before the shared-job migration lack the book
-            # reference required for authorization, so keep them owner-only.
-            return response(error_payload('not_found', 'AI job not found'), 404)
-        result = (
-            store.get_ai_reading_result(job['result_id'])
-            if job.get('result_id') else None
-        )
-        if result is not None and not store.can_read_book(
-            principal.user_id, principal.role, result['book_id']
-        ):
+        if outcome == 'forbidden':
             return response(error_payload('forbidden', 'Forbidden'), 403)
         return response({
             'job': _public_ai_job(job),
@@ -3551,7 +3858,9 @@ window.location.assign(payload.redirect||'/');
     async def ai_book_results(request):
         principal = require_principal(request)
         book_id = request.path_params['book_id']
-        if not store.can_read_book(principal.user_id, principal.role, book_id):
+        if not await run_db(
+            store.can_read_book, principal.user_id, principal.role, book_id
+        ):
             return response(error_payload('forbidden', 'Forbidden'), 403)
         chapter_index_raw = request.query_params.get('chapter_index')
         language = request.query_params.get('language')
@@ -3559,15 +3868,18 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('invalid_ai_reading_request', 'Invalid AI reading request'), 400)
         view = request.query_params.get('view')
         if view == 'indicators':
-            return response({
-                'results': list(store.list_ai_reading_result_indicators(
-                    book_id, language=language
-                )),
-            })
+            results = await run_db(
+                store.list_ai_reading_result_indicators,
+                book_id, language=language,
+            )
+            return response({'results': list(results)})
         if view == 'summary':
-            chapter_titles = ai_reading_chapter_titles(book_id)
+            chapter_titles = await run_io(ai_reading_chapter_titles, book_id)
+            summaries = await run_db(
+                store.list_ai_reading_library_summaries, book_id
+            )
             results = []
-            for result in store.list_ai_reading_library_summaries(book_id):
+            for result in summaries:
                 item = dict(result)
                 item['can_delete'] = (
                     principal.role == 'admin'
@@ -3589,10 +3901,12 @@ window.location.assign(payload.redirect||'/');
                 return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
             if chapter_index < 0:
                 return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
+        results = await run_db(
+            store.list_ai_reading_results,
+            book_id, chapter_index=chapter_index, language=language,
+        )
         return response({
-            'results': list(store.list_ai_reading_results(
-                book_id, chapter_index=chapter_index, language=language
-            )),
+            'results': list(results),
             # Clients use this to avoid treating an older result schema as
             # the active reading layer while retaining it in the history hub.
             'current_template_version': template_for('chapter', 'chapter')['version'],
@@ -3610,77 +3924,98 @@ window.location.assign(payload.redirect||'/');
                 error_payload('invalid_ai_reading_request', 'Invalid AI reading request'),
                 400,
             )
-        visible_books = list(store.visible_books(principal))
-        result_counts = (
-            store.ai_reading_result_counts()
-            if view == 'summary'
-            else {}
-        )
-        books = []
-        for book in visible_books:
-            # A shared layer belongs to the book rather than to the user who
-            # generated it.  Retain historic results here too: a newer model
-            # configuration must not make an earlier, still-useful reading
-            # disappear from the user's AI-reading library.
-            result_count = result_counts.get(book.book_id, 0)
-            if view == 'summary':
-                results = None
-            else:
-                results = list(store.list_ai_reading_results(book.book_id))
-                result_count = len(results)
-            if not result_count:
-                continue
-            metadata = store.managed_book_metadata(book.book_id)
-            chapter_titles = (
-                ai_reading_chapter_titles(book.book_id)
-                if results is not None
+        def _library_payload():
+            visible_books = list(store.visible_books(principal))
+            result_counts = (
+                store.ai_reading_result_counts()
+                if view == 'summary'
                 else {}
             )
-            enriched_results = []
-            for result in results or ():
-                enriched_result = dict(result)
-                enriched_result['can_delete'] = (
-                    principal.role == 'admin'
-                    or result.get('created_by_user_id') == principal.user_id
+            books = []
+            for book in visible_books:
+                # A shared layer belongs to the book rather than to the user who
+                # generated it.  Retain historic results here too: a newer model
+                # configuration must not make an earlier, still-useful reading
+                # disappear from the user's AI-reading library.
+                result_count = result_counts.get(book.book_id, 0)
+                if view == 'summary':
+                    results = None
+                else:
+                    results = list(store.list_ai_reading_results(book.book_id))
+                    result_count = len(results)
+                if not result_count:
+                    continue
+                metadata = store.managed_book_metadata(book.book_id)
+                chapter_titles = (
+                    ai_reading_chapter_titles(book.book_id)
+                    if results is not None
+                    else {}
                 )
-                # The UI only needs a permission bit.  Do not disclose which
-                # member generated another reader's shared learning layer.
-                enriched_result.pop('created_by_user_id', None)
-                chapter_index = enriched_result.get('chapter_index')
-                if isinstance(chapter_index, int) and chapter_index in chapter_titles:
-                    enriched_result['chapter_title'] = chapter_titles[chapter_index]
-                enriched_results.append(enriched_result)
-            cover = metadata.get('cover')
-            book_payload = {
-                'book_id': book.book_id,
-                'title': str(metadata.get('title') or book.book_id),
-                'authors': list(metadata.get('authors') or []),
-                'cover': (
-                    f"/book/{book.book_id}/{cover.lstrip('/')}"
-                    if isinstance(cover, str) and cover.strip() else None
-                ),
-            }
-            if results is None:
-                book_payload['result_count'] = result_count
-            else:
-                book_payload['results'] = enriched_results
-            books.append(book_payload)
-        return response({'books': books})
+                enriched_results = []
+                for result in results or ():
+                    enriched_result = dict(result)
+                    enriched_result['can_delete'] = (
+                        principal.role == 'admin'
+                        or result.get('created_by_user_id') == principal.user_id
+                    )
+                    # The UI only needs a permission bit.  Do not disclose which
+                    # member generated another reader's shared learning layer.
+                    enriched_result.pop('created_by_user_id', None)
+                    chapter_index = enriched_result.get('chapter_index')
+                    if isinstance(chapter_index, int) and chapter_index in chapter_titles:
+                        enriched_result['chapter_title'] = chapter_titles[chapter_index]
+                    enriched_results.append(enriched_result)
+                cover = metadata.get('cover')
+                book_payload = {
+                    'book_id': book.book_id,
+                    'title': str(metadata.get('title') or book.book_id),
+                    'authors': list(metadata.get('authors') or []),
+                    'cover': (
+                        f"/book/{book.book_id}/{cover.lstrip('/')}"
+                        if isinstance(cover, str) and cover.strip() else None
+                    ),
+                }
+                if results is None:
+                    book_payload['result_count'] = result_count
+                else:
+                    book_payload['results'] = enriched_results
+                books.append(book_payload)
+            return books
+
+        return response({'books': await run_io(_library_payload)})
 
     async def ai_result(request):
         principal = require_principal(request)
-        result = store.get_ai_reading_result(request.path_params['result_id'])
-        if result is None:
+
+        def _result_state():
+            result = store.get_ai_reading_result(
+                request.path_params['result_id']
+            )
+            if result is None:
+                return 'not_found', None
+            if not store.can_read_book(
+                principal.user_id, principal.role, result['book_id']
+            ):
+                return 'forbidden', None
+            if request.method == 'DELETE':
+                # Shared learning layers remain readable by every authorized
+                # reader, but their lifecycle is controlled by administrators
+                # or by the member who generated the specific retained version.
+                if (
+                    principal.role != 'admin'
+                    and result['created_by_user_id'] != principal.user_id
+                ):
+                    return 'forbidden', None
+                store.delete_ai_reading_result(result['id'])
+                return 'deleted', result
+            return 'ok', result
+
+        outcome, result = await run_db(_result_state)
+        if outcome == 'not_found':
             return response(error_payload('not_found', 'AI result not found'), 404)
-        if not store.can_read_book(principal.user_id, principal.role, result['book_id']):
+        if outcome == 'forbidden':
             return response(error_payload('forbidden', 'Forbidden'), 403)
-        if request.method == 'DELETE':
-            # Shared learning layers remain readable by every authorized
-            # reader, but their lifecycle is controlled by administrators or
-            # by the member who generated the specific retained version.
-            if principal.role != 'admin' and result['created_by_user_id'] != principal.user_id:
-                return response(error_payload('forbidden', 'Forbidden'), 403)
-            store.delete_ai_reading_result(result['id'])
+        if outcome == 'deleted':
             return response({'deleted': result['id']})
         return response({'result': result})
 
@@ -3700,14 +4035,22 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('invalid_ai_event_request', 'Invalid AI event request'), 400)
 
         if job_id:
-            job = store.get_ai_job(job_id)
-            if job is None:
+            def _job_access():
+                job = store.get_ai_job(job_id)
+                if job is None:
+                    return 'not_found'
+                if job.get('book_id'):
+                    if not store.can_read_book(
+                        principal.user_id, principal.role, job['book_id']
+                    ):
+                        return 'forbidden'
+                    return 'ok'
+                return 'ok' if job['owner_user_id'] == principal.user_id else 'forbidden'
+
+            access = await run_db(_job_access)
+            if access == 'not_found':
                 return response(error_payload('not_found', 'AI job not found'), 404)
-            if job.get('book_id'):
-                allowed = store.can_read_book(principal.user_id, principal.role, job['book_id'])
-            else:
-                allowed = job['owner_user_id'] == principal.user_id
-            if not allowed:
+            if access == 'forbidden':
                 return response(error_payload('forbidden', 'Forbidden'), 403)
 
             def snapshot():
@@ -3723,13 +4066,25 @@ window.location.assign(payload.redirect||'/');
             event_name = 'job'
             terminal = lambda payload: payload is None or payload['job']['status'] not in {'queued', 'running'}
         elif followup_id:
-            followup = store.get_ai_followup(followup_id, principal.user_id)
-            if followup is None:
+            def _followup_access():
+                followup = store.get_ai_followup(followup_id, principal.user_id)
+                if followup is None:
+                    return 'followup_not_found'
+                result = store.get_ai_reading_result(followup['result_id'])
+                if result is None:
+                    return 'result_not_found'
+                if not store.can_read_book(
+                    principal.user_id, principal.role, result['book_id']
+                ):
+                    return 'forbidden'
+                return 'ok'
+
+            access = await run_db(_followup_access)
+            if access == 'followup_not_found':
                 return response(error_payload('not_found', 'AI follow-up not found'), 404)
-            result = store.get_ai_reading_result(followup['result_id'])
-            if result is None:
+            if access == 'result_not_found':
                 return response(error_payload('not_found', 'AI result not found'), 404)
-            if not store.can_read_book(principal.user_id, principal.role, result['book_id']):
+            if access == 'forbidden':
                 return response(error_payload('forbidden', 'Forbidden'), 403)
 
             def snapshot():
@@ -3739,10 +4094,20 @@ window.location.assign(payload.redirect||'/');
             event_name = 'followup'
             terminal = lambda payload: payload is None or payload['followup']['status'] not in {'queued', 'running'}
         else:
-            turn = store.get_ai_book_chat_turn(chat_id, principal.user_id)
-            if turn is None:
+            def _chat_access():
+                turn = store.get_ai_book_chat_turn(chat_id, principal.user_id)
+                if turn is None:
+                    return 'not_found'
+                if not store.can_read_book(
+                    principal.user_id, principal.role, turn['book_id']
+                ):
+                    return 'forbidden'
+                return 'ok'
+
+            access = await run_db(_chat_access)
+            if access == 'not_found':
                 return response(error_payload('not_found', 'AI chat turn not found'), 404)
-            if not store.can_read_book(principal.user_id, principal.role, turn['book_id']):
+            if access == 'forbidden':
                 return response(error_payload('forbidden', 'Forbidden'), 403)
 
             def snapshot():
@@ -3755,7 +4120,7 @@ window.location.assign(payload.redirect||'/');
         async def events():
             previous = None
             while True:
-                payload = snapshot()
+                payload = await run_db(snapshot)
                 serialized = json.dumps(payload, ensure_ascii=False, separators=(',', ':'))
                 if serialized != previous:
                     yield 'event: ' + event_name + '\ndata: ' + serialized + '\n\n'
@@ -3777,12 +4142,25 @@ window.location.assign(payload.redirect||'/');
         principal = require_principal(request)
         if request.method == 'GET':
             result_id = request.path_params['result_id']
-            result = store.get_ai_reading_result(result_id)
-            if result is None:
+
+            def _list_followups():
+                result = store.get_ai_reading_result(result_id)
+                if result is None:
+                    return 'not_found', None
+                if not store.can_read_book(
+                    principal.user_id, principal.role, result['book_id']
+                ):
+                    return 'forbidden', None
+                return 'ok', list(
+                    store.list_ai_followups(result_id, principal.user_id)
+                )
+
+            outcome, followups = await run_db(_list_followups)
+            if outcome == 'not_found':
                 return response(error_payload('not_found', 'AI result not found'), 404)
-            if not store.can_read_book(principal.user_id, principal.role, result['book_id']):
+            if outcome == 'forbidden':
                 return response(error_payload('forbidden', 'Forbidden'), 403)
-            return response({'followups': list(store.list_ai_followups(result_id, principal.user_id))})
+            return response({'followups': followups})
         data, error = await bounded_public_json_object(request)
         if error:
             return response(error_payload(error, 'Invalid AI follow-up'), 400)
@@ -3791,10 +4169,20 @@ window.location.assign(payload.redirect||'/');
         language = data.get('language', 'en')
         if not isinstance(result_id, str) or not isinstance(question, str) or language not in SUPPORTED_LOCALE_SET:
             return response(error_payload('invalid_ai_followup', 'Invalid AI follow-up'), 400)
-        result = store.get_ai_reading_result(result_id)
-        if result is None:
+        def _followup_result():
+            result = store.get_ai_reading_result(result_id)
+            if result is None:
+                return 'not_found'
+            if not store.can_read_book(
+                principal.user_id, principal.role, result['book_id']
+            ):
+                return 'forbidden'
+            return 'ok'
+
+        outcome = await run_db(_followup_result)
+        if outcome == 'not_found':
             return response(error_payload('not_found', 'AI result not found'), 404)
-        if not store.can_read_book(principal.user_id, principal.role, result['book_id']):
+        if outcome == 'forbidden':
             return response(error_payload('forbidden', 'Forbidden'), 403)
         try:
             followup = await ai_reading.follow_up(principal, result_id, question, language)
@@ -3805,10 +4193,15 @@ window.location.assign(payload.redirect||'/');
     async def ai_book_chat(request):
         principal = require_principal(request)
         book_id = request.path_params['book_id']
-        if not store.can_read_book(principal.user_id, principal.role, book_id):
+        if not await run_db(
+            store.can_read_book, principal.user_id, principal.role, book_id
+        ):
             return response(error_payload('forbidden', 'Forbidden'), 403)
         if request.method == 'GET':
-            return response({'turns': list(store.list_ai_book_chat_turns(book_id, principal.user_id))})
+            turns = await run_db(
+                store.list_ai_book_chat_turns, book_id, principal.user_id
+            )
+            return response({'turns': list(turns)})
         data, error = await bounded_public_json_object(request)
         if error:
             return response(error_payload(error, 'Invalid AI chat'), 400)
@@ -3835,12 +4228,14 @@ window.location.assign(payload.redirect||'/');
 
     async def filtered_library_metadata(request):
         principal = require_principal(request)
-        return response(
-            library_metadata(
+
+        def _library_metadata():
+            return library_metadata(
                 store.visible_books(principal), base_directory, state_store=store,
                 owner_user_id=principal.user_id,
             )
-        )
+
+        return response(await run_db(_library_metadata))
 
     async def library_index(request):
         # Server's library is an authenticated SPA shell.  Render it from the
@@ -3849,23 +4244,25 @@ window.location.assign(payload.redirect||'/');
         # Keep the static fallback for partially initialized/legacy installs
         # where no manifest has been published yet.
         try:
-            markup = render_library_shell(
+            ai_settings = await run_db(store.get_ai_settings)
+            markup = await run_render(
+                render_library_shell,
                 (), current_published_assets(), SiteURLs(),
                 deployment_mode='server', kindle=kindle,
-                ai_reading_enabled=store.get_ai_settings()["enabled"],
+                ai_reading_enabled=ai_settings["enabled"],
             )
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
             markup = None
         if markup is not None:
             target = HTMLResponse(markup, headers={'Cache-Control': 'no-cache'})
-            return apply_reader_security_headers(target, markup=markup)
+            return await apply_security_headers(target, markup=markup)
 
         index_path = os.path.join(base_directory, 'index.html')
         if not os.path.isfile(index_path):
             return response(error_payload('not_found', 'Library index not found'), 404)
         response = FileResponse(index_path, media_type='text/html')
         response.headers['Cache-Control'] = 'no-cache'
-        return apply_reader_security_headers(response, index_path)
+        return await apply_security_headers(response, index_path)
 
     def kindle_library_books(principal):
         """Project visible book records onto the read-only minimal shelf."""
@@ -3900,18 +4297,23 @@ window.location.assign(payload.redirect||'/');
         # render as plain nested lists, read-only, from the authenticated
         # SQLite document (never from client input).
         principal = require_principal(request)
-        shelf = None
-        row = store.get_bookshelf(principal.user_id)
-        if row is not None:
+
+        def _kindle_shelf():
+            books = kindle_library_books(principal)
+            row = store.get_bookshelf(principal.user_id)
+            if row is None:
+                return books, None
             try:
-                shelf = json.loads(row[1])
+                return books, json.loads(row[1])
             except (TypeError, json.JSONDecodeError):
-                shelf = None
-        markup = render_kindle_library_page(
-            kindle_library_books(principal), SiteURLs(), shelf=shelf
+                return books, None
+
+        books, shelf = await run_db(_kindle_shelf)
+        markup = await run_render(
+            render_kindle_library_page, books, SiteURLs(), shelf=shelf
         )
         target = HTMLResponse(markup, headers={'Cache-Control': 'no-cache'})
-        return apply_reader_security_headers(
+        return await apply_security_headers(
             target, markup=markup, inline_scripts=True
         )
 
@@ -3919,13 +4321,18 @@ window.location.assign(payload.redirect||'/');
         return response(openapi_document(), cache_control='public, max-age=300')
 
     async def api_docs(request):
-        markup = render_api_docs(public_api_operations(), locale=resolve_request_locale(request))
-        try:
-            markup = rewrite_asset_urls(markup, current_published_assets())
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
-            pass
+        locale = resolve_request_locale(request)
+
+        def _render_docs():
+            docs = render_api_docs(public_api_operations(), locale=locale)
+            try:
+                return rewrite_asset_urls(docs, current_published_assets())
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
+                return docs
+
+        markup = await run_render(_render_docs)
         target = HTMLResponse(markup, headers={'Cache-Control': 'public, max-age=300'})
-        return apply_reader_security_headers(target, markup=markup)
+        return await apply_security_headers(target, markup=markup)
 
     async def reading_insights_page(request):
         """Keep legacy links safe now that insights lives in the shared modal hub."""
@@ -3955,9 +4362,11 @@ window.location.assign(payload.redirect||'/');
                 },
             )
         book_id = request.path_params['book_id']
-        if not store.can_read_book(principal.user_id, principal.role, book_id):
+        if not await run_db(
+            store.can_read_book, principal.user_id, principal.role, book_id
+        ):
             return response(error_payload('not_found', 'Not Found'), 404)
-        book = store.book_by_id(book_id)
+        book = await run_db(store.book_by_id, book_id)
         if book is None or book.source_format != PDF_FORMAT:
             return response(error_payload('not_found', 'Not Found'), 404)
 
@@ -4057,13 +4466,13 @@ window.location.assign(payload.redirect||'/');
             from .i18n_bundles import build_i18n_manifest
 
             return JSONResponse(
-                build_i18n_manifest(),
+                await run_io(build_i18n_manifest),
                 headers={'Cache-Control': 'no-cache'},
             )
         if path.startswith('assets/i18n/') or path.startswith('assets/immutable/i18n/'):
             from .i18n_bundles import read_i18n_asset
 
-            result = read_i18n_asset(path)
+            result = await run_io(read_i18n_asset, path)
             if result is None:
                 return response(error_payload('not_found', 'Not Found'), 404)
             content, media_type = result
@@ -4086,22 +4495,30 @@ window.location.assign(payload.redirect||'/');
         book_id = extract_book_id_from_public_path(path)
         book_relative_path = None
         if book_id:
-            if not store.can_read_book(
+            if not await run_db(
+                store.can_read_book,
                 principal.user_id,
                 principal.role,
                 book_id,
             ):
                 return response(error_payload('forbidden', 'Forbidden'), 403)
-            book = store.book_by_id(book_id)
-            if book is None or not server_book_output_is_current(
-                base_directory, book_id, book.source_format
+            book = await run_db(store.book_by_id, book_id)
+            if book is None or not await run_io(
+                server_book_output_is_current,
+                base_directory,
+                book_id,
+                book.source_format,
             ):
                 return response(error_payload('not_found', 'Not Found'), 404)
             book_relative_path = '/'.join(path.split('/')[2:])
-            try:
-                recorded_cover = json.loads(book.metadata_json).get('cover')
-            except (TypeError, json.JSONDecodeError):
-                recorded_cover = None
+
+            def _recorded_cover():
+                try:
+                    return json.loads(book.metadata_json).get('cover')
+                except (TypeError, json.JSONDecodeError):
+                    return None
+
+            recorded_cover = await run_db(_recorded_cover)
             pdf_cover_allowed = (
                 book.source_format == PDF_FORMAT
                 and isinstance(recorded_cover, str)
@@ -4123,13 +4540,17 @@ window.location.assign(payload.redirect||'/');
                 or kindle_page_allowed
             ):
                 return response(error_payload('not_found', 'Not Found'), 404)
-            ai_settings = store.get_ai_settings()
+            ai_settings = await run_db(store.get_ai_settings)
             ai_reading_enabled = bool(ai_settings.get("enabled"))
+
+            def _renderer_metadata():
+                return store.managed_book_metadata(book_id)
+
             renderer = ServerPageRenderer(
                 base_directory,
                 book_id,
                 source_format=book.source_format,
-                metadata_overrides=store.managed_book_metadata(book_id),
+                metadata_overrides=await run_db(_renderer_metadata),
                 kindle=kindle,
                 ai_reading_enabled=ai_reading_enabled,
             )
@@ -4137,29 +4558,35 @@ window.location.assign(payload.redirect||'/');
             # fixtures and legacy caches that still have an accepted marker.
             # Fresh Server conversions always carry content/metadata.json and
             # therefore take the dynamic path below.
-            has_dynamic_cache = (
-                Path(
-                    base_directory, 'book', book_id, 'pdf', 'metadata.json'
-                ).is_file()
-                if book.source_format == PDF_FORMAT
-                else Path(
-                    base_directory, 'book', book_id, 'content', 'metadata.json'
-                ).is_file()
-            )
+            def _has_dynamic_cache():
+                return (
+                    Path(
+                        base_directory, 'book', book_id, 'pdf', 'metadata.json'
+                    ).is_file()
+                    if book.source_format == PDF_FORMAT
+                    else Path(
+                        base_directory, 'book', book_id, 'content', 'metadata.json'
+                    ).is_file()
+                )
+
+            has_dynamic_cache = await run_io(_has_dynamic_cache)
             if has_dynamic_cache:
                 try:
                     if book_relative_path == 'index.html':
-                        markup = renderer.render_index(
-                            initial_book_review=store.get_book_review(
-                                book_id,
-                                principal.user_id,
-                            )
+                        review = await run_db(
+                            store.get_book_review,
+                            book_id,
+                            principal.user_id,
+                        )
+                        markup = await run_render(
+                            renderer.render_index,
+                            initial_book_review=review,
                         )
                         dynamic_response = HTMLResponse(
                             markup,
                             headers={'Cache-Control': 'no-cache'},
                         )
-                        return apply_reader_security_headers(
+                        return await apply_security_headers(
                             dynamic_response,
                             markup=markup,
                         )
@@ -4169,23 +4596,26 @@ window.location.assign(payload.redirect||'/');
                         re.IGNORECASE,
                     )
                     if chapter_match:
-                        markup = renderer.render_chapter(int(chapter_match.group(1)))
+                        markup = await run_render(
+                            renderer.render_chapter,
+                            int(chapter_match.group(1)),
+                        )
                         dynamic_response = HTMLResponse(
                             markup,
                             headers={'Cache-Control': 'no-cache'},
                         )
-                        return apply_reader_security_headers(
+                        return await apply_security_headers(
                             dynamic_response,
                             markup=markup,
                         )
                     if kindle_page_allowed:
                         if book_relative_path == 'kindle.html':
-                            markup = renderer.render_kindle_index()
+                            markup = await run_render(renderer.render_kindle_index)
                             dynamic_response = HTMLResponse(
                                 markup,
                                 headers={'Cache-Control': 'no-cache'},
                             )
-                            return apply_reader_security_headers(
+                            return await apply_security_headers(
                                 dynamic_response,
                                 markup=markup,
                                 inline_scripts=True,
@@ -4196,21 +4626,22 @@ window.location.assign(payload.redirect||'/');
                             re.IGNORECASE,
                         )
                         if kindle_chapter_match:
-                            markup = renderer.render_kindle_chapter(
-                                int(kindle_chapter_match.group(1))
+                            markup = await run_render(
+                                renderer.render_kindle_chapter,
+                                int(kindle_chapter_match.group(1)),
                             )
                             dynamic_response = HTMLResponse(
                                 markup,
                                 headers={'Cache-Control': 'no-cache'},
                             )
-                            return apply_reader_security_headers(
+                            return await apply_security_headers(
                                 dynamic_response,
                                 markup=markup,
                                 inline_scripts=True,
                             )
                     if book_relative_path == 'toc.json':
                         return Response(
-                            renderer.toc_bytes(),
+                            await run_render(renderer.toc_bytes),
                             media_type='application/json',
                             headers={'Cache-Control': 'no-cache'},
                         )
@@ -4222,7 +4653,7 @@ window.location.assign(payload.redirect||'/');
             book_relative_path,
             re.IGNORECASE,
         ):
-            apply_reader_security_headers(
+            await apply_security_headers(
                 static_response,
                 getattr(
                     static_response,
@@ -4361,21 +4792,34 @@ window.location.assign(payload.redirect||'/');
                             ),
                             400,
                         )
-                    rows = [
-                        row for row in store.list_annotation_summaries(
-                            user_id=principal.user_id,
-                        )
-                        if not book_access_denied(principal, row.get('book_hash'))
-                    ]
-                    return response({'data': rows})
+                    def _annotation_summaries():
+                        return [
+                            row for row in store.list_annotation_summaries(
+                                user_id=principal.user_id,
+                            )
+                            if not book_access_denied(
+                                principal, row.get('book_hash')
+                            )
+                        ]
+
+                    return response({'data': await run_db(_annotation_summaries)})
                 if tail[:1] == ['batch']:
                     return response(
                         error_payload('batch_requires_post', 'Batch requires POST'),
                         400,
                     )
                 if tail[:1] == ['item'] and len(tail) == 2:
-                    row = store.get_annotation(tail[1], user_id=principal.user_id)
-                    if row and book_access_denied(principal, row.get('book_hash')):
+                    def _get_annotation_item():
+                        row = store.get_annotation(
+                            tail[1], user_id=principal.user_id
+                        )
+                        forbidden = bool(
+                            row and book_access_denied(principal, row.get('book_hash'))
+                        )
+                        return row, forbidden
+
+                    row, forbidden = await run_db(_get_annotation_item)
+                    if forbidden:
                         return forbidden_book_response()
                     return (
                         response({'data': row}, 200)
@@ -4390,7 +4834,7 @@ window.location.assign(payload.redirect||'/');
                     )
                 if len(tail) > 2:
                     return response(error_payload('not_found', 'Not found'), 404)
-                if tail and book_access_denied(principal, tail[0]):
+                if tail and await run_db(book_access_denied, principal, tail[0]):
                     return forbidden_book_response()
                 chapter_index = None
                 if len(tail) == 2:
@@ -4404,28 +4848,39 @@ window.location.assign(payload.redirect||'/');
                             ),
                             400,
                         )
-                rows = store.list_annotations(
-                    book_hash=tail[0] if tail else None,
-                    chapter_index=chapter_index,
-                    user_id=principal.user_id,
-                )
-                if not tail:
-                    rows = [
+
+                def _list_annotations():
+                    rows = store.list_annotations(
+                        book_hash=tail[0] if tail else None,
+                        chapter_index=chapter_index,
+                        user_id=principal.user_id,
+                    )
+                    if tail:
+                        return rows
+                    return [
                         row for row in rows
                         if not book_access_denied(
                             principal,
                             row.get('book_hash'),
                         )
                     ]
-                return response({'data': rows})
+
+                return response({'data': await run_db(_list_annotations)})
 
             if request.method == 'DELETE':
                 if len(tail) != 2 or tail[0] != 'item':
                     return response(error_payload('not_found', 'Not found'), 404)
-                row = store.get_annotation(tail[1], user_id=principal.user_id)
-                if row and book_access_denied(principal, row.get('book_hash')):
+                def _delete_annotation():
+                    row = store.get_annotation(
+                        tail[1], user_id=principal.user_id
+                    )
+                    if row and book_access_denied(principal, row.get('book_hash')):
+                        return 'forbidden'
+                    store.delete_annotation(tail[1], user_id=principal.user_id)
+                    return 'deleted'
+
+                if await run_db(_delete_annotation) == 'forbidden':
                     return forbidden_book_response()
-                store.delete_annotation(tail[1], user_id=principal.user_id)
                 return response({'message': 'Deleted'})
             try:
                 data = await request.json()
@@ -4443,45 +4898,53 @@ window.location.assign(payload.redirect||'/');
                     if tail and tail[0] not in {'batch', 'item'}
                     else None
                 )
-                if path_book_id and book_access_denied(principal, path_book_id):
+                def _apply_annotations():
+                    if path_book_id and book_access_denied(principal, path_book_id):
+                        return 'forbidden', 0, 0
+                    for entry in entries:
+                        entry_book_id = entry.get('book_hash')
+                        stored = None
+                        if entry.get('id'):
+                            stored = store.get_annotation(
+                                entry['id'],
+                                user_id=principal.user_id,
+                            )
+                        if stored and book_access_denied(
+                            principal,
+                            stored.get('book_hash'),
+                        ):
+                            return 'forbidden', 0, 0
+                        if stored and stored.get('book_hash') != entry_book_id:
+                            return 'mismatch', 0, 0
+                        if (
+                            (path_book_id and entry_book_id != path_book_id)
+                            or book_access_denied(principal, entry_book_id)
+                        ):
+                            return 'forbidden', 0, 0
+                    created = failed = 0
+                    for entry in entries:
+                        try:
+                            store.upsert_annotation(
+                                entry,
+                                user_id=principal.user_id,
+                                replace_existing=tail == ['batch'],
+                            )
+                            created += 1
+                        except Exception:
+                            failed += 1
+                    return 'ok', created, failed
+
+                outcome, created, failed = await run_db(_apply_annotations)
+                if outcome == 'forbidden':
                     return forbidden_book_response()
-                for entry in entries:
-                    entry_book_id = entry.get('book_hash')
-                    stored = None
-                    if entry.get('id'):
-                        stored = store.get_annotation(
-                            entry['id'],
-                            user_id=principal.user_id,
-                        )
-                    if stored and book_access_denied(
-                        principal,
-                        stored.get('book_hash'),
-                    ):
-                        return forbidden_book_response()
-                    if stored and stored.get('book_hash') != entry_book_id:
-                        return response(
-                            error_payload(
-                                'annotation_book_mismatch',
-                                'Annotation cannot move between books',
-                            ),
-                            409,
-                        )
-                    if (
-                        (path_book_id and entry_book_id != path_book_id)
-                        or book_access_denied(principal, entry_book_id)
-                    ):
-                        return forbidden_book_response()
-                created = failed = 0
-                for entry in entries:
-                    try:
-                        store.upsert_annotation(
-                            entry,
-                            user_id=principal.user_id,
-                            replace_existing=tail == ['batch'],
-                        )
-                        created += 1
-                    except Exception:
-                        failed += 1
+                if outcome == 'mismatch':
+                    return response(
+                        error_payload(
+                            'annotation_book_mismatch',
+                            'Annotation cannot move between books',
+                        ),
+                        409,
+                    )
                 if tail == ['batch']:
                     return response({'created': created, 'failed': failed}, 201)
                 if failed:
@@ -4491,26 +4954,34 @@ window.location.assign(payload.redirect||'/');
             if len(tail) != 2 or tail[0] != 'item':
                 return response(error_payload('not_found', 'Not found'), 404)
             annotation_id = tail[1]
-            stored = store.get_annotation(
-                annotation_id,
-                user_id=principal.user_id,
-            )
-            if stored and book_access_denied(
-                principal,
-                stored.get('book_hash'),
-            ):
+
+            def _update_annotation():
+                stored = store.get_annotation(
+                    annotation_id,
+                    user_id=principal.user_id,
+                )
+                if stored and book_access_denied(
+                    principal,
+                    stored.get('book_hash'),
+                ):
+                    return 'forbidden', None
+                if 'chapter_index' in data and (
+                    isinstance(data['chapter_index'], bool)
+                    or not isinstance(data['chapter_index'], int)
+                    or data['chapter_index'] < 0
+                ):
+                    return 'invalid', None
+                return 'ok', store.update_annotation(
+                    annotation_id,
+                    data,
+                    user_id=principal.user_id,
+                )
+
+            outcome, row = await run_db(_update_annotation)
+            if outcome == 'forbidden':
                 return forbidden_book_response()
-            if 'chapter_index' in data and (
-                isinstance(data['chapter_index'], bool)
-                or not isinstance(data['chapter_index'], int)
-                or data['chapter_index'] < 0
-            ):
+            if outcome == 'invalid':
                 return response({'message': 'Invalid chapter index'}, 400)
-            row = store.update_annotation(
-                annotation_id,
-                data,
-                user_id=principal.user_id,
-            )
             return (
                 response({'data': row}, 200)
                 if row
@@ -4532,7 +5003,8 @@ window.location.assign(payload.redirect||'/');
         try:
             data = await request.json()
             version, shelf = data.get('version', 1), data.get('data')
-            payload, status = sync_bookshelf(
+            payload, status = await run_db(
+                sync_bookshelf,
                 database_path(base_directory), principal.user_id,
                 version, shelf, store=store,
             )
@@ -4562,7 +5034,7 @@ window.location.assign(payload.redirect||'/');
     async def bookshelf_membership(request):
         principal = require_principal(request)
         try:
-            _version, shelf = bookshelf_document(principal.user_id)
+            _version, shelf = await run_db(bookshelf_document, principal.user_id)
             return response({"in_shelf": bookshelf_contains(request.path_params["book_hash"], shelf)})
         except Exception:
             return response(error_payload('server_error', 'Internal server error'), 500)
@@ -4571,7 +5043,7 @@ window.location.assign(payload.redirect||'/');
         principal = require_principal(request)
         user_id = principal.user_id
         try:
-            current_version, current_data = bookshelf_document(user_id)
+            current_version, current_data = await run_db(bookshelf_document, user_id)
             if request.method == 'GET':
                 return response({'version': current_version, 'data': current_data})
             if not runtime_status.is_ready():
@@ -4593,9 +5065,13 @@ window.location.assign(payload.redirect||'/');
                 )
             next_version = current_version + 1
             if current_version == 0:
-                store.create_bookshelf(user_id, next_version, proposed_data)
+                await run_db(
+                    store.create_bookshelf, user_id, next_version, proposed_data
+                )
             else:
-                store.update_bookshelf(user_id, next_version, proposed_data)
+                await run_db(
+                    store.update_bookshelf, user_id, next_version, proposed_data
+                )
             return response({'version': next_version, 'data': proposed_data})
         except json.JSONDecodeError:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
@@ -4612,14 +5088,16 @@ window.location.assign(payload.redirect||'/');
         principal = require_principal(request)
         book_hash = request.path_params['book_hash']
 
-        if book_access_denied(principal, book_hash):
+        if await run_db(book_access_denied, principal, book_hash):
             return forbidden_book_response()
 
         if request.method != 'GET' and not runtime_status.is_ready():
             return response(error_payload('not_ready', 'Server is not ready'), 503)
 
         if request.method == 'GET':
-            chapter_index = store.get_reading_progress(principal.user_id, book_hash)
+            chapter_index = await run_db(
+                store.get_reading_progress, principal.user_id, book_hash
+            )
             return (
                 response({'chapter_index': chapter_index})
                 if chapter_index is not None
@@ -4640,10 +5118,15 @@ window.location.assign(payload.redirect||'/');
             chapter_index = data.get('chapter_index') if isinstance(data, dict) else None
             if isinstance(chapter_index, bool) or not isinstance(chapter_index, int) or chapter_index < 0:
                 return response(error_payload('invalid_chapter_index', 'Invalid chapter index'), 400)
-            store.set_reading_progress(principal.user_id, book_hash, chapter_index)
+            await run_db(
+                store.set_reading_progress,
+                principal.user_id,
+                book_hash,
+                chapter_index,
+            )
             return response({'chapter_index': chapter_index})
 
-        store.delete_reading_progress(principal.user_id, book_hash)
+        await run_db(store.delete_reading_progress, principal.user_id, book_hash)
         return response({'message': 'Deleted'})
 
     def recent_reading_limit(request):
@@ -4682,19 +5165,28 @@ window.location.assign(payload.redirect||'/');
         books it can already open.
         """
         principal = require_principal(request)
-        items = []
-        for row in store.list_reading_progress(principal.user_id, limit=recent_reading_limit(request)):
-            book_id = row.get('book_id')
-            if book_access_denied(principal, book_id):
-                continue
-            items.append(
-                {
-                    'book_id': book_id,
-                    'chapter_index': row.get('chapter_index'),
-                    'updated_at': row.get('updated_at'),
-                }
-            )
-        return response({'items': items}, cache_control='private, no-store')
+
+        def _recent_items():
+            items = []
+            for row in store.list_reading_progress(
+                principal.user_id, limit=recent_reading_limit(request)
+            ):
+                book_id = row.get('book_id')
+                if book_access_denied(principal, book_id):
+                    continue
+                items.append(
+                    {
+                        'book_id': book_id,
+                        'chapter_index': row.get('chapter_index'),
+                        'updated_at': row.get('updated_at'),
+                    }
+                )
+            return items
+
+        return response(
+            {'items': await run_db(_recent_items)},
+            cache_control='private, no-store',
+        )
 
     chapter_snapshot_cache: OrderedDict = OrderedDict()
     chapter_snapshot_cache_ttl_seconds = 60.0
@@ -4774,16 +5266,20 @@ window.location.assign(payload.redirect||'/');
     async def book_review(request):
         principal = require_principal(request)
         book_id = request.path_params['book_id']
-        if not store.can_read_book(principal.user_id, principal.role, book_id):
+        if not await run_db(
+            store.can_read_book, principal.user_id, principal.role, book_id
+        ):
             return forbidden_book_response()
         if request.method == 'GET':
             return response({
-                'review': store.get_book_review(book_id, principal.user_id),
+                'review': await run_db(
+                    store.get_book_review, book_id, principal.user_id
+                ),
             })
         if request.method == 'DELETE':
             if not runtime_status.is_ready():
                 return response(error_payload('not_ready', 'Server is not ready'), 503)
-            store.delete_book_review(book_id, principal.user_id)
+            await run_db(store.delete_book_review, book_id, principal.user_id)
             return Response(status_code=204)
 
         if not runtime_status.is_ready():
@@ -4801,15 +5297,18 @@ window.location.assign(payload.redirect||'/');
             return response(
                 error_payload('invalid_book_review', 'Invalid book review'), 400
             )
-        review = store.upsert_book_review(
-            book_id, principal.user_id, rating, review_text
+        review = await run_db(
+            store.upsert_book_review,
+            book_id, principal.user_id, rating, review_text,
         )
         return response({'review': review})
 
     async def reading_session_heartbeat(request):
         principal = require_principal(request)
         book_id = request.path_params['book_id']
-        if not store.can_read_book(principal.user_id, principal.role, book_id):
+        if not await run_db(
+            store.can_read_book, principal.user_id, principal.role, book_id
+        ):
             return forbidden_book_response()
         if not runtime_status.is_ready():
             return response(error_payload('not_ready', 'Server is not ready'), 503)
@@ -4839,8 +5338,8 @@ window.location.assign(payload.redirect||'/');
                 429,
             )
         try:
-            book_title, chapter_label = authorized_chapter_snapshot(
-                book_id, chapter_index
+            book_title, chapter_label = await run_db(
+                authorized_chapter_snapshot, book_id, chapter_index
             )
         except ServerPageError:
             return response(
@@ -4855,7 +5354,8 @@ window.location.assign(payload.redirect||'/');
                 error_payload('invalid_reading_session', 'Invalid reading session'),
                 400,
             )
-        session = store.record_reading_heartbeat(
+        session = await run_db(
+            store.record_reading_heartbeat,
             user_id=principal.user_id,
             book_id=book_id,
             client_id=client_id,
@@ -4871,10 +5371,14 @@ window.location.assign(payload.redirect||'/');
     async def reading_session_summary(request):
         principal = require_principal(request)
         book_id = request.path_params['book_id']
-        if not store.can_read_book(principal.user_id, principal.role, book_id):
+        if not await run_db(
+            store.can_read_book, principal.user_id, principal.role, book_id
+        ):
             return forbidden_book_response()
         try:
-            active_seconds = store.reading_time_for_book(principal.user_id, book_id)
+            active_seconds = await run_db(
+                store.reading_time_for_book, principal.user_id, book_id
+            )
         except KeyError:
             return forbidden_book_response()
         return response({'active_seconds': active_seconds})
@@ -4915,8 +5419,9 @@ window.location.assign(payload.redirect||'/');
                 400,
             )
         try:
-            insights = store.reading_insights(
-                principal.user_id, period, anchor_date, timezone_name
+            insights = await run_db(
+                store.reading_insights,
+                principal.user_id, period, anchor_date, timezone_name,
             )
         except (OverflowError, ValueError):
             return response(
@@ -4947,45 +5452,63 @@ window.location.assign(payload.redirect||'/');
     async def admin_webhooks(request):
         require_admin(request)
         if request.method == 'GET':
-            return response({'items': store.list_webhook_endpoints()}, cache_control='private, no-store')
+            items = await run_db(store.list_webhook_endpoints)
+            return response({'items': items}, cache_control='private, no-store')
         data, error = await bounded_public_json_object(request, maximum_size=16 * 1024)
         configuration = valid_webhook_configuration(data) if not error else None
         if configuration is None:
             return response(error_payload('invalid_webhook', 'Invalid WebHook configuration'), 400, 'private, no-store')
-        created = store.create_webhook_endpoint(*configuration[:3], enabled=configuration[3])
+        created = await run_db(
+            store.create_webhook_endpoint,
+            *configuration[:3],
+            enabled=configuration[3],
+        )
         return response(created, 201, 'private, no-store')
 
     async def admin_webhook(request):
         require_admin(request)
         endpoint_id = request.path_params['webhook_id']
         if request.method == 'GET':
-            endpoint = store.get_webhook_endpoint(endpoint_id)
+            endpoint = await run_db(store.get_webhook_endpoint, endpoint_id)
             return response({'webhook': endpoint}, cache_control='private, no-store') if endpoint else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
         if request.method == 'DELETE':
-            return Response(status_code=204) if store.delete_webhook_endpoint(endpoint_id) else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
+            deleted = await run_db(store.delete_webhook_endpoint, endpoint_id)
+            return Response(status_code=204) if deleted else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
         data, error = await bounded_public_json_object(request, maximum_size=16 * 1024)
         configuration = valid_webhook_configuration(data) if not error else None
         if configuration is None:
             return response(error_payload('invalid_webhook', 'Invalid WebHook configuration'), 400, 'private, no-store')
-        endpoint = store.update_webhook_endpoint(endpoint_id, name=configuration[0], url=configuration[1], event_types=configuration[2], enabled=configuration[3])
+        endpoint = await run_db(
+            store.update_webhook_endpoint,
+            endpoint_id,
+            name=configuration[0],
+            url=configuration[1],
+            event_types=configuration[2],
+            enabled=configuration[3],
+        )
         return response({'webhook': endpoint}, cache_control='private, no-store') if endpoint else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
 
     async def admin_webhook_test(request):
         require_admin(request)
         try:
-            queued = store.enqueue_webhook_test(request.path_params['webhook_id'])
+            queued = await run_db(
+                store.enqueue_webhook_test, request.path_params['webhook_id']
+            )
         except KeyError:
             return response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
         return response(queued, 202, 'private, no-store')
 
     async def admin_webhook_rotate(request):
         require_admin(request)
-        secret = store.rotate_webhook_secret(request.path_params['webhook_id'])
+        secret = await run_db(
+            store.rotate_webhook_secret, request.path_params['webhook_id']
+        )
         return response({'secret': secret}, cache_control='private, no-store') if secret else response(error_payload('webhook_not_found', 'WebHook not found'), 404, 'private, no-store')
 
     async def admin_webhook_deliveries(request):
         require_admin(request)
-        return response({'items': store.list_webhook_deliveries()}, cache_control='private, no-store')
+        items = await run_db(store.list_webhook_deliveries)
+        return response({'items': items}, cache_control='private, no-store')
 
     async def admin_webhook_redeliver(request):
         require_admin(request)
@@ -4994,7 +5517,11 @@ window.location.assign(payload.redirect||'/');
         if not isinstance(endpoint_id, str):
             return response(error_payload('invalid_webhook_redelivery', 'Invalid WebHook redelivery'), 400, 'private, no-store')
         try:
-            delivery_id = store.redeliver_webhook_event(request.path_params['event_id'], endpoint_id)
+            delivery_id = await run_db(
+                store.redeliver_webhook_event,
+                request.path_params['event_id'],
+                endpoint_id,
+            )
         except sqlite3.IntegrityError:
             return response(error_payload('webhook_event_not_found', 'WebHook event not found'), 404, 'private, no-store')
         return response({'delivery_id': delivery_id}, 202, 'private, no-store')
@@ -5119,12 +5646,18 @@ window.location.assign(payload.redirect||'/');
     @asynccontextmanager
     async def ai_worker_lifespan(application):
         """Keep the AI worker lifecycle aligned with the ASGI application."""
-        await ai_reading.start_worker()
-        await webhook_service.start_worker()
-        ai_reading.wake_worker()
+        setup_monitor_task = asyncio.create_task(setup_state.run())
         try:
+            await ai_reading.start_worker()
+            await webhook_service.start_worker()
+            ai_reading.wake_worker()
             yield
         finally:
+            setup_monitor_task.cancel()
+            try:
+                await setup_monitor_task
+            except asyncio.CancelledError:
+                pass
             await webhook_service.stop_worker()
             await ai_reading.stop_worker()
             await oidc_service.aclose()
@@ -5141,7 +5674,7 @@ window.location.assign(payload.redirect||'/');
 
     async def auth_middleware(request, call_next):
         path = request.url.path
-        if not store.has_administrator():
+        if await setup_state.setup_required():
             if (
                 path in PUBLIC_PRE_SETUP_ENDPOINTS
                 or is_public_unauthenticated_asset(path)
@@ -5189,7 +5722,8 @@ window.location.assign(payload.redirect||'/');
                 return denied
         new_proxy_session = None
         if raw_session is None:
-            new_proxy_session, _ = auth_service.create_session(
+            new_proxy_session, _ = await run_db(
+                auth_service.create_session,
                 principal,
                 **session_client_metadata(request),
             )

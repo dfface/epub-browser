@@ -12,6 +12,8 @@ import uuid
 from dataclasses import dataclass
 from typing import Optional
 
+from .server_concurrency import run_db
+
 
 WEBHOOK_EVENT_TYPES = frozenset({
     "book.created", "book.updated", "book.removed",
@@ -76,7 +78,9 @@ class WebhookService:
 
     async def run_once(self):
         now = self.clock()
-        delivery = self.store.claim_webhook_delivery(self.worker_id, now=now)
+        delivery = await run_db(
+            self.store.claim_webhook_delivery, self.worker_id, now=now
+        )
         if delivery is None:
             return False
         timestamp = int(now)
@@ -100,7 +104,8 @@ class WebhookService:
             error = type(caught).__name__
         attempt = delivery["attempt_count"] + 1
         retry_at = now + retry_delay_seconds(attempt, jitter=self.jitter)
-        self.store.finish_webhook_delivery(
+        await run_db(
+            self.store.finish_webhook_delivery,
             delivery["id"], self.worker_id, status_code=status_code,
             error=error, retry_at=retry_at, now=now,
         )
@@ -119,7 +124,10 @@ class WebhookService:
         state = self._worker_states.get(current_loop)
         if state is not None and state.task is not None and not state.task.done():
             return
-        self.store.cleanup_webhook_history(now=self.clock(), retention_days=30)
+        await run_db(
+            self.store.cleanup_webhook_history,
+            now=self.clock(), retention_days=30,
+        )
         state = _WorkerState(stop=asyncio.Event())
         self._worker_states[current_loop] = state
         state.task = asyncio.create_task(self._run(state))

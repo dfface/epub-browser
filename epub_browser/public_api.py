@@ -15,6 +15,7 @@ from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.routing import Match, Route
 
 from .pat import AuthenticatedPAT, PAT_SCOPES
+from .server_concurrency import run_db, run_render
 from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import PDF_FORMAT
 
@@ -53,12 +54,15 @@ def _context(request) -> PublicAPIContext:
     return getattr(request.app.state, PUBLIC_API_CONTEXT_KEY)
 
 
-def require_pat(request, scope: str):
+async def require_pat(request, scope: str):
     """Authenticate one exact Bearer credential and enforce one operation scope."""
     values = request.headers.getlist("authorization")
     match = _BEARER_PATTERN.fullmatch(values[0]) if len(values) == 1 else None
     authenticated = (
-        _context(request).store.authenticate_personal_access_token(match.group(1))
+        await run_db(
+            _context(request).store.authenticate_personal_access_token,
+            match.group(1),
+        )
         if match is not None
         else None
     )
@@ -103,32 +107,45 @@ def _book_payload(store, book):
 
 async def _list_books(request, authenticated: AuthenticatedPAT):
     store = _context(request).store
-    books = store.visible_books(authenticated.principal)
+
+    def _book_items():
+        return [
+            _book_payload(store, book)
+            for book in store.visible_books(authenticated.principal)
+        ]
+
     return JSONResponse(
-        {"items": [_book_payload(store, book) for book in books], "next_cursor": None},
+        {"items": await run_db(_book_items), "next_cursor": None},
         headers={"Cache-Control": "private, no-store"},
     )
 
 
-def _authorized_book(request, authenticated, book_id):
-    context = _context(request)
-    if not context.store.can_read_book(
+def _authorized_book_sync(store, authenticated, book_id):
+    if not store.can_read_book(
         authenticated.principal.user_id,
         authenticated.principal.role,
         book_id,
     ):
         return None
-    return context.store.book_by_id(book_id)
+    return store.book_by_id(book_id)
+
+
+async def _authorized_book(request, authenticated, book_id):
+    return await run_db(
+        _authorized_book_sync, _context(request).store, authenticated, book_id
+    )
 
 
 async def _book_detail(request, authenticated: AuthenticatedPAT):
-    book = _authorized_book(
+    book = await _authorized_book(
         request, authenticated, request.path_params["book_id"]
     )
     if book is None:
         return public_api_error("book_not_found", "Book not found", 404)
+    store = _context(request).store
+    payload = await run_db(_book_payload, store, book)
     return JSONResponse(
-        {"book": _book_payload(_context(request).store, book)},
+        {"book": payload},
         headers={"Cache-Control": "private, no-store"},
     )
 
@@ -159,16 +176,22 @@ def _chapter_list(renderer):
 
 async def _book_chapters(request, authenticated: AuthenticatedPAT):
     book_id = request.path_params["book_id"]
-    book = _authorized_book(request, authenticated, book_id)
+    book = await _authorized_book(request, authenticated, book_id)
     if book is None:
         return public_api_error("book_not_found", "Book not found", 404)
-    try:
-        items = _chapter_list(ServerPageRenderer(
-            _context(request).public_dir,
+    store = _context(request).store
+    public_dir = _context(request).public_dir
+
+    def _chapter_items():
+        return _chapter_list(ServerPageRenderer(
+            public_dir,
             book_id,
             source_format=book.source_format,
-            metadata_overrides=_context(request).store.managed_book_metadata(book_id),
+            metadata_overrides=store.managed_book_metadata(book_id),
         ))
+
+    try:
+        items = await run_render(_chapter_items)
     except ServerPageError:
         return public_api_error(
             "book_content_unavailable", "Book content is unavailable", 503
@@ -212,7 +235,7 @@ class _PlainTextExtractor(HTMLParser):
 
 async def _chapter_detail(request, authenticated: AuthenticatedPAT):
     book_id = request.path_params["book_id"]
-    book = _authorized_book(request, authenticated, book_id)
+    book = await _authorized_book(request, authenticated, book_id)
     if book is None:
         return public_api_error("book_not_found", "Book not found", 404)
     values = request.query_params.getlist("format")
@@ -225,42 +248,55 @@ async def _chapter_detail(request, authenticated: AuthenticatedPAT):
             raise ValueError
     except (TypeError, ValueError):
         return public_api_error("chapter_not_found", "Chapter not found", 404)
-    try:
+    store = _context(request).store
+    public_dir = _context(request).public_dir
+
+    def _load_chapter():
         renderer = ServerPageRenderer(
-            _context(request).public_dir,
+            public_dir,
             book_id,
             source_format=book.source_format,
-            metadata_overrides=_context(request).store.managed_book_metadata(book_id),
+            metadata_overrides=store.managed_book_metadata(book_id),
         )
         chapters = _chapter_list(renderer)
         if chapter_index >= len(chapters):
-            return public_api_error("chapter_not_found", "Chapter not found", 404)
+            return "chapter_not_found", None, None
         if renderer.source_format == PDF_FORMAT:
-            chapter = chapters[chapter_index]
-            if output_format == "text":
-                return PlainTextResponse(
-                    "", headers={"Cache-Control": "private, no-store"}
-                )
-            return JSONResponse(
-                {"chapter": {
-                    **chapter,
-                    "content_type": "application/pdf-page",
-                    "content_html": None,
-                    "text": "",
-                }},
-                headers={"Cache-Control": "private, no-store"},
-            )
-        chapter = renderer.chapter_content(chapter_index)
+            return "pdf", chapters[chapter_index], None
+        return "html", None, renderer.chapter_content(chapter_index)
+
+    try:
+        outcome, chapter_meta, chapter = await run_render(_load_chapter)
     except ServerPageError:
         return public_api_error(
             "book_content_unavailable", "Book content is unavailable", 503
         )
+    if outcome == "chapter_not_found":
+        return public_api_error("chapter_not_found", "Chapter not found", 404)
+    if outcome == "pdf":
+        if output_format == "text":
+            return PlainTextResponse(
+                "", headers={"Cache-Control": "private, no-store"}
+            )
+        return JSONResponse(
+            {"chapter": {
+                **chapter_meta,
+                "content_type": "application/pdf-page",
+                "content_html": None,
+                "text": "",
+            }},
+            headers={"Cache-Control": "private, no-store"},
+        )
     if output_format == "text":
-        extractor = _PlainTextExtractor()
-        extractor.feed(chapter["content"])
-        extractor.close()
+        def _extract_text():
+            extractor = _PlainTextExtractor()
+            extractor.feed(chapter["content"])
+            extractor.close()
+            return extractor.text()
+
         return PlainTextResponse(
-            extractor.text(), headers={"Cache-Control": "private, no-store"}
+            await run_render(_extract_text),
+            headers={"Cache-Control": "private, no-store"},
         )
     return JSONResponse(
         {
@@ -295,8 +331,10 @@ def _bookshelf_document(store, user_id):
 
 
 async def _get_bookshelf(request, authenticated):
-    version, data = _bookshelf_document(
-        _context(request).store, authenticated.principal.user_id
+    version, data = await run_db(
+        _bookshelf_document,
+        _context(request).store,
+        authenticated.principal.user_id,
     )
     return JSONResponse(
         {"version": version, "data": data},
@@ -311,8 +349,9 @@ async def _put_bookshelf(request, authenticated):
     if isinstance(version, bool) or not isinstance(version, int) or version < 0 or not isinstance(document, dict):
         return public_api_error("invalid_bookshelf", "Invalid bookshelf document", 400)
     store = _context(request).store
-    current_version, current_data = _bookshelf_document(
-        store, authenticated.principal.user_id
+    user_id = authenticated.principal.user_id
+    current_version, current_data = await run_db(
+        _bookshelf_document, store, user_id
     )
     if version != current_version:
         response = public_api_error(
@@ -328,9 +367,9 @@ async def _put_bookshelf(request, authenticated):
         return response
     next_version = version + 1
     if version == 0:
-        store.create_bookshelf(authenticated.principal.user_id, next_version, document)
+        await run_db(store.create_bookshelf, user_id, next_version, document)
     else:
-        store.update_bookshelf(authenticated.principal.user_id, next_version, document)
+        await run_db(store.update_bookshelf, user_id, next_version, document)
     return JSONResponse(
         {"version": next_version, "data": document},
         headers={"Cache-Control": "private, no-store"},
@@ -350,13 +389,16 @@ def _visible_items(store, authenticated, items, book_key="book_id"):
 
 async def _list_progress(request, authenticated):
     store = _context(request).store
-    items = _visible_items(
-        store,
-        authenticated,
-        store.list_reading_progress(authenticated.principal.user_id),
-    )
+
+    def _items():
+        return _visible_items(
+            store,
+            authenticated,
+            store.list_reading_progress(authenticated.principal.user_id),
+        )
+
     return JSONResponse(
-        {"items": items, "next_cursor": None},
+        {"items": await run_db(_items), "next_cursor": None},
         headers={"Cache-Control": "private, no-store"},
     )
 
@@ -364,11 +406,13 @@ async def _list_progress(request, authenticated):
 async def _progress_item(request, authenticated):
     store = _context(request).store
     book_id = request.path_params["book_id"]
-    if _authorized_book(request, authenticated, book_id) is None:
+    if await _authorized_book(request, authenticated, book_id) is None:
         return public_api_error("book_not_found", "Book not found", 404)
     user_id = authenticated.principal.user_id
     if request.method == "GET":
-        chapter_index = store.get_reading_progress(user_id, book_id)
+        chapter_index = await run_db(
+            store.get_reading_progress, user_id, book_id
+        )
         if chapter_index is None:
             return public_api_error("progress_not_found", "Reading progress not found", 404)
         return JSONResponse(
@@ -376,25 +420,30 @@ async def _progress_item(request, authenticated):
             headers={"Cache-Control": "private, no-store"},
         )
     if request.method == "DELETE":
-        store.delete_reading_progress(user_id, book_id)
+        await run_db(store.delete_reading_progress, user_id, book_id)
         return Response(status_code=204, headers={"Cache-Control": "private, no-store"})
     data = await _json_object(request)
     chapter_index = data.get("chapter_index") if data else None
     if isinstance(chapter_index, bool) or not isinstance(chapter_index, int) or chapter_index < 0:
         return public_api_error("invalid_chapter_index", "Invalid chapter index", 400)
-    try:
-        book = _authorized_book(request, authenticated, book_id)
-        chapters = _chapter_list(ServerPageRenderer(
-            _context(request).public_dir,
+    public_dir = _context(request).public_dir
+
+    def _chapters():
+        return _chapter_list(ServerPageRenderer(
+            public_dir,
             book_id,
             source_format=book.source_format,
-            metadata_overrides=_context(request).store.managed_book_metadata(book_id),
+            metadata_overrides=store.managed_book_metadata(book_id),
         ))
+
+    try:
+        book = await _authorized_book(request, authenticated, book_id)
+        chapters = await run_render(_chapters)
     except ServerPageError:
         return public_api_error("book_content_unavailable", "Book content is unavailable", 503)
     if chapter_index >= len(chapters):
         return public_api_error("invalid_chapter_index", "Invalid chapter index", 400)
-    store.set_reading_progress(user_id, book_id, chapter_index)
+    await run_db(store.set_reading_progress, user_id, book_id, chapter_index)
     return JSONResponse(
         {"book_id": book_id, "chapter_index": chapter_index},
         headers={"Cache-Control": "private, no-store"},
@@ -403,14 +452,17 @@ async def _progress_item(request, authenticated):
 
 async def _list_annotations(request, authenticated):
     store = _context(request).store
-    items = _visible_items(
-        store,
-        authenticated,
-        store.list_annotations(user_id=authenticated.principal.user_id),
-        book_key="book_hash",
-    )
+
+    def _items():
+        return _visible_items(
+            store,
+            authenticated,
+            store.list_annotations(user_id=authenticated.principal.user_id),
+            book_key="book_hash",
+        )
+
     return JSONResponse(
-        {"items": items, "next_cursor": None},
+        {"items": await run_db(_items), "next_cursor": None},
         headers={"Cache-Control": "private, no-store"},
     )
 
@@ -437,7 +489,7 @@ async def _create_annotation(request, authenticated):
     if not _valid_annotation(data):
         return public_api_error("invalid_annotation", "Invalid annotation", 400)
     book_id = data["book_hash"]
-    if _authorized_book(request, authenticated, book_id) is None:
+    if await _authorized_book(request, authenticated, book_id) is None:
         return public_api_error("book_not_found", "Book not found", 404)
     annotation = {
         "id": data.get("id") if isinstance(data.get("id"), str) and 1 <= len(data["id"]) <= 128 else uuid.uuid4().hex,
@@ -452,11 +504,20 @@ async def _create_annotation(request, authenticated):
         "updated_at": data.get("updated_at") or "",
     }
     store = _context(request).store
+
     try:
-        store.upsert_annotation(annotation, authenticated.principal.user_id)
+        await run_db(
+            store.upsert_annotation,
+            annotation,
+            authenticated.principal.user_id,
+        )
     except Exception:
         return public_api_error("annotation_conflict", "Annotation already exists", 409)
-    stored = store.get_annotation(annotation["id"], authenticated.principal.user_id)
+    stored = await run_db(
+        store.get_annotation,
+        annotation["id"],
+        authenticated.principal.user_id,
+    )
     return JSONResponse(
         {"annotation": stored},
         status_code=201,
@@ -468,52 +529,64 @@ async def _annotation_item(request, authenticated):
     store = _context(request).store
     user_id = authenticated.principal.user_id
     annotation_id = request.path_params["annotation_id"]
-    stored = store.get_annotation(annotation_id, user_id)
-    if stored is None or _authorized_book(request, authenticated, stored["book_hash"]) is None:
+    stored = await run_db(store.get_annotation, annotation_id, user_id)
+    if stored is None or await _authorized_book(
+        request, authenticated, stored["book_hash"]
+    ) is None:
         return public_api_error("annotation_not_found", "Annotation not found", 404)
     if request.method == "GET":
         return JSONResponse({"annotation": stored}, headers={"Cache-Control": "private, no-store"})
     if request.method == "DELETE":
-        store.delete_annotation(annotation_id, user_id)
+        await run_db(store.delete_annotation, annotation_id, user_id)
         return Response(status_code=204, headers={"Cache-Control": "private, no-store"})
     data = await _json_object(request)
     allowed = {key: data[key] for key in ("note", "color", "chapter_index", "startMeta", "endMeta") if data and key in data}
     if not allowed or ("chapter_index" in allowed and (isinstance(allowed["chapter_index"], bool) or not isinstance(allowed["chapter_index"], int) or allowed["chapter_index"] < 0)):
         return public_api_error("invalid_annotation", "Invalid annotation", 400)
-    updated = store.update_annotation(annotation_id, allowed, user_id)
+    updated = await run_db(
+        store.update_annotation, annotation_id, allowed, user_id
+    )
     return JSONResponse({"annotation": updated}, headers={"Cache-Control": "private, no-store"})
 
 
 async def _list_reviews(request, authenticated):
     store = _context(request).store
-    items = _visible_items(
-        store,
-        authenticated,
-        store.list_book_reviews(authenticated.principal.user_id),
+
+    def _items():
+        return _visible_items(
+            store,
+            authenticated,
+            store.list_book_reviews(authenticated.principal.user_id),
+        )
+
+    return JSONResponse(
+        {"items": await run_db(_items), "next_cursor": None},
+        headers={"Cache-Control": "private, no-store"},
     )
-    return JSONResponse({"items": items, "next_cursor": None}, headers={"Cache-Control": "private, no-store"})
 
 
 async def _review_item(request, authenticated):
     store = _context(request).store
     book_id = request.path_params["book_id"]
-    if _authorized_book(request, authenticated, book_id) is None:
+    if await _authorized_book(request, authenticated, book_id) is None:
         return public_api_error("book_not_found", "Book not found", 404)
     user_id = authenticated.principal.user_id
     if request.method == "GET":
-        review = store.get_book_review(book_id, user_id)
+        review = await run_db(store.get_book_review, book_id, user_id)
         if review is None:
             return public_api_error("review_not_found", "Review not found", 404)
         return JSONResponse({"review": review}, headers={"Cache-Control": "private, no-store"})
     if request.method == "DELETE":
-        store.delete_book_review(book_id, user_id)
+        await run_db(store.delete_book_review, book_id, user_id)
         return Response(status_code=204, headers={"Cache-Control": "private, no-store"})
     data = await _json_object(request)
     rating = data.get("rating") if data else None
     review_text = data.get("review_text") if data else None
     if isinstance(rating, bool) or not isinstance(rating, int) or not 1 <= rating <= 5 or not isinstance(review_text, str) or len(review_text.strip()) > 10_000:
         return public_api_error("invalid_review", "Invalid review", 400)
-    review = store.upsert_book_review(book_id, user_id, rating, review_text)
+    review = await run_db(
+        store.upsert_book_review, book_id, user_id, rating, review_text
+    )
     return JSONResponse({"review": review}, headers={"Cache-Control": "private, no-store"})
 
 
@@ -537,8 +610,15 @@ def _user_payload(user):
 
 async def _admin_users(request, authenticated):
     del authenticated
-    items = [_user_payload(user) for user in _context(request).store.list_users()]
-    return JSONResponse({"items": items, "next_cursor": None}, headers={"Cache-Control": "private, no-store"})
+    store = _context(request).store
+
+    def _items():
+        return [_user_payload(user) for user in store.list_users()]
+
+    return JSONResponse(
+        {"items": await run_db(_items), "next_cursor": None},
+        headers={"Cache-Control": "private, no-store"},
+    )
 
 
 def _admin_items_response(items):
@@ -548,85 +628,120 @@ def _admin_items_response(items):
     )
 
 
+async def _admin_user_items(request, loader):
+    """Run an admin per-user listing with its existence check in the DB pool."""
+    store = _context(request).store
+    user_id = request.path_params["user_id"]
+
+    def _load():
+        if _admin_user(store, user_id) is None:
+            return None
+        return loader(store, user_id)
+
+    return await run_db(_load)
+
+
 async def _admin_bookshelf(request, authenticated):
     del authenticated
     store = _context(request).store
     user_id = request.path_params["user_id"]
-    if _admin_user(store, user_id) is None:
+
+    def _load():
+        if _admin_user(store, user_id) is None:
+            return None
+        return _bookshelf_document(store, user_id)
+
+    result = await run_db(_load)
+    if result is None:
         return public_api_error("user_not_found", "User not found", 404)
-    version, data = _bookshelf_document(store, user_id)
+    version, data = result
     return JSONResponse({"version": version, "data": data}, headers={"Cache-Control": "private, no-store"})
 
 
 async def _admin_progress(request, authenticated):
     del authenticated
-    store = _context(request).store
-    user_id = request.path_params["user_id"]
-    if _admin_user(store, user_id) is None:
+    items = await _admin_user_items(
+        request, lambda store, user_id: store.list_reading_progress(user_id)
+    )
+    if items is None:
         return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(store.list_reading_progress(user_id))
+    return _admin_items_response(items)
 
 
 async def _admin_annotations(request, authenticated):
     del authenticated
-    store = _context(request).store
-    user_id = request.path_params["user_id"]
-    if _admin_user(store, user_id) is None:
+    items = await _admin_user_items(
+        request, lambda store, user_id: store.list_annotations(user_id=user_id)
+    )
+    if items is None:
         return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(store.list_annotations(user_id=user_id))
+    return _admin_items_response(items)
 
 
 async def _admin_reviews(request, authenticated):
     del authenticated
-    store = _context(request).store
-    user_id = request.path_params["user_id"]
-    if _admin_user(store, user_id) is None:
+    items = await _admin_user_items(
+        request, lambda store, user_id: store.list_book_reviews(user_id)
+    )
+    if items is None:
         return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(store.list_book_reviews(user_id))
+    return _admin_items_response(items)
 
 
 async def _admin_reading_sessions(request, authenticated):
     del authenticated
-    store = _context(request).store
-    user_id = request.path_params["user_id"]
-    if _admin_user(store, user_id) is None:
+    items = await _admin_user_items(
+        request,
+        lambda store, user_id: store.list_reading_sessions_for_user(user_id),
+    )
+    if items is None:
         return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(store.list_reading_sessions_for_user(user_id))
+    return _admin_items_response(items)
 
 
 async def _admin_reading_insights(request, authenticated):
     del authenticated
     store = _context(request).store
     user_id = request.path_params["user_id"]
-    if _admin_user(store, user_id) is None:
-        return public_api_error("user_not_found", "User not found", 404)
     period = request.query_params.get("period", "overview")
     anchor_value = request.query_params.get("anchor", date.today().isoformat())
     timezone_name = request.query_params.get("timezone", "UTC")
-    try:
+
+    def _load():
+        if _admin_user(store, user_id) is None:
+            return None
         anchor = date.fromisoformat(anchor_value)
-        insights = store.reading_insights(user_id, period, anchor, timezone_name)
+        return store.reading_insights(user_id, period, anchor, timezone_name)
+
+    try:
+        insights = await run_db(_load)
     except (TypeError, ValueError, OverflowError):
         return public_api_error("invalid_reading_insights", "Invalid reading insights query", 400)
+    if insights is None:
+        return public_api_error("user_not_found", "User not found", 404)
     return JSONResponse({"insights": insights}, headers={"Cache-Control": "private, no-store"})
 
 
 async def _admin_ai_conversations(request, authenticated):
     del authenticated
-    store = _context(request).store
-    user_id = request.path_params["user_id"]
-    if _admin_user(store, user_id) is None:
+    items = await _admin_user_items(
+        request,
+        lambda store, user_id: store.list_ai_book_chat_turns_for_user(user_id),
+    )
+    if items is None:
         return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(store.list_ai_book_chat_turns_for_user(user_id))
+    return _admin_items_response(items)
 
 
 async def _admin_ai_results(request, authenticated):
     del authenticated
-    store = _context(request).store
-    user_id = request.path_params["user_id"]
-    if _admin_user(store, user_id) is None:
+    items = await _admin_user_items(
+        request,
+        lambda store, user_id: store.list_ai_reading_results_for_user(user_id),
+    )
+    if items is None:
         return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(store.list_ai_reading_results_for_user(user_id))
+    return _admin_items_response(items)
 
 
 def public_api_operations():
@@ -692,7 +807,7 @@ def public_api_operations():
 
 def _endpoint(operation: PublicAPIOperation):
     async def endpoint(request):
-        authenticated = require_pat(request, operation.required_scope)
+        authenticated = await require_pat(request, operation.required_scope)
         if isinstance(authenticated, Response):
             return authenticated
         return await operation.handler(request, authenticated)
