@@ -81,6 +81,8 @@ SERVER_PASSIVE_RESOURCE_SUFFIXES = frozenset({
     "woff", "woff2",
 })
 _GENERATED_READER_PAGE = re.compile(r"^(?:index|chapter_[0-9]+)\.html$")
+_READER_FONT_SIZES_REM = (0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.2, 2.5, 2.8, 3.2, 3.6, 4.0)
+_DEFAULT_READER_FONT_LEVEL = 3
 
 # Kindle minimal reader: a deliberately dependency-free surface for legacy
 # Kindle WebKit browsers. All CSS/JS is inlined into the page, preferences and
@@ -151,12 +153,13 @@ function setCookie(key, value, days) {
   document.cookie = key + '=' + encodeURIComponent(value) + expires + '; path=/';
 }
 var K_THEMES = ['light', 'sepia', 'dark'];
-var K_FONT_SIZES = [12, 14, 16, 18, 20, 22, 24];
+var K_FONT_SIZES = [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 42, 48];
 function applyTheme(theme) {
   document.body.className = theme;
 }
 function applyFont(size) {
-  document.body.style.fontSize = K_FONT_SIZES[size - 1] + 'px';
+  var pixels = K_FONT_SIZES[size - 1] || K_FONT_SIZES[2];
+  document.body.style.setProperty('font-size', pixels + 'px', 'important');
 }
 function kTheme() {
   var current = getCookie('kindle_theme') || 'light';
@@ -172,7 +175,7 @@ function kTheme() {
 function kFont(delta) {
   var size = parseInt(getCookie('kindle_font_size') || '3', 10);
   if (isNaN(size)) { size = 3; }
-  size = Math.max(1, Math.min(7, size + delta));
+  size = Math.max(1, Math.min(K_FONT_SIZES.length, size + delta));
   setCookie('kindle_font_size', String(size), 365);
   applyFont(size);
 }
@@ -1001,14 +1004,16 @@ def _declaration_name_value(declaration):
     return name, value
 
 
-def sanitize_css_declarations(content):
+def sanitize_css_declarations(content, *, normalize_only=False):
     parsed = []
     for raw_declaration in _split_css_declarations(str(content or "")):
         declaration = raw_declaration.strip()
         if not declaration or ":" not in declaration:
             continue
         decoded = _decode_css_escapes(declaration)
-        if _RISKY_CSS.search(decoded) or not _css_urls_are_safe(declaration):
+        if not normalize_only and (
+            _RISKY_CSS.search(decoded) or not _css_urls_are_safe(declaration)
+        ):
             continue
         parsed.append(declaration)
     # Resolve the block's own font-size (px) so a px/pt line-height can be
@@ -1087,7 +1092,7 @@ def _find_matching_css_brace(content, opening):
     return None
 
 
-def _sanitize_css_stylesheet(content):
+def _sanitize_css_stylesheet(content, *, normalize_only=False):
     output = []
     position = 0
     while position < len(content):
@@ -1096,31 +1101,40 @@ def _sanitize_css_stylesheet(content):
         boundary, kind = _find_css_boundary(content, position)
         prelude = content[position:boundary].strip()
         if not kind:
+            if normalize_only and prelude:
+                output.append(prelude)
             break
         if kind == ";":
             rule_name = _css_at_rule_name(prelude)
-            if rule_name not in {"import", "namespace", "charset"} \
-                    and prelude and not _RISKY_CSS.search(_decode_css_escapes(prelude)):
+            if prelude and (normalize_only or (
+                rule_name not in {"import", "namespace", "charset"}
+                and not _RISKY_CSS.search(_decode_css_escapes(prelude))
+            )):
                 output.append(prelude + ";")
             position = boundary + 1
             continue
 
         closing = _find_matching_css_brace(content, boundary)
         if closing is None:
+            if normalize_only:
+                output.append(content[position:])
             break
         body = content[boundary + 1:closing]
         rule_name = _css_at_rule_name(prelude)
         if rule_name:
             if rule_name in _CSS_DECLARATION_AT_RULES:
-                safe_body = sanitize_css_declarations(body)
+                safe_body = sanitize_css_declarations(body, normalize_only=normalize_only)
             elif rule_name in _CSS_GROUP_AT_RULES:
-                safe_body = _sanitize_css_stylesheet(body)
+                safe_body = _sanitize_css_stylesheet(body, normalize_only=normalize_only)
             else:
-                safe_body = ""
-        elif _RISKY_CSS.search(_decode_css_escapes(prelude)):
+                safe_body = body if normalize_only else ""
+        elif not normalize_only and _RISKY_CSS.search(_decode_css_escapes(prelude)):
             safe_body = ""
+        elif normalize_only and ("{" in body or "}" in body):
+            # Leave nested rules intact. The declaration parser reads flat blocks.
+            safe_body = body
         else:
-            safe_body = sanitize_css_declarations(body)
+            safe_body = sanitize_css_declarations(body, normalize_only=normalize_only)
         if prelude and safe_body:
             output.append("{} {{ {} }}".format(prelude, safe_body))
         position = closing + 1
@@ -3588,20 +3602,22 @@ document.addEventListener('DOMContentLoaded', function() {{
                             <span>100%</span>
                             <span>200%</span>
                             <span>400%</span>'''
-        font_size_control = "" if pdf_page is not None else '''
+        font_size_control = ""
+        if pdf_page is None:
+            sizes = len(_READER_FONT_SIZES_REM)
+            font_sizes = ",".join(f"{size:g}" for size in _READER_FONT_SIZES_REM)
+            scale_marks = "".join(
+                '<span class="scale-mark major"></span>'
+                if level in (1, _DEFAULT_READER_FONT_LEVEL, sizes)
+                else '<span class="scale-mark"></span>'
+                for level in range(1, sizes + 1)
+            )
+            font_size_control = f'''
                 <div class="settings-group">
                     <label class="settings-label" for="fontSizeSlider" data-i18n="settings.fontSize">Font size</label>
                     <div class="font-size-control">
-                        <input type="range" id="fontSizeSlider" min="1" max="7" value="3" step="1">
-                        <div class="font-size-scale">
-                            <span class="scale-mark major"></span>
-                            <span class="scale-mark"></span>
-                            <span class="scale-mark"></span>
-                            <span class="scale-mark major"></span>
-                            <span class="scale-mark"></span>
-                            <span class="scale-mark"></span>
-                            <span class="scale-mark major"></span>
-                        </div>
+                        <input type="range" id="fontSizeSlider" min="1" max="{sizes}" value="{_DEFAULT_READER_FONT_LEVEL}" step="1" data-sizes-rem="{font_sizes}">
+                        <div class="font-size-scale" aria-hidden="true">{scale_marks}</div>
                     </div>
                 </div>'''
         sync_shelf_button = (
@@ -4289,14 +4305,25 @@ document.addEventListener('DOMContentLoaded', function() {{
                         sanitize_svg_content(source),
                         encoding="utf-8",
                     )
-                elif self.deployment_mode == "server" and suffix == "css":
+                elif suffix.casefold() == "css":
+                    normalize_only = self.deployment_mode == "ssg"
+                    errors = "surrogateescape" if normalize_only else "replace"
                     source = Path(src_path).read_text(
                         encoding="utf-8",
-                        errors="replace",
+                        errors=errors,
+                    )
+                    # SSG keeps publisher stylesheet features such as @import
+                    # while sharing the font unit conversion used by Server.
+                    css = (
+                        _sanitize_css_stylesheet(
+                            _CSS_COMMENT.sub("", source), normalize_only=True,
+                        )
+                        if normalize_only else sanitize_css_text(source)
                     )
                     Path(dst_path).write_text(
-                        sanitize_css_text(source),
+                        css,
                         encoding="utf-8",
+                        errors=errors,
                     )
                 else:
                     shutil.copy2(src_path, dst_path)

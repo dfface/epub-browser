@@ -426,7 +426,9 @@ function initScript() {
         }
     }
 
-    var fontSize = "3";
+    var fontSizeSlider = document.getElementById('fontSizeSlider');
+    var fontSizes = fontSizeSlider ? fontSizeSlider.dataset.sizesRem.split(',') : [];
+    var fontSize = fontSizeSlider ? getReadingPreference('font_size') : null;
     var pageWidthPreset = "3";
     var fontFamily = "ebook-default";
     var fontFamilyInput = null;
@@ -462,16 +464,6 @@ function initScript() {
                 if (!window.epubBrowserCache) window.epubBrowserCache = {};
                 window.epubBrowserCache.continuousScroll = isContinuousScroll ? 'true' : 'false';
             }
-        }
-    }
-
-    if (window.epubBrowserCache && window.epubBrowserCache.font_size) {
-        fontSize = window.epubBrowserCache.font_size;
-    } else {
-        fontSize = localStorage.getItem('font_size') || "3";
-        if (fontSize) {
-            if (!window.epubBrowserCache) window.epubBrowserCache = {};
-            window.epubBrowserCache.font_size = fontSize;
         }
     }
 
@@ -716,7 +708,6 @@ function initScript() {
             afterPaginationLayout(function() {
                 calculateTotalPages();
                 watchPaginationCanvas();
-                pageJumpInput.setAttribute('max', totalPages);
                 if (target) scrollToPaginationTarget(target);
                 setTimeout(function() {
                     hideLoading();
@@ -775,6 +766,7 @@ function initScript() {
         totalPagesEl.textContent = totalPages;
         pageJumpRange.textContent = i18n.t('reader.pageRange', { total: totalPages });
         currentPageEl.textContent = currentPage+1;
+        pageJumpInput.max = totalPages;
         pageJumpInput.value = currentPage+1;
     }
     
@@ -2222,7 +2214,6 @@ function initScript() {
     var settingsModal = document.getElementById('settingsModal');
     var settingsOverlay = document.getElementById('settingsOverlay');
     var settingsCloseBtn = document.getElementById('settingsCloseBtn');
-    var fontSizeBtns = document.querySelectorAll('.font-size-btn');
     var fontFamilySelect = document.getElementById('fontFamilySelect');
     var customFontInput = document.getElementById('customFontInput');
     var applyFontSettings = document.getElementById('applyFontSettings');
@@ -2319,12 +2310,12 @@ function initScript() {
     });
 
     function updateFontSize(size) {
-        var slider = document.getElementById('fontSizeSlider');
-        if (slider) {
-            slider.value = size;
-        }
-        content.classList.remove('font-size-1', 'font-size-2', 'font-size-3', 'font-size-4', 'font-size-5', 'font-size-6', 'font-size-7');
-        content.classList.add('font-size-' + size);
+        if (!fontSizeSlider) return;
+        if (!fontSizes[Number(size) - 1]) size = fontSizeSlider.defaultValue;
+        fontSizeSlider.value = size;
+        // EPUB body/html/:root rules are scoped onto this same element.
+        // The reader owns its base size, including when those rules use !important.
+        content.style.setProperty('font-size', fontSizes[Number(size) - 1] + 'rem', 'important');
         document.dispatchEvent(new CustomEvent('epub:reader-typography-change'));
     }
 
@@ -2395,12 +2386,21 @@ function initScript() {
         if (refresh && typeof refresh.catch === 'function') refresh.catch(function() {});
     }
 
-    var fontSizeSlider = document.getElementById('fontSizeSlider');
     if (fontSizeSlider) {
+        var fontPaginationFrame = null;
         fontSizeSlider.addEventListener('input', function() {
             var s = this.value;
-            localStorage.setItem('font_size', s);
+            fontSize = s;
+            setReadingPreference('font_size', s);
             updateFontSize(s);
+            if (isPaginationMode && totalPages && fontPaginationFrame === null) {
+                fontPaginationFrame = window.requestAnimationFrame(function() {
+                    fontPaginationFrame = null;
+                    var progress = totalPages > 1 ? currentPage / (totalPages - 1) : 0;
+                    calculateTotalPages();
+                    showPage(Math.round(progress * (totalPages - 1)));
+                });
+            }
         });
     }
 
@@ -2431,18 +2431,6 @@ function initScript() {
         });
     }
     
-    var style = document.createElement('style');
-    style.textContent = `
-        .font-size-1 { font-size: 0.9rem; }
-        .font-size-2 { font-size: 1.1rem; }
-        .font-size-3 { font-size: 1.3rem; }
-        .font-size-4 { font-size: 1.5rem; }
-        .font-size-5 { font-size: 1.7rem; }
-        .font-size-6 { font-size: 1.9rem; }
-        .font-size-7 { font-size: 2.2rem; }
-    `;
-    document.head.appendChild(style);
-
     window.addEventListener('load', function() {
         document.body.focus();
     });
