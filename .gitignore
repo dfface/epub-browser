@@ -10,6 +10,7 @@ epub_browser/assets/vendor/
 .agents/
 .augment
 .claude
+.codex
 .codebuddy
 .codewhale
 .continue
