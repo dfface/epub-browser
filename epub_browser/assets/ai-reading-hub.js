@@ -213,7 +213,14 @@
   // A book or chapter opens a contextual view and must offer a way back to it.
   function load() { var version = ++state.version; renderLoading(); request(path('/api/ai/library?view=summary')).then(function(data) { if (version !== state.version) return; state.books = data.books || []; state.bookId = state.contextualBookId || ''; state.back.hidden = !Boolean(state.bookId); var book = state.books.filter(function(item) { return item.book_id === state.bookId; })[0]; if (book) loadBook(book); else render(); }).catch(function() { if (version === state.version) renderEmpty(t('ai.libraryLoadFailed'), t('ai.libraryLoadFailedDetail'), true); }); }
   function open(opener) { if (root.EpubBrowserAIRich && root.EpubBrowserAIRich.loadStyle) root.EpubBrowserAIRich.loadStyle('aiReadingHubCss'); var modal = ensure(); if (modal.hidden) { state.opener = opener || document.activeElement; state.scrollY = root.scrollY || 0; document.body.classList.add('ai-reading-hub-open'); document.body.style.top = '-' + state.scrollY + 'px'; modal.hidden = false; } state.contextualBookId = opener && opener.getAttribute('data-book-id') || ''; state.bookId = state.contextualBookId; state.language = locale(); state.back.hidden = !Boolean(state.bookId); load(); root.setTimeout(function() { state.close.focus(); }, 0); }
-  function close() { if (!state.modal || state.modal.hidden) return; state.modal.hidden = true; document.body.classList.remove('ai-reading-hub-open'); document.body.style.top = ''; root.scrollTo(0, state.scrollY); if (state.opener && state.opener.focus) state.opener.focus(); }
+  function close() {
+    if (!state.modal || state.modal.hidden) return;
+    state.modal.hidden = true;
+    document.body.classList.remove('ai-reading-hub-open');
+    document.body.style.top = '';
+    root.scrollTo(0, state.scrollY);
+    if (state.opener && state.opener.focus) state.opener.focus({ preventScroll: true });
+  }
   function addChapterBadge(link) {
     var existing = link.querySelector('.ai-reading-chapter-badge');
     if (existing) {

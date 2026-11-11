@@ -581,7 +581,7 @@
         modalState.modal.hidden = true;
         document.body.classList.remove('annotation-hub-open'); document.body.style.top = '';
         root.scrollTo(0, modalState.scrollY);
-        if (modalState.opener && typeof modalState.opener.focus === 'function') modalState.opener.focus();
+        if (modalState.opener && typeof modalState.opener.focus === 'function') modalState.opener.focus({ preventScroll: true });
     }
 
     function bind() {

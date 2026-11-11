@@ -761,7 +761,7 @@
       documentTarget.body.classList.remove('reading-insights-open');
       documentTarget.body.style.top = '';
       if (typeof target.scrollTo === 'function') target.scrollTo(0, state.scrollY);
-      if (state.opener && typeof state.opener.focus === 'function') state.opener.focus();
+      if (state.opener && typeof state.opener.focus === 'function') state.opener.focus({ preventScroll: true });
     }
 
     function bind(scope) {

@@ -98,7 +98,7 @@ function initTheme() {
                     renderThemeMenu(menu, themeId, themeToggle);
                     menu.style.display = 'none';
                     themeToggle.setAttribute('aria-expanded', 'false');
-                    themeToggle.focus();
+                    themeToggle.focus({ preventScroll: true });
                 };
             }(theme.id));
             
@@ -209,7 +209,7 @@ function initTheme() {
             if (e.key === 'Escape' && themeMenu && themeMenu.style.display !== 'none') {
                 themeMenu.style.display = 'none';
                 themeToggle.setAttribute('aria-expanded', 'false');
-                themeToggle.focus();
+                themeToggle.focus({ preventScroll: true });
                 return;
             }
             if (!themeMenu || themeMenu.style.display === 'none') return;

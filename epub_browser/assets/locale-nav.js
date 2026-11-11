@@ -50,7 +50,7 @@
     function closeLocaleMenu(restoreFocus) {
       localeMenu.style.display = 'none';
       localeToggle.setAttribute('aria-expanded', 'false');
-      if (restoreFocus) localeToggle.focus();
+      if (restoreFocus) localeToggle.focus({ preventScroll: true });
     }
 
     function menuItems() {

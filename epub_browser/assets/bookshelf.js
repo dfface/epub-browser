@@ -1404,7 +1404,7 @@ function initBookshelf() {
         if (bookshelfModal.classList.contains('active')) {
             bookshelfModal.classList.remove('active');
             document.body.style.overflow = '';
-            bookshelfBtn.focus();
+            bookshelfBtn.focus({ preventScroll: true });
         }
     });
 

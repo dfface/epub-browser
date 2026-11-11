@@ -3827,7 +3827,7 @@ assert.deepEqual(
         self.assertIn("modal.setAttribute('aria-modal', 'true')", script)
         self.assertIn("if (event.key === 'Escape')", script)
         self.assertIn("document.body.classList.add('annotation-hub-open')", script)
-        self.assertIn("modalState.opener.focus()", script)
+        self.assertIn("modalState.opener.focus({ preventScroll: true })", script)
         self.assertIn('.annotation-hub-header-button[hidden] { display: none; }', css)
         self.assertIn('grid-column: 3;', css)
 
