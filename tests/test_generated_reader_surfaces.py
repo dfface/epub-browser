@@ -1,10 +1,15 @@
 import json
+import os
+import shutil
 import tempfile
+import threading
 import unittest
 import subprocess
 import sys
 import re
 import zipfile
+from functools import partial
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from epub_browser.asset_publisher import AssetPublisher
@@ -2956,6 +2961,79 @@ assert.deepEqual(
         self.assertIn('showLoading();\n        requestAnimationFrame(function()', script)
         self.assertIn('updateFontSize(s);', script)
         self.assertNotIn('applyFontSizeWithLoading', script)
+
+    def test_epub_font_slider_overrides_publisher_body_size(self):
+        chrome = next((path for path in (
+            os.environ.get("EPUB_BROWSER_CHROMIUM"),
+            shutil.which("chromium"),
+            shutil.which("google-chrome"),
+            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        ) if path and Path(path).is_file()), None)
+        if not chrome:
+            self.skipTest("Chromium is required to check computed font sizes")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            processor = EPUBProcessor("book.epub", directory)
+            processor.chapters = [{"title": "One"}]
+            extracted = Path(processor.extract_dir)
+            extracted.mkdir()
+            (extracted / "publisher.css").write_text(
+                "body { font-size: 1em !important; text-align: justify; }"
+                "h2 { font-size: 1.5em; } p strong { font-size: 18px; }",
+                encoding="utf-8",
+            )
+            processor.copy_resources()
+            chapter_path = "book/demo/chapter_0.html"
+            (root / chapter_path).parent.mkdir(parents=True)
+            shutil.move(Path(processor.web_dir) / "resources", (root / chapter_path).parent)
+            chapter = processor.create_chapter_template(
+                '<h2>Heading</h2><p id="sample"><strong>Text</strong></p>',
+                '<link class="eb" rel="stylesheet" href="resources/publisher.css">',
+                0, "One",
+            )
+            probe = """
+            <script>
+            window.addEventListener('load', () => setTimeout(function () {
+                const slider = document.querySelector('#fontSizeSlider');
+                const paragraph = document.querySelector('#sample');
+                const heading = document.querySelector('#eb-content h2');
+                const sizes = [getComputedStyle(paragraph).fontSize];
+                for (const level of [slider.min, slider.max]) {
+                    slider.value = level;
+                    slider.dispatchEvent(new Event('input'));
+                    sizes.push(getComputedStyle(paragraph).fontSize);
+                }
+                const result = [slider.max, ...sizes, getComputedStyle(heading).fontSize,
+                    getComputedStyle(paragraph.firstElementChild).fontSize,
+                    getComputedStyle(paragraph).textAlign, localStorage.getItem('font_size')];
+                document.body.dataset.fontResult = result.join('|');
+            }, 800));
+            </script>
+            """
+            (root / chapter_path).write_text(
+                chapter.replace("</body>", probe + "</body>"), encoding="utf-8"
+            )
+
+            class QuietHandler(SimpleHTTPRequestHandler):
+                def log_message(self, *args):
+                    pass
+
+            with ThreadingHTTPServer(("127.0.0.1", 0), partial(QuietHandler, directory=root)) as server:
+                thread = threading.Thread(target=server.serve_forever, daemon=True)
+                thread.start()
+                try:
+                    result = subprocess.run([
+                        chrome, "--headless", "--no-sandbox", "--disable-gpu",
+                        f"--user-data-dir={root / 'chrome'}", "--virtual-time-budget=2500",
+                        "--dump-dom", f"http://127.0.0.1:{server.server_port}/{chapter_path}",
+                    ], capture_output=True, text=True, check=True, timeout=20)
+                finally:
+                    server.shutdown()
+                    thread.join()
+        match = re.search(r'data-font-result="([^"]+)"', result.stdout)
+        self.assertIsNotNone(match, "The browser did not complete the font slider probe")
+        self.assertEqual(match.group(1), "12|20.8px|14.4px|64px|96px|72px|justify|12")
 
     def test_content_loading_uses_the_active_theme_surface(self):
         css = Path("epub_browser/assets/loading.css").read_text(encoding="utf-8")

@@ -515,6 +515,7 @@ body.reader-drawer-open {
     padding: clamp(40px, 5vw, 72px) clamp(28px, 6vw, 80px);
     color: var(--reader-ink, var(--text));
     transition: var(--transition);
+    transition-property: color;
     text-indent: 0px;
     width: 100%;
 }
