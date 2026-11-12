@@ -7,7 +7,6 @@ import unittest
 from datetime import date, datetime, timezone
 from pathlib import Path
 from unittest import mock
-from zoneinfo import ZoneInfo
 
 from epub_browser.auth import BootstrapCredentials, hash_password, token_digest
 from epub_browser.locales import SUPPORTED_LOCALES
@@ -345,25 +344,25 @@ class StateStoreTests(unittest.TestCase):
             )
         result = self.store.reading_insights(self.owner.user_id, "day", date(2026, 8, 15), "Asia/Shanghai")
         self.assertEqual(result["total_active_seconds"], 1800)
-        self.assertEqual(result["days"][0]["date"], "2026-08-15")
-        self.assertEqual(result["sessions"][0]["chapter_label"], "Chapter 3")
+        timeline = self.store.reading_insight_sessions(self.owner.user_id, date(2026, 8, 15), "Asia/Shanghai", 1)
+        self.assertEqual(timeline["sessions"][0]["chapter_label"], "Chapter 3")
         self.assertEqual(self.store.reading_time_for_book(self.owner.user_id, "book-1"), 1800)
         self.assertEqual(result["trend"]["granularity"], "hour")
         self.assertEqual(len(result["trend"]["points"]), 24)
         self.assertEqual(result["trend"]["points"][0], {
             "bucket": "0", "active_seconds": 1800, "book_count": 1,
         })
-        self.assertEqual(len(result["activity"]["days"]), 365)
-        self.assertIn({
-            "date": "2026-08-15", "active_seconds": 1800, "book_count": 1,
-        }, result["activity"]["days"])
-        self.assertEqual(result["activity"]["days"][-1], {
-            "date": "2026-12-31", "active_seconds": 0, "book_count": 0,
-        })
-
         overview = self.store.reading_insights(
             self.owner.user_id, "overview", date(2026, 8, 15), "Asia/Shanghai"
         )
+        self.assertEqual(len(overview["activity"]["days"]), 365)
+        self.assertIn({
+            "date": "2026-08-15", "active_seconds": 1800, "book_count": 1,
+        }, overview["activity"]["days"])
+        self.assertEqual(overview["activity"]["days"][-1], {
+            "date": "2026-12-31", "active_seconds": 0, "book_count": 0,
+        })
+
         self.assertEqual(overview["trend"]["granularity"], "month")
         self.assertEqual(len(overview["trend"]["points"]), 12)
         self.assertEqual(overview["trend"]["points"][7], {
@@ -402,8 +401,9 @@ class StateStoreTests(unittest.TestCase):
 
         self.assertEqual(raw_count, 2)
         self.assertEqual(result["total_active_seconds"], 13)
-        self.assertEqual(len(result["sessions"]), 1)
-        self.assertEqual(result["sessions"][0]["active_seconds"], 13)
+        timeline = self.store.reading_insight_sessions(self.owner.user_id, date(2026, 8, 15), "Asia/Shanghai", 1)
+        self.assertEqual(len(timeline["sessions"]), 1)
+        self.assertEqual(timeline["sessions"][0]["active_seconds"], 13)
 
     def test_reading_history_uses_the_current_managed_book_title_by_book_id(self):
         self._reading_book()
@@ -434,7 +434,8 @@ class StateStoreTests(unittest.TestCase):
         sessions = self.store.list_reading_sessions_for_user(self.owner.user_id)
 
         self.assertEqual(insights["top_book"]["title"], "Renamed in book management")
-        self.assertEqual(insights["sessions"][0]["book_title"], "Renamed in book management")
+        timeline = self.store.reading_insight_sessions(self.owner.user_id, date(2026, 8, 15), "Asia/Shanghai", 1)
+        self.assertEqual(timeline["sessions"][0]["book_title"], "Renamed in book management")
         self.assertEqual(sessions[0]["book_title"], "Renamed in book management")
 
     def test_insights_split_session_at_local_midnight_without_losing_seconds(self):
@@ -448,12 +449,11 @@ class StateStoreTests(unittest.TestCase):
         self.assertEqual(sum(day["active_seconds"] for day in result["days"]), 20)
         self.assertEqual(len(result["days"]), 7)
         self.assertIn(0, [day["active_seconds"] for day in result["days"]])
-        zone = ZoneInfo("Asia/Shanghai")
-        by_date = {
-            datetime.fromisoformat(item["started_at"].replace("Z", "+00:00")).astimezone(zone).date().isoformat(): item
-            for item in result["sessions"]
-        }
-        self.assertEqual(by_date["2026-08-15"]["active_seconds"] + by_date["2026-08-16"]["active_seconds"], 20)
+        for selected_day in (15, 16):
+            timeline = self.store.reading_insight_sessions(
+                self.owner.user_id, date(2026, 8, selected_day), "Asia/Shanghai", 1,
+            )
+            self.assertEqual(timeline["sessions"][0]["active_seconds"], 10)
 
     def test_heartbeat_rejects_invalid_owner_book_sequence_and_increment(self):
         self._reading_book()
@@ -3432,11 +3432,11 @@ class StateStoreTests(unittest.TestCase):
     def test_general_settings_default_and_validation(self):
         self.assertEqual(
             self.store.get_general_settings(),
-            {"recent_reading_limit": 10},
+            {"recent_reading_limit": 10, "reading_insights_rank_limit": 10},
         )
         self.assertEqual(
             self.store.set_general_settings(recent_reading_limit=18),
-            {"recent_reading_limit": 18},
+            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10},
         )
         self.assertEqual(
             self.store.get_general_settings()["recent_reading_limit"], 18
@@ -3448,7 +3448,18 @@ class StateStoreTests(unittest.TestCase):
         # No upper cap: values above 24 are accepted.
         self.assertEqual(
             self.store.set_general_settings(recent_reading_limit=100),
-            {"recent_reading_limit": 100},
+            {"recent_reading_limit": 100, "reading_insights_rank_limit": 10},
+        )
+
+    def test_general_settings_migration_preserves_recent_reading_limit(self):
+        self.store.set_general_settings(recent_reading_limit=18)
+        with self.store._connection() as connection:
+            connection.execute("ALTER TABLE general_settings DROP COLUMN reading_insights_rank_limit")
+            connection.execute("PRAGMA user_version = 27")
+        self.store.initialize()
+        self.assertEqual(
+            self.store.get_general_settings(),
+            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10},
         )
 
     def test_imported_and_administrator_tags_share_one_managed_collection(self):

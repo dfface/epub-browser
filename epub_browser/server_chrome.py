@@ -185,8 +185,17 @@ SERVER_ACCOUNT_PANEL = '''
                         <input class="admin-general-input" type="number" name="recent_reading_limit" id="adminGeneralRecentReadingLimit" min="1" step="1" inputmode="numeric" required aria-describedby="adminGeneralHelp adminGeneralError">
                     </div>
                     <p class="admin-setting-help" id="adminGeneralHelp" data-i18n="admin.general.recentReadingLimitHelp">How many recently read books appear in the home "Continue reading" rail.</p>
-                    <p class="admin-setting-error" id="adminGeneralError" role="alert" hidden></p>
                 </div>
+                <div class="admin-setting-row">
+                    <div class="admin-setting-main">
+                        <label class="admin-setting-label" for="adminGeneralReadingInsightsRankLimit">
+                            <span data-i18n="admin.general.readingInsightsRankLimit">Books in the reading time ranking</span>
+                        </label>
+                        <input class="admin-general-input" type="number" name="reading_insights_rank_limit" id="adminGeneralReadingInsightsRankLimit" min="1" step="1" inputmode="numeric" required aria-describedby="adminGeneralRankHelp adminGeneralError">
+                    </div>
+                    <p class="admin-setting-help" id="adminGeneralRankHelp" data-i18n="admin.general.readingInsightsRankLimitHelp">The default is 10 books. Showing more books increases the size of the initial reading insights response.</p>
+                </div>
+                <p class="admin-setting-error" id="adminGeneralError" role="alert" hidden></p>
             </div>
             <div class="admin-form-actions">
                 <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminGeneralSubmit" data-i18n="admin.general.save">Save settings</button>

@@ -16,7 +16,7 @@ function element(tagName) {
   };
 }
 
-function clientFor(payload, translations) {
+function clientFor(payload, translations, fetchPayload) {
   const root = element('main');
   const requests = [];
   const browser = {
@@ -43,7 +43,9 @@ function clientFor(payload, translations) {
     EpubBrowserAuth: {
       fetch(url) {
         requests.push(url);
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ insights: payload }) });
+        const result = fetchPayload ? fetchPayload(url) : url.includes('/sessions?')
+          ? { sessions: payload.sessions || [] } : { insights: payload };
+        return Promise.resolve({ ok: !!result, json: () => Promise.resolve(result) });
       },
     },
   };
@@ -61,10 +63,14 @@ test('selecting a day fetches and safely renders chronological sessions', async 
     sessions: [{ started_at: '2026-08-15T08:18:00+00:00', book_id: 'book-id', chapter_index: 5, book_title: 'Book', chapter_label: 'Chapter 6', active_seconds: 1860 }],
   });
   await page.mount();
+  assert.equal(page.requests.length, 1);
+  await page.setPeriod('week', '2026-08-15');
+  await page.selectDay('2026-08-14');
   await page.selectDay('2026-08-15');
+  assert.match(page.requests.at(-1), /reading-insights\/sessions\?date=2026-08-15/);
   assert.equal(page.sessionRows[0].getAttribute('aria-label'), '08:18 Book Chapter 6 31 min');
   assert.match(page.sessionRows[0].children.at(-1).className, /is-focused/);
-  assert.equal(page.sessionRows[0].children[1].children[0].getAttribute('href'), '/book/book-id/index.html');
+  assert.equal(page.sessionRows[0].children[1].children[0].tagName, 'button');
   assert.equal(page.sessionRows[0].children[1].children[1].getAttribute('href'), '/book/book-id/chapter_5.html');
 });
 
@@ -81,13 +87,16 @@ test('duration fallback uses the active locale unit copy when DurationFormat is 
     'readingInsights.duration.hour': '小时',
   });
   await page.mount();
+  await page.setPeriod('day', '2026-08-15');
   assert.equal(page.sessionRows[0].getAttribute('aria-label'), '08:18 书 第一章 1 小时 1 分钟');
   assert.match(page.sessionRows[0].children.at(-1).className, /is-deep/);
 });
 
-test('renders a theme-token-ready activity calendar and switches its daily trend metric', async () => {
+test('the activity calendar opens a day and trend titles describe their period and metric', async () => {
   const page = clientFor({
     total_active_seconds: 3661,
+    books_read_count: 2,
+    trend: { granularity: 'month', points: [{ bucket: '2026-07', book_count: 2 }, { bucket: '2026-08', book_count: 2 }] },
     days: [{ date: '2026-08-15', active_seconds: 3661 }],
     activity: {
       days: [
@@ -110,9 +119,28 @@ test('renders a theme-token-ready activity calendar and switches its daily trend
   assert.match(page.activityCells[4].className, /is-level-3/);
   assert.match(page.activityCells[5].className, /is-level-4/);
   assert.equal(page.activityCells[5].getAttribute('aria-label'), 'Sat, Aug 15, 2026: 1 hr. Books read: 2');
+  assert.equal(page.activityCells.filter(cell => cell.getAttribute('tabindex') === '0').length, 1);
+  const analytics = page.root.children.find(child => child.className === 'reading-insights-analytics');
+  const [calendar, trend] = analytics.children[0].children;
+  assert.equal(calendar.children.some(child => child.tagName === 'input'), false);
+  assert.equal(calendar.children[1].textContent, 'Select a square to view that day’s reading activity.');
+  assert.equal(trend.children[0].textContent, 'Monthly reading time');
+
   page.metricButtons[1].click();
+  assert.equal(trend.children[0].textContent, 'Books read per month');
+  assert.equal(trend.children.at(-1).textContent, 'Total books read: 2');
   assert.equal(page.metricButtons[0].getAttribute('aria-pressed'), 'false');
   assert.equal(page.metricButtons[1].getAttribute('aria-pressed'), 'true');
+
+  page.activityCells[5].click();
+  assert.match(page.requests.at(-1), /period=day&anchor=2026-08-15/);
+  await page.setPeriod('week', '2026-08-15');
+  page.metricButtons[0].click();
+  assert.equal(trend.children[0].textContent, 'Daily reading time');
+  page.metricButtons[1].click();
+  assert.equal(trend.children[0].textContent, 'Books read per day');
+  await page.setPeriod('month', '2026-08-15');
+  assert.equal(trend.children[0].textContent, 'Books read per day');
 });
 
 test('opens on the annual overview and activating a period updates its pressed state before requesting the new range', async () => {
@@ -138,9 +166,9 @@ test('previous and next range controls preserve period and shift the API anchor'
   await page.mount();
   await page.setPeriod('week', '2026-08-15');
   await page.previousRange();
-  assert.match(page.requests.at(-1), /period=week&anchor=2026-08-08/);
+  assert.match(page.requests.at(-2), /period=week&anchor=2026-08-08/);
   await page.nextRange();
-  assert.match(page.requests.at(-1), /period=week&anchor=2026-08-15/);
+  assert.match(page.requests.at(-2), /period=week&anchor=2026-08-15/);
   assert.equal(page.rangeButtons.previous.getAttribute('aria-label'), 'Previous range');
   assert.equal(page.rangeButtons.next.getAttribute('aria-label'), 'Next range');
 });
@@ -161,24 +189,44 @@ test('overview range covers a complete natural year and hides range-specific dri
   await page.mount();
   await page.setPeriod('overview', '2026-08-15');
   assert.equal(page.rangeLabel.textContent, '2026-01-01–2026-12-31');
-  assert.equal(page.root.children[5].hidden, false);
-  assert.equal(page.root.children[6].hidden, true);
-  assert.equal(page.root.children[7].hidden, true);
+  const analytics = page.root.children.find(child => child.className === 'reading-insights-analytics');
+  const dates = page.root.children.find(child => child.className === 'reading-insights-days');
+  assert.equal(analytics.hidden, false);
+  assert.equal(dates.hidden, true);
 
   await page.setPeriod('month', '2026-08-15');
-  assert.equal(page.root.children[5].hidden, false);
-  assert.equal(page.root.children[5].children[0].hidden, true);
-  assert.equal(page.root.children[5].children[1].children[0].hidden, true);
+  assert.equal(analytics.hidden, false);
+  assert.equal(analytics.children[0].children[0].hidden, true);
+});
+
+test('all periods keep the same report card order', async () => {
+  const page = clientFor({
+    total_active_seconds: 90,
+    books: [
+      { book_id: 'one', title: 'First book', active_seconds: 60 },
+      { book_id: 'two', title: 'Second book', active_seconds: 30 },
+    ],
+  });
+  await page.mount();
+  const cardNames = ['summary', 'rank', 'analytics', 'days'];
+  for (const period of ['overview', 'day', 'week', 'month', 'overview']) {
+    await page.setPeriod(period, '2026-08-15');
+    const visibleCards = page.root.children
+      .filter(card => !card.hidden)
+      .map(card => cardNames.find(name => card.className.split(' ').includes('reading-insights-' + name)))
+      .filter(Boolean);
+    assert.deepEqual(visibleCards, period === 'overview' ? cardNames.slice(0, 3) : cardNames, period);
+  }
 });
 
 test('week and month use compact visual day labels while preserving full dates for assistive technology', async () => {
   const page = clientFor({ total_active_seconds: 0, days: [{ date: '2026-08-15', active_seconds: 0 }], sessions: [] });
   await page.mount();
   await page.setPeriod('week', '2026-08-15');
-  const dayList = page.root.children[6].children[1];
+  const dayList = page.root.children.find(child => child.className === 'reading-insights-days').children[1];
   const button = dayList.children[0];
   assert.equal(button.children[0].textContent, 'Sat');
-  assert.equal(button.children[1].textContent, '8/15');
+  assert.equal(button.children[1].textContent, '15');
   assert.equal(button.getAttribute('aria-label'), 'Sat, Aug 15, 2026: 0 sec');
 });
 
@@ -195,11 +243,58 @@ test('week and month prefer today over the range end when today is visible', asy
 
   await page.mount();
   await page.setPeriod('week', todayIso);
-  let dayList = page.root.children[6].children[1];
+  let dayList = page.root.children.find(child => child.className === 'reading-insights-days').children[1];
   assert.equal(dayList.children[0].getAttribute('aria-pressed'), 'true');
   assert.equal(dayList.children[1].getAttribute('aria-pressed'), 'false');
 
   await page.setPeriod('month', todayIso);
-  dayList = page.root.children[6].children[1];
-  assert.equal(dayList.children[0].getAttribute('aria-pressed'), 'true');
+  dayList = page.root.children.find(child => child.className === 'reading-insights-days').children[1];
+  assert.equal(dayList.children.filter(child => child.className === 'reading-insights-weekday').length, 7);
+  const todayButton = dayList.children.find(child => child.getAttribute('data-date') === todayIso);
+  assert.equal(todayButton.getAttribute('aria-pressed'), 'true');
+});
+
+
+test('opening a ranked book fetches its report and returning keeps the same time range', async () => {
+  const page = clientFor({}, {}, url => ({
+    insights: url.startsWith('/api/books/')
+      ? { title: 'Book', active_seconds: 15, annotation_count: 2 }
+      : { books: [{ book_id: 'book', title: 'Book', active_seconds: 15 }] },
+  }));
+  await page.mount();
+  await page.setPeriod('overview', '2025-08-15');
+  const rank = page.root.children.find(child => child.className.includes('reading-insights-rank'));
+  const row = rank.children[1].children[0].children[0];
+  assert.deepEqual(row.children.slice(0, 3).map(cell => cell.textContent), ['1', 'Book', '15 sec']);
+  row.click();
+  assert.equal(page.requests.at(-1), '/api/books/book/insights');
+  await new Promise(resolve => setImmediate(resolve));
+  const heading = page.root.children[0];
+  assert.equal(heading.children[0].children[0].textContent, 'Book reading stats');
+  assert.equal(heading.children[0].children[1].textContent, 'Book');
+  const bookLink = heading.children.find(child => child.tagName === 'a');
+  assert.equal(bookLink.textContent, 'Open book home');
+  assert.equal(bookLink.getAttribute('href'), '/book/book/index.html');
+  assert.equal(bookLink.hidden, false);
+  assert.equal(page.root.children[2].children[0].children[1].children[1].textContent, '2');
+  const back = heading.children.find(child => child.tagName === 'button');
+  assert.equal(back.textContent, 'Back to reading insights');
+  back.click();
+  assert.equal(page.rangeLabel.textContent, '2025-01-01–2025-12-31');
+  assert.equal(page.requests.length, 3);
+});
+
+test('overview displays a visible error and retries the same request', async () => {
+  let attempts = 0;
+  const page = clientFor({}, {}, () => ++attempts === 1 ? null : { insights: { total_active_seconds: 1 } });
+  await page.mount();
+  const status = page.root.children[2];
+  assert.equal(status.children[0].getAttribute('role'), 'status');
+  assert.match(status.children[0].textContent, /Unable to load/);
+  assert.equal(status.children[1].hidden, false);
+  status.children[1].click();
+  assert.match(status.children[0].textContent, /Loading/);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(status.children[1].hidden, true);
+  assert.equal(page.requests[0], page.requests[1]);
 });
