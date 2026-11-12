@@ -501,6 +501,10 @@ def render_account_panel(kindle=False):
             </div>
             <label class="account-kindle-default"><input type="checkbox" name="default"> <span data-i18n="account.kindle.default">Open screensaver when entering Kindle mode</span></label>
             <div class="account-kindle-fields">
+                <label for="kindleTimezone" data-i18n="account.kindle.timezone">Time zone</label>
+                <select id="kindleTimezone" name="timezone">
+                    <option value="" data-i18n="account.kindle.deviceTimezone">Use device time zone</option>
+                </select>
                 <label for="kindleMemoText" data-i18n="account.kindle.memo">Memo</label>
                 <textarea id="kindleMemoText" name="memo_text" rows="4" maxlength="4000" aria-describedby="kindleMemoHelp"></textarea>
                 <p class="account-help" id="kindleMemoHelp" data-i18n="account.kindle.memoHelp">Only your account can read this memo.</p>

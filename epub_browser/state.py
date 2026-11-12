@@ -35,7 +35,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 26
+DB_SCHEMA_VERSION = 27
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -433,6 +433,11 @@ class StateStore:
                         "ALTER TABLE kindle_screensavers ADD COLUMN calendar_urls_json TEXT"
                     )
                 connection.execute("PRAGMA user_version = 26")
+            if version < 27:
+                connection.execute(
+                    "ALTER TABLE kindle_screensavers ADD COLUMN timezone TEXT NOT NULL DEFAULT ''"
+                )
+                connection.execute("PRAGMA user_version = 27")
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -8418,7 +8423,7 @@ class StateStore:
         if row is None:
             return {
                 "clock": True, "calendar": True, "memo": True, "default": False,
-                "text": "", "calendar_url": "", "calendar_urls": [], "pomodoro": False,
+                "text": "", "calendar_url": "", "calendar_urls": [], "pomodoro": False, "timezone": "",
             }
         urls = (
             json.loads(row["calendar_urls_json"]) if row["calendar_urls_json"] is not None
@@ -8433,6 +8438,7 @@ class StateStore:
             "calendar_url": urls[0] if urls else "",
             "calendar_urls": urls,
             "pomodoro": bool(row["pomodoro"]),
+            "timezone": row["timezone"],
         }
 
     def set_kindle_screensaver_preferences(self, user_id: str, preferences: dict) -> None:
@@ -8443,24 +8449,26 @@ class StateStore:
         first_feed = (urls[0] if urls else "") if urls is not None else None
         memo = preferences.get("memo_text")
         pomodoro = preferences.get("pomodoro")
+        timezone = preferences.get("timezone")
         with self._connection() as connection:
             connection.execute(
                 """
                 INSERT INTO kindle_screensavers
                     (user_id, clock, calendar, memo_visible, default_page, memo,
-                     calendar_url, pomodoro, calendar_urls_json)
-                VALUES (?, ?, ?, ?, ?, COALESCE(?, ''), COALESCE(?, ''), COALESCE(?, 0), ?)
+                     calendar_url, pomodoro, calendar_urls_json, timezone)
+                VALUES (?, ?, ?, ?, ?, COALESCE(?, ''), COALESCE(?, ''), COALESCE(?, 0), ?, COALESCE(?, ''))
                 ON CONFLICT(user_id) DO UPDATE SET clock = excluded.clock,
                     calendar = excluded.calendar, memo_visible = excluded.memo_visible,
                     default_page = excluded.default_page,
                     memo = COALESCE(?, kindle_screensavers.memo),
                     calendar_url = COALESCE(?, kindle_screensavers.calendar_url),
                     pomodoro = COALESCE(?, kindle_screensavers.pomodoro),
-                    calendar_urls_json = COALESCE(excluded.calendar_urls_json, kindle_screensavers.calendar_urls_json)
+                    calendar_urls_json = COALESCE(excluded.calendar_urls_json, kindle_screensavers.calendar_urls_json),
+                    timezone = COALESCE(?, kindle_screensavers.timezone)
                 """,
                 (user_id, preferences["clock"], preferences["calendar"],
                  preferences["memo"], preferences["default"], memo, first_feed,
-                 pomodoro, feeds, memo, first_feed, pomodoro),
+                 pomodoro, feeds, timezone, memo, first_feed, pomodoro, timezone),
             )
 
     def set_kindle_memo(self, user_id: str, memo: str) -> None:

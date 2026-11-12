@@ -281,6 +281,7 @@
         authentication_required: true,
         csrf_required: true,
         invalid_kindle_preferences: true,
+        invalid_kindle_timezone: true,
         invalid_kindle_calendar_url: true,
         forbidden: true,
         invalid_credentials: true,
@@ -3651,6 +3652,16 @@
           var calendar = form.elements.namedItem('calendar_urls');
           memo.defaultValue = memo.value = settings.memo_text || '';
           calendar.defaultValue = calendar.value = (settings.calendar_urls || []).join('\n');
+          var timezone = form.elements.namedItem('timezone');
+          if (timezone) {
+            while (timezone.options.length > 1) timezone.remove(1);
+            (settings.timezones || []).forEach(function(name) {
+              var option = document.createElement('option');
+              option.value = option.textContent = name;
+              timezone.appendChild(option);
+            });
+            timezone.value = settings.timezone || '';
+          }
           fields.disabled = false;
         });
       }).catch(function() { showStatus('account.error.network', 'error'); });
@@ -3903,6 +3914,8 @@
         });
         var memoField = kindleForm.elements.namedItem('memo_text');
         var calendarField = kindleForm.elements.namedItem('calendar_urls');
+        var timezone = kindleForm.elements.namedItem('timezone');
+        if (timezone) settings.timezone = timezone.value;
         if (memoField.value !== memoField.defaultValue) settings.memo_text = memoField.value;
         if (calendarField.value !== calendarField.defaultValue) settings.calendar_urls = calendarField.value.split(/\r?\n/).map(function(url) { return url.trim(); }).filter(Boolean);
         fields.disabled = true;

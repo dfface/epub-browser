@@ -21,6 +21,7 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Optional
 from urllib.parse import parse_qs, quote, unquote, unquote_to_bytes, urlsplit
+from zoneinfo import ZoneInfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from starlette.applications import Starlette
@@ -105,7 +106,7 @@ from .server_library import (
 )
 from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import EPUB_FORMAT, PDF_FORMAT, is_supported_source
-from .kindle import KINDLE_WIDGETS, valid_kindle_memo
+from .kindle import KINDLE_WIDGETS, kindle_timezone_offset, kindle_timezones, valid_kindle_memo
 from .kindle_calendar import CALENDAR_REFRESH_SECONDS, calendar_url, load_calendar_events
 from .site import LibraryBook, render_kindle_library_page, render_library_shell
 from .urls import SiteURLs
@@ -4349,13 +4350,24 @@ window.location.assign(payload.redirect||'/');
         return response({'memo': settings['text'] if settings['memo'] else ''},
                         cache_control='private, no-store')
 
+    async def kindle_screensaver_timezone(request):
+        principal = require_principal(request)
+        settings = await run_db(store.get_kindle_screensaver, principal.user_id)
+        return response(
+            {"offset": kindle_timezone_offset(settings["timezone"])},
+            cache_control="private, no-store",
+        )
+
     async def kindle_screensaver_calendar(request):
         principal = require_principal(request)
         settings = await run_db(store.get_kindle_screensaver, principal.user_id)
         urls = settings["calendar_urls"] if settings["calendar"] else []
         window = int(time.monotonic() // CALENDAR_REFRESH_SECONDS)
+        zone_name = settings["timezone"]
+        zone = ZoneInfo(zone_name) if zone_name else None
         feeds = await asyncio.gather(*(
-            run_io(load_calendar_events, principal.user_id, url, window) for url in urls
+            run_io(load_calendar_events, principal.user_id, url, window, zone_name)
+            for url in urls
         ))
         events = {}
         failures = 0
@@ -4365,11 +4377,20 @@ window.location.assign(payload.redirect||'/');
                 continue
             for event in feed:
                 key = (event.get("start", ""), event.get("end", ""), event["title"])
+                if zone:
+                    event = dict(event)
+                    for field in ("start", "end"):
+                        value = event.get(field, "")
+                        if "T" in value:
+                            timestamp = datetime.fromisoformat(value)
+                            if timestamp.tzinfo is not None:
+                                event[field] = timestamp.astimezone(zone).isoformat()
                 events[key] = event
         return response(
             {"events": [events[key] for key in sorted(events)[:500]],
              "unavailable": bool(feeds) and failures == len(feeds),
-             "partial": 0 < failures < len(feeds)},
+             "partial": 0 < failures < len(feeds),
+             **({"localized": True} if zone else {})},
             cache_control="private, no-store",
         )
 
@@ -4393,6 +4414,10 @@ window.location.assign(payload.redirect||'/');
                 or ("memo_text" in data and not valid_kindle_memo(data["memo_text"]))
             ):
                 return invalid("invalid_kindle_preferences")
+            if "timezone" in data:
+                zone = data["timezone"]
+                if not isinstance(zone, str) or (zone and zone not in kindle_timezones()):
+                    return invalid("invalid_kindle_timezone")
             if "calendar_urls" in data or "calendar_url" in data:
                 urls = data.get("calendar_urls", [data.get("calendar_url")])
                 try:
@@ -4409,7 +4434,8 @@ window.location.assign(payload.redirect||'/');
             {**{key: settings[key] for key in KINDLE_WIDGETS},
              "memo_text": settings["text"], "calendar_url": settings["calendar_url"],
              "calendar_urls": settings["calendar_urls"],
-             "pomodoro": settings["pomodoro"]},
+             "pomodoro": settings["pomodoro"], "timezone": settings["timezone"],
+             **({"timezones": kindle_timezones()} if request.method == "GET" else {})},
             cache_control='private, no-store',
         )
 
@@ -5702,6 +5728,7 @@ window.location.assign(payload.redirect||'/');
                 Route('/kindle', kindle_entry),
                 Route('/kindle/screensaver', kindle_screensaver),
                 Route('/api/kindle/screensaver/memo', kindle_screensaver_memo),
+                Route('/api/kindle/screensaver/timezone', kindle_screensaver_timezone),
                 Route('/api/kindle/screensaver/calendar', kindle_screensaver_calendar),
                 Route('/api/account/kindle-screensaver', kindle_screensaver_preferences, methods=['GET', 'PUT']),
                 Route(
