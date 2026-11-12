@@ -61,6 +61,27 @@
     
     // ========== Web Highlighter Integration ==========
     var highlighter = null;
+    var replaySelection = null;
+    var TABLE_STRUCTURE = /^(TABLE|THEAD|TBODY|TFOOT|TR|COLGROUP)$/;
+
+    function selectHighlightNodes(id, nodes) {
+        // The painter wraps every selected text node in a span. A span under
+        // a table row (even around indentation) creates an anonymous cell.
+        var replay = replaySelection && replaySelection.id === id ? replaySelection : null;
+        var omittedTableText = false;
+        var selected = nodes.filter(function(item) {
+            var node = item.$node;
+            if (!node.nodeValue) return false;
+            if (!TABLE_STRUCTURE.test(node.parentNode.tagName)) return true;
+            omittedTableText = true;
+            return false;
+        });
+        if (replay && omittedTableText) {
+            replay.text = nodes.map(function(item) { return item.$node.nodeValue; }).join('');
+            replay.paintableText = selected.map(function(item) { return item.$node.nodeValue; }).join('');
+        }
+        return selected;
+    }
     
     function initHighlighter() {
         if (highlighter) return highlighter;
@@ -75,11 +96,9 @@
             $root: document.getElementById('eb-content') || document.documentElement,
             exceptSelectors: ['pre', 'code', 'a', 'br'],
             wrapTag: 'span',
-            style: {
-                className: CONFIG.ANNOTATION_CLASS,
-                backgroundColor: Utils.addColorAlpha(Settings.defaultColor, 0.4)
-            }
+            style: { className: CONFIG.ANNOTATION_CLASS }
         });
+        if (highlighter.hooks) highlighter.hooks.Render.SelectedNodes.tap(selectHighlightNodes);
         
         return highlighter;
     }
@@ -1335,13 +1354,10 @@
         applyHighlightStyles: function(annotation, nodes) {
             var bgColor = Utils.addColorAlpha(annotation.color, 0.4);
             var hoverColor = Utils.addColorAlpha(annotation.color, 0.6);
-            var borderColor = Utils.addColorAlpha(annotation.color, 0.8);
             var self = this;
             (nodes || []).forEach(function(node) {
-                node.style.backgroundColor = bgColor;
                 node.style.setProperty('--annotation-color', bgColor);
                 node.style.setProperty('--annotation-hover-color', hoverColor);
-                node.style.setProperty('--annotation-border-color', borderColor);
                 self.bindHighlightHoverState(node, annotation.id);
             });
         },
@@ -1768,11 +1784,19 @@
 
         renderWithMetas: function(annotation, startMeta, endMeta, expectedSection) {
             if (!startMeta || !endMeta) return null;
+            var previousReplay = replaySelection;
+            var replay = replaySelection = { id: annotation.id, text: null };
             try {
                 var source = highlighter.fromStore(startMeta, endMeta, annotation.text, annotation.id);
                 var nodes = source ? this.getHighlightNodesByAnnotationId(annotation.id) : [];
                 var renderedText = nodes.map(function(node) { return node.textContent || ''; }).join('');
-                var isExpectedText = this.normalizedHighlightText(renderedText) === this.normalizedHighlightText(annotation.text);
+                // Stored quotes can include table indentation. Check the
+                // original quote as well as the text the painter kept.
+                var expectedText = this.normalizedHighlightText(annotation.text);
+                var normalizedRendered = this.normalizedHighlightText(renderedText);
+                var isExpectedText = normalizedRendered === expectedText ||
+                    (replay.text !== null && this.normalizedHighlightText(replay.text) === expectedText &&
+                        normalizedRendered === this.normalizedHighlightText(replay.paintableText));
                 var isExpectedSection = !expectedSection || nodes.every(function(node) {
                     return expectedSection.contains(node);
                 });
@@ -1787,6 +1811,8 @@
                     try { highlighter.remove(annotation.id); } catch (removeError) {}
                 }
                 return null;
+            } finally {
+                replaySelection = previousReplay;
             }
         },
 

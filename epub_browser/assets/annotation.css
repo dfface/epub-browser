@@ -2,19 +2,19 @@
 
 .annotation-highlight {
     background-color: var(--annotation-color, rgba(255, 235, 59, 0.4));
-    border-radius: 2px;
     cursor: pointer;
     padding: 0;
-    outline: 2px solid transparent;
-    outline-offset: 1px;
-    transition: background-color 0.2s ease, outline-color 0.2s ease;
+    transition: background-color 0.2s ease;
     position: relative;
     display: inline;
 }
 
+.annotation-highlight.annotation-hover-active,
 .annotation-highlight.annotation-focus-active {
-    outline: 2px solid var(--annotation-border-color, currentColor);
-    outline-offset: 3px;
+    background-color: var(--annotation-hover-color, rgba(255, 235, 59, 0.6));
+}
+
+.annotation-highlight.annotation-focus-active {
     animation: annotation-focus-pulse 0.9s ease-in-out 2;
 }
 
@@ -26,12 +26,6 @@
 
 @keyframes annotation-focus-pulse {
     50% { filter: brightness(1.15); }
-}
-
-.annotation-highlight.annotation-hover-active {
-    background-color: var(--annotation-hover-color, rgba(255, 235, 59, 0.6));
-    outline: 2px solid var(--annotation-border-color, rgba(255, 235, 59, 0.8));
-    outline-offset: 1px;
 }
 
 /* Image notes share the annotation model but use a quiet, whole-image anchor.
@@ -938,10 +932,6 @@
 
 .dark-mode .annotation-dialog {
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-}
-
-.dark-mode .annotation-highlight.annotation-hover-active {
-    outline-color: var(--annotation-border-color, rgba(255, 235, 59, 0.8));
 }
 
 /* ========== Mobile Responsive ========== */
