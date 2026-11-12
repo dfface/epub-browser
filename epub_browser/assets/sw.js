@@ -30,7 +30,10 @@ async function networkFirst(request, fallbackUrl) {
     try {
         const response = await fetch(request);
         if (response && response.status === 200) {
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, response.clone()));
+            const responseCopy = response.clone();
+            caches.open(CACHE_NAME)
+                .then((cache) => cache.put(request, responseCopy))
+                .catch(() => {});
         }
         return response;
     } catch (error) {

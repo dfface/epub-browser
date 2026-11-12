@@ -84,6 +84,66 @@ test('keeps immutable precached assets cache-first', async () => {
   assert.equal(result.fetches, 0);
 });
 
+test('network responses are cloned before the page consumes their body', async () => {
+  const worker = loadWorker();
+  const handlers = {};
+  let earlyClones = 0;
+  let lateClones = 0;
+  let cachedResponse = null;
+  const networkResponse = {
+    status: 200,
+    source: 'network',
+    bodyUsed: false,
+    clone() {
+      if (this.bodyUsed) {
+        lateClones += 1;
+        return { source: 'late-copy' };
+      }
+      earlyClones += 1;
+      return { source: 'copy' };
+    },
+  };
+  const context = {
+    URL,
+    caches: {
+      async match() { return null; },
+      async open() {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        return {
+          async put(request, response) { cachedResponse = response; },
+        };
+      },
+    },
+    async fetch() { return networkResponse; },
+    self: {
+      addEventListener(type, handler) { handlers[type] = handler; },
+      clients: { claim() {} },
+      location: { origin: 'https://library.test' },
+      skipWaiting() {},
+    },
+  };
+  vm.runInNewContext(worker, context);
+
+  const request = {
+    method: 'GET',
+    mode: 'cors',
+    url: 'https://library.test/book/demo/chapter_1.html',
+  };
+  let responsePromise;
+  handlers.fetch({
+    request,
+    respondWith(value) { responsePromise = Promise.resolve(value); },
+  });
+  const response = await responsePromise;
+  networkResponse.bodyUsed = true;
+  await new Promise((resolve) => setTimeout(resolve, 5));
+
+  assert.equal(response.source, 'network');
+  assert.equal(earlyClones, 1);
+  assert.equal(lateClones, 0);
+  assert.equal(cachedResponse && cachedResponse.source, 'copy');
+});
+
 for (const manifestPath of [
   '/assets/manifest.json',
   '/assets/manifest.en.json',

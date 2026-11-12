@@ -101,6 +101,73 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertRegex(book_html, r'class="book-source-format"[^>]*data-i18n="pdf.formatBadge"')
             self.assertIn('aria-label="PDF"', book_html)
 
+    def test_chapter_pages_prefetch_the_next_chapter_with_one_shared_asset(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            metadata = PDFMetadata(
+                title='A PDF', authors=(), tags=(), language='en',
+                pages=(
+                    PDFPageMetadata(1, 612.0, 792.0),
+                    PDFPageMetadata(2, 612.0, 792.0),
+                ),
+                encrypted=False, has_extractable_text=True, cover=None,
+            )
+            pdf = EPUBProcessor.from_pdf_metadata(
+                book_id='pdf-book', metadata=metadata, cover_path=None,
+                asset_manifest=assets, urls=SiteURLs('/reader/'),
+                deployment_mode='server',
+            )
+            epub = EPUBProcessor(
+                'book.epub', directory, asset_manifest=assets,
+                book_id='epub-book', urls=SiteURLs('/reader/'),
+                deployment_mode='ssg',
+            )
+            epub.book_title = 'An EPUB'
+            epub.chapters = [{'title': 'One'}, {'title': 'Two'}]
+
+            pdf_html = pdf.create_pdf_chapter_template(
+                0, '/api/books/pdf-book/document',
+            )
+            epub_html = epub.create_chapter_template('<p>Text</p>', '', 0, 'One')
+            prefetch_script = re.compile(
+                r'<script src="((?:/reader)?/assets/immutable/chapter-prefetch\.[0-9a-f]{12}\.js)" defer></script>'
+            )
+            reader_script = re.compile(
+                r'<script src="[^"]*/assets/immutable/chapter\.[0-9a-f]{12}\.js" defer></script>'
+            )
+            urls = []
+            for markup in (epub_html, pdf_html):
+                prefetch = prefetch_script.search(markup)
+                reader = reader_script.search(markup)
+                self.assertIsNotNone(prefetch)
+                self.assertIsNotNone(reader)
+                urls.append(prefetch.group(1))
+                self.assertLess(
+                    prefetch.start(),
+                    reader.start(),
+                    'the prefetch module must load before the reader script',
+                )
+            self.assertEqual(urls[0], urls[1], 'EPUB and PDF share the same prefetch module')
+
+            chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+            self.assertIn('window.EpubChapterPrefetch.create(', chapter_js)
+            self.assertIn('chapterPrefetch.afterChapterRendered(', chapter_js)
+            self.assertIn('chapterPrefetch.take(', chapter_js)
+
+    def test_prefetched_navigation_invalidates_in_flight_chapter_requests(self):
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        start = script.index('function navigateReaderChapter(')
+        navigation = script[start:script.index('\n    function applyReaderChapterResponse(', start)]
+
+        self.assertEqual(navigation.count('activeReaderChapterRequest += 1;'), 2)
+        self.assertLess(
+            navigation.rindex('activeReaderChapterRequest += 1;'),
+            navigation.index('chapterPrefetch.take('),
+        )
+        self.assertIn('if (readerChapterXhr) readerChapterXhr.abort();', navigation)
+
     def test_pdf_page_adds_only_a_scoped_descriptor_to_the_shared_reader(self):
         with tempfile.TemporaryDirectory() as directory:
             assets = AssetPublisher(
