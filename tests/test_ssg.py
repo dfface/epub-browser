@@ -11,11 +11,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from PIL import Image
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
 
 from epub_browser.cli import SSGConfig
 from epub_browser.epub_identity import read_embedded_book_id
-from epub_browser.reporting import Reporter
 from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.ssg import SSGBuildError, SSGPublisher, run_ssg
 
@@ -41,30 +40,40 @@ class SSGPublicationTests(unittest.TestCase):
                 {path.name for path in discovered}, {"one.EPUB", "two.PDF"}
             )
 
-    def test_embedded_storage_reports_pdf_sidecar_fallback_once(self):
+    def test_embedded_pdf_migrates_sidecar_id_and_survives_rename(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            first = root / "one.pdf"
-            second = root / "two.PDF"
-            first.write_bytes(b"%PDF-1.4\none\n%%EOF\n")
-            second.write_bytes(b"%PDF-1.4\ntwo\n%%EOF\n")
-            publisher = SSGPublisher(
-                SSGConfig(
-                    (first, second),
-                    root / "dist",
-                    log=True,
-                    book_id_storage="embedded",
-                ),
-                reporter=Reporter(True),
-                show_progress=False,
-            )
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=2, metadata={"/Title": "Portable PDF"})
+            before = source.read_bytes()
+            SSGPublisher(SSGConfig((source,), output), show_progress=False).build()
+            sidecar = read_exact_sidecar(source)
 
-            with contextlib.redirect_stderr(io.StringIO()) as stderr:
-                publisher._discover_sources()
+            def build_embedded(path):
+                SSGPublisher(
+                    SSGConfig((path,), output, book_id_storage="embedded"),
+                    show_progress=False,
+                ).build()
 
-            output = stderr.getvalue()
-            self.assertEqual(output.count("Embedded book ID storage is EPUB-only"), 1)
-            self.assertIn("PDF identities use adjacent sidecars", output)
+            build_embedded(source)
+            embedded = source.read_bytes()
+            self.assertGreater(len(embedded), len(before))
+            self.assertTrue(embedded.startswith(before))
+            self.assertEqual(read_exact_sidecar(source), sidecar)
+            reader = PdfReader(source)
+            self.assertEqual(reader.metadata["/EpubBrowserBookId"], sidecar.book_id)
+            self.assertEqual(reader.metadata.title, "Portable PDF")
+            self.assertEqual(len(reader.pages), 2)
+            published = output / "book" / sidecar.book_id / "document.pdf"
+            self.assertEqual(published.read_bytes(), embedded)
+
+            moved = root / "renamed.PDF"
+            source.rename(moved)
+            build_embedded(moved)
+            self.assertFalse(sidecar_path_for(moved).exists())
+            self.assertEqual(moved.read_bytes(), embedded)
+            self.assertEqual(published.read_bytes(), embedded)
 
     def test_pdf_ssg_writes_one_shared_chapter_per_page(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -75,7 +84,7 @@ class SSGPublicationTests(unittest.TestCase):
             before = source.read_bytes()
 
             SSGPublisher(
-                SSGConfig((source,), output, "/reader/", book_id_storage="embedded"),
+                SSGConfig((source,), output, "/reader/"),
                 show_progress=False,
             ).build()
 

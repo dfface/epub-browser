@@ -8,6 +8,7 @@ from .epub_identity import (
     validate_book_id,
 )
 from .identity import new_server_book_id, source_sha256
+from .pdf_identity import embed_pdf_book_id, read_pdf_book_id
 from .sidecar_identity import (
     SidecarIdentity,
     adopt_sidecar,
@@ -105,7 +106,7 @@ def inspect_book_identity(
     embedded_book_id = (
         read_embedded_book_id(source_path)
         if format_name == EPUB_FORMAT
-        else None
+        else read_pdf_book_id(source_path)
     )
     matching_orphans = []
     for orphan_path in orphan_sidecars:
@@ -147,8 +148,9 @@ def resolve_book_identity(
             )
         )
     if inspection.embedded_book_id is not None:
+        format_name = source_format(inspection.source).upper()
         current_candidates.append(
-            ("embedded EPUB metadata", inspection.embedded_book_id)
+            (f"embedded {format_name} metadata", inspection.embedded_book_id)
         )
 
     move_candidates = []
@@ -192,10 +194,7 @@ def resolve_book_identity(
             source_mtime_ns=inspection.source_mtime_ns,
         )
 
-    if (
-        storage == BOOK_ID_STORAGE_SIDECAR
-        or source_format(inspection.source) == PDF_FORMAT
-    ):
+    if storage == BOOK_ID_STORAGE_SIDECAR:
         if selected_orphan is not None:
             adopt_sidecar(selected_orphan, inspection.source)
         write_sidecar(
@@ -220,13 +219,18 @@ def resolve_book_identity(
             source_mtime_ns=inspection.source_mtime_ns,
         )
 
-    persisted_id = ensure_embedded_book_id(
-        inspection.source,
-        preferred_book_id=book_id,
-    )
+    format_name = source_format(inspection.source)
+    if format_name == PDF_FORMAT:
+        persisted_id = embed_pdf_book_id(
+            inspection.source, book_id, inspection.source_snapshot
+        )
+    else:
+        persisted_id = ensure_embedded_book_id(
+            inspection.source, preferred_book_id=book_id
+        )
     if persisted_id != book_id:
         raise BookIdentityConflict(
-            f"Embedded EPUB book ID {persisted_id!r} conflicts with {book_id!r}"
+            f"Embedded {format_name.upper()} book ID {persisted_id!r} conflicts with {book_id!r}"
         )
     post_write = _source_snapshot(inspection.source)
     post_fingerprint = source_sha256(inspection.source)

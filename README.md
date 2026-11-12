@@ -287,17 +287,17 @@ Each book receives a stable `book_id`, also exposed as `book_hash` in generated 
 --book-id-storage sidecar
 ```
 
-Sidecar mode writes a visible identity file beside the EPUB, such as `BOOK.epub.epub-browser.json`, and leaves the EPUB bytes unchanged. The sidecar contains the stable ID and a verified SHA-256 source fingerprint.
+Sidecar mode writes a visible identity file beside the source, such as `BOOK.epub.epub-browser.json` or `BOOK.pdf.epub-browser.json`, and leaves the source bytes unchanged. The sidecar contains the stable ID and a verified SHA-256 source fingerprint.
 
-To place the ID in OPF metadata instead, select embedded storage for the entire invocation:
+To place the ID in EPUB OPF metadata or the PDF document information dictionary, select embedded storage for the entire invocation:
 
 ```bash
 --book-id-storage embedded
 ```
 
-Embedded mode can rebuild the EPUB ZIP, so the source must be writable and safe to modify. EPUB Browser does not silently fall back to a database-only identity. It stops when IDs disagree, active sources duplicate an ID, a carrier is invalid, or a required carrier cannot be written.
+Embedded mode can rebuild the EPUB ZIP or append a PDF metadata update before conversion, so the source must be writable and safe to modify. Use sidecar mode for signed or encrypted PDFs. EPUB Browser stops when IDs disagree, active sources duplicate an ID, a carrier is invalid, or a required carrier cannot be written.
 
-When migrating storage modes, the existing ID is copied to the selected carrier; the other valid carrier is retained. An existing embedded ID from v2.0.4 is copied to the default sidecar without rewriting the EPUB. For PDF, `--book-id-storage embedded` always falls back to the adjacent sidecar (for example, `BOOK.pdf.epub-browser.json`): a PDF is an immutable document and EPUB Browser cannot write an ID into its bytes. This fallback applies only to PDF; existing EPUB embedded/sidecar semantics are unchanged.
+When migrating storage modes, EPUB Browser copies the existing ID to the selected carrier and keeps the other valid carrier. An existing embedded ID from v2.0.4 is copied to the default sidecar without rewriting the EPUB. Both SSG and Server deliver a byte-for-byte copy of the PDF source after any metadata update.
 
 ### PDF: one page, one chapter
 
@@ -565,7 +565,7 @@ The image runs persistent Server mode with these defaults:
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
 
-Because embedded identity may rewrite an EPUB, mount the library read-write. Mount Server state read-write and keep it across container replacement:
+Because embedded identity may update EPUB or PDF files, mount the library read-write. Mount Server state read-write and keep it across container replacement:
 
 ```bash
 docker run -d \

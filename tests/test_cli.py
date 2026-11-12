@@ -71,7 +71,7 @@ class NewCommandTests(unittest.TestCase):
                 ]
             )
 
-    def test_book_id_storage_help_explains_pdf_fallback(self):
+    def test_book_id_storage_help_includes_pdf_metadata(self):
         with contextlib.redirect_stdout(io.StringIO()) as stdout, self.assertRaises(
             SystemExit
         ) as raised:
@@ -79,8 +79,7 @@ class NewCommandTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.code, 0)
         help_text = " ".join(stdout.getvalue().split())
-        self.assertIn("embedded storage is EPUB-only", help_text)
-        self.assertIn("PDF always uses a sidecar", help_text)
+        self.assertIn("EPUB OPF and PDF document metadata", help_text)
 
     def test_ssg_cli_parses_without_loading_argon2(self):
         script = """

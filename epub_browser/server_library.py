@@ -36,7 +36,6 @@ from .site import LibraryBook, publish_library_shell
 from .sidecar_identity import discover_orphan_sidecars, sidecar_path_for
 from .source_format import (
     EPUB_FORMAT,
-    PDF_EMBEDDED_STORAGE_NOTICE,
     PDF_FORMAT,
     is_supported_source,
     source_format,
@@ -197,7 +196,6 @@ class ServerLibraryManager:
         )
         self._queued_generations = {}
         self._event_future = None
-        self._pdf_embedded_storage_notice_reported = False
         self.on_reconcile_started = None
         self.on_reconciled = None
         self._validate_source_boundaries()
@@ -260,13 +258,6 @@ class ServerLibraryManager:
                 return self._stopped_summary()
             if self._stop_event.is_set():
                 return self._stopped_summary()
-            if (
-                self.book_id_storage == BOOK_ID_STORAGE_EMBEDDED
-                and not self._pdf_embedded_storage_notice_reported
-                and any(source_format(path) == PDF_FORMAT for path in discovered)
-            ):
-                self.reporter.notice(PDF_EMBEDDED_STORAGE_NOTICE)
-                self._pdf_embedded_storage_notice_reported = True
             discovered_set = {str(path.resolve()) for path in discovered}
             removed = 0
             with self._commit_lock:
@@ -379,11 +370,15 @@ class ServerLibraryManager:
                                 )
                             )
 
+                    defer_identity = (
+                        format_name == PDF_FORMAT
+                        and self.book_id_storage != BOOK_ID_STORAGE_EMBEDDED
+                    )
                     resolved = resolve_book_identity(
                         inspection,
                         self.book_id_storage,
                         external_candidates=external_candidates,
-                        persist=format_name == EPUB_FORMAT,
+                        persist=not defer_identity,
                     )
                     resolved_book_id = resolved.book_id
 
@@ -400,6 +395,11 @@ class ServerLibraryManager:
                             if self._stop_event.is_set():
                                 break
                             self._require_source_stat(source, resolved)
+                            if defer_identity:
+                                resolve_book_identity(
+                                    inspection, self.book_id_storage,
+                                    external_candidates=external_candidates,
+                                )
                             record = self.state_store.resolve_book(
                                 source,
                                 existing.epub_identifier,
@@ -446,6 +446,11 @@ class ServerLibraryManager:
                             if self._stop_event.is_set():
                                 break
                             self._require_source_stat(source, resolved)
+                            if defer_identity:
+                                resolve_book_identity(
+                                    inspection, self.book_id_storage,
+                                    external_candidates=external_candidates,
+                                )
                             record = self.state_store.resolve_book(
                                 source,
                                 metadata.epub_identifier,
@@ -474,7 +479,7 @@ class ServerLibraryManager:
                             source_mtime_ns=resolved.source_mtime_ns,
                             source_format=format_name,
                             pdf_metadata=pdf_metadata,
-                            identity_inspection=inspection,
+                            identity_inspection=inspection if defer_identity else None,
                         )
                     )
                 except Exception as error:
@@ -940,17 +945,18 @@ class ServerLibraryManager:
             had_previous = destination.exists()
             activated = False
             try:
-                persisted = resolve_book_identity(
-                    plan.identity_inspection,
-                    self.book_id_storage,
-                    external_candidates=(ExternalBookIdentity(
-                        "prepared Server PDF cache",
-                        plan.record.book_id,
-                        False,
-                    ),),
-                )
-                if persisted.book_id != plan.record.book_id:
-                    raise ValueError("PDF identity changed during conversion")
+                if plan.identity_inspection is not None:
+                    persisted = resolve_book_identity(
+                        plan.identity_inspection,
+                        self.book_id_storage,
+                        external_candidates=(ExternalBookIdentity(
+                            "prepared Server PDF cache",
+                            plan.record.book_id,
+                            False,
+                        ),),
+                    )
+                    if persisted.book_id != plan.record.book_id:
+                        raise ValueError("PDF identity changed during conversion")
                 if had_previous:
                     os.replace(destination, rollback)
                 os.replace(job_root, destination)
@@ -1146,9 +1152,10 @@ class ServerLibraryManager:
 
     @staticmethod
     def _capture_pdf_identity_state(plan: _ConversionPlan):
+        if plan.identity_inspection is None:
+            return ()
         paths = {sidecar_path_for(plan.source)}
-        if plan.identity_inspection is not None:
-            paths.update(sidecar.path for sidecar in plan.identity_inspection.matching_orphans)
+        paths.update(sidecar.path for sidecar in plan.identity_inspection.matching_orphans)
         return tuple(
             (path, path.read_bytes() if path.exists() or path.is_symlink() else None)
             for path in sorted(paths, key=str)
