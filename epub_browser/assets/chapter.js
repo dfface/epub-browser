@@ -1160,6 +1160,20 @@ function initScript() {
         }
     }
 
+    var chapterPrefetch = window.EpubChapterPrefetch
+        ? window.EpubChapterPrefetch.create({ urlFor: getChapterUrl })
+        : null;
+
+    function scheduleNextChapterPrefetch() {
+        // Continuous reading already appends the next chapter through
+        // loadNextChapter(); requesting the same page twice would be wasted.
+        if (!chapterPrefetch || isContinuousScroll) return;
+        chapterPrefetch.afterChapterRendered(
+            parseInt(chapter_index, 10),
+            parseInt(content.getAttribute('data-total-chapters'), 10)
+        );
+    }
+
     function navigateReaderChapter(url, options) {
         options = options || {};
         var target = chapterTargetFromUrl(url);
@@ -1189,6 +1203,12 @@ function initScript() {
         activeReaderChapterRequest += 1;
         var requestId = activeReaderChapterRequest;
         if (readerChapterXhr) readerChapterXhr.abort();
+
+        // A prefetched page is only usable when it still passes the same
+        // chapter/book checks as a network response; otherwise fall through.
+        var cached = chapterPrefetch ? chapterPrefetch.take(target.index) : null;
+        if (cached && applyReaderChapterResponse(cached, target, options)) return true;
+
         var xhr = new XMLHttpRequest();
         readerChapterXhr = xhr;
         xhr.open('GET', url, true);
@@ -1199,24 +1219,8 @@ function initScript() {
                 showNotification(i18n.t('reader.chapterLoadFailed'), 'warning');
                 return;
             }
-            var tempDiv = document.createElement('div');
-            tempDiv.innerHTML = xhr.responseText;
-            var chapterContent = tempDiv.querySelector('#eb-content');
-            if (
-                !chapterContent ||
-                parseInt(chapterContent.getAttribute('data-chapter-index'), 10) !== target.index ||
-                chapterContent.getAttribute('data-book-hash') !== content.getAttribute('data-book-hash')
-            ) {
+            if (!applyReaderChapterResponse(xhr.responseText, target, options)) {
                 showNotification(i18n.t('reader.chapterLoadFailed'), 'warning');
-                return;
-            }
-            updateReaderChapterHistory(target, options);
-            if (isContinuousScroll) {
-                replaceContinuousChapterWindow(target, chapterContent, tempDiv);
-            } else {
-                replaceReaderChapterContent(chapterContent, tempDiv, target);
-                if (isPaginationMode) refreshPaginationChapter(target);
-                else refreshNormalScrollChapter(target);
             }
         };
         xhr.onerror = function() {
@@ -1225,6 +1229,29 @@ function initScript() {
             showNotification(i18n.t('reader.chapterLoadFailed'), 'warning');
         };
         xhr.send();
+        return true;
+    }
+
+    function applyReaderChapterResponse(html, target, options) {
+        var tempDiv = document.createElement('div');
+        tempDiv.innerHTML = html;
+        var chapterContent = tempDiv.querySelector('#eb-content');
+        if (
+            !chapterContent ||
+            parseInt(chapterContent.getAttribute('data-chapter-index'), 10) !== target.index ||
+            chapterContent.getAttribute('data-book-hash') !== content.getAttribute('data-book-hash')
+        ) {
+            return false;
+        }
+        updateReaderChapterHistory(target, options);
+        if (isContinuousScroll) {
+            replaceContinuousChapterWindow(target, chapterContent, tempDiv);
+        } else {
+            replaceReaderChapterContent(chapterContent, tempDiv, target);
+            if (isPaginationMode) refreshPaginationChapter(target);
+            else refreshNormalScrollChapter(target);
+        }
+        scheduleNextChapterPrefetch();
         return true;
     }
 
@@ -3099,6 +3126,8 @@ function initScript() {
             }
         });
     });
+
+    scheduleNextChapterPrefetch();
 }
 
 window.initScriptChapter = initScript;

@@ -4565,6 +4565,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     <script src="/assets/vendor/glightbox/glightbox.min.js" defer></script>
     <script src="/assets/lightbox-adapter.js" defer></script>
     <script src="/assets/vendor/web-highlighter/web-highlighter.min.js" defer></script>
+    <script src="/assets/chapter-prefetch.js" defer></script>
     <script src="/assets/chapter-window.js" defer></script>
     <script src="/assets/viewport-anchor.js" defer></script>
     <script src="/assets/continuous-buffer.js" defer></script>
