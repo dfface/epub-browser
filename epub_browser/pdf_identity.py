@@ -1,12 +1,21 @@
 """Store an EPUB Browser ID in the PDF document information dictionary."""
 
 import os
+import shutil
 import stat
 import tempfile
 from pathlib import Path
+from typing import BinaryIO
 
-from pypdf import PdfReader, PdfWriter
-from pypdf.generic import NullObject
+from pypdf import PdfReader
+from pypdf.generic import (
+    DictionaryObject,
+    IndirectObject,
+    NameObject,
+    NullObject,
+    NumberObject,
+    TextStringObject,
+)
 
 from .epub_identity import validate_book_id
 
@@ -58,13 +67,11 @@ def embed_pdf_book_id(path: Path, book_id: str, expected_snapshot: tuple) -> str
             ):
                 raise ValueError("cannot embed a book ID in a signed PDF")
 
-            writer = PdfWriter(reader, incremental=True)
-            writer.add_metadata({PDF_BOOK_ID_KEY: book_id})
             with tempfile.NamedTemporaryFile(
                 mode="w+b", dir=path.parent, prefix=f".{path.name}.", delete=False,
             ) as output:
                 temporary = Path(output.name)
-                writer.write(output)
+                _write_metadata_update(reader, source, output, book_id)
                 os.fchmod(output.fileno(), stat.S_IMODE(source_stat.st_mode))
                 output.flush()
                 os.fsync(output.fileno())
@@ -77,6 +84,51 @@ def embed_pdf_book_id(path: Path, book_id: str, expected_snapshot: tuple) -> str
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def _write_metadata_update(
+    reader: PdfReader, source: BinaryIO, output: BinaryIO, book_id: str
+) -> None:
+    # pypdf's incremental writer clones the page tree, where references with
+    # nonzero generations can fail to resolve. This revision adds only /Info.
+    previous_xref = reader._startxref
+    if reader._get_xref_issues(source, previous_xref):
+        raise ValueError("cannot embed a book ID in a PDF with a broken cross-reference pointer")
+
+    info = reader.metadata
+    if info is None:
+        info = DictionaryObject()
+    info[NameObject(PDF_BOOK_ID_KEY)] = TextStringObject(book_id)
+
+    info_number = 1 + max(
+        reader.trailer.get("/Size", 0) - 1,
+        max((number for entries in reader.xref.values() for number in entries), default=0),
+        max((number for entries in reader.xref_free_entry.values() for number in entries), default=0),
+        max(reader.xref_objStm, default=0),
+        max((number for _, number in reader.resolved_objects), default=0),
+    )
+    trailer = DictionaryObject({
+        NameObject("/Size"): NumberObject(info_number + 1),
+        NameObject("/Root"): reader.trailer.raw_get("/Root"),
+        NameObject("/Info"): IndirectObject(info_number, 0, reader),
+        NameObject("/Prev"): NumberObject(previous_xref),
+    })
+    if "/ID" in reader.trailer:
+        trailer[NameObject("/ID")] = reader.trailer.raw_get("/ID")
+
+    source.seek(0)
+    shutil.copyfileobj(source, output)
+    output.write(b"\n")
+    info_offset = output.tell()
+    if info_offset >= 10**10:
+        raise ValueError("PDF is too large for an embedded book ID cross-reference table")
+    output.write(f"{info_number} 0 obj\n".encode("ascii"))
+    info.write_to_stream(output)
+    output.write(b"\nendobj\n")
+    xref_offset = output.tell()
+    output.write(f"xref\n{info_number} 1\n{info_offset:010d} 00000 n \ntrailer\n".encode("ascii"))
+    trailer.write_to_stream(output)
+    output.write(f"\nstartxref\n{xref_offset}\n%%EOF\n".encode("ascii"))
 
 
 def _snapshot(source_stat: os.stat_result) -> tuple[int, int, int, int]:

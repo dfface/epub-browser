@@ -295,7 +295,7 @@ To place the ID in EPUB OPF metadata or the PDF document information dictionary,
 --book-id-storage embedded
 ```
 
-Embedded mode can rebuild the EPUB ZIP or append a PDF metadata update before conversion, so the source must be writable and safe to modify. Use sidecar mode for signed or encrypted PDFs. EPUB Browser stops when IDs disagree, active sources duplicate an ID, a carrier is invalid, or a required carrier cannot be written.
+Embedded mode can rebuild the EPUB ZIP or append a PDF metadata update before conversion. If the PDF cannot be updated and its source is unchanged, EPUB Browser saves the same ID in an adjacent sidecar. This includes signed, encrypted, and read-only PDFs. EPUB Browser stops when IDs disagree, active sources duplicate an ID, a carrier is invalid, or a required carrier cannot be written.
 
 When migrating storage modes, EPUB Browser copies the existing ID to the selected carrier and keeps the other valid carrier. An existing embedded ID from v2.0.4 is copied to the default sidecar without rewriting the EPUB. Both SSG and Server deliver a byte-for-byte copy of the PDF source after any metadata update.
 

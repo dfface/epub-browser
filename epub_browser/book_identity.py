@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Sequence
 
+from pypdf.errors import PyPdfError
+
 from .epub_identity import (
     ensure_embedded_book_id,
     read_embedded_book_id,
@@ -186,44 +188,39 @@ def resolve_book_identity(
     book_id = candidates[0][1] if candidates else new_server_book_id()
     _assert_snapshot(inspection)
 
+    resolved = ResolvedBookIdentity(
+        book_id=book_id,
+        source_fingerprint=inspection.source_fingerprint,
+        source_size=inspection.source_size,
+        source_mtime_ns=inspection.source_mtime_ns,
+    )
     if not persist:
-        return ResolvedBookIdentity(
-            book_id=book_id,
-            source_fingerprint=inspection.source_fingerprint,
-            source_size=inspection.source_size,
-            source_mtime_ns=inspection.source_mtime_ns,
-        )
+        return resolved
 
     if storage == BOOK_ID_STORAGE_SIDECAR:
-        if selected_orphan is not None:
-            adopt_sidecar(selected_orphan, inspection.source)
-        write_sidecar(
-            inspection.source,
-            book_id,
-            inspection.source_fingerprint,
-        )
-        _assert_snapshot(inspection)
-        return ResolvedBookIdentity(
-            book_id=book_id,
-            source_fingerprint=inspection.source_fingerprint,
-            source_size=inspection.source_size,
-            source_mtime_ns=inspection.source_mtime_ns,
-        )
+        return _persist_sidecar(inspection, resolved, selected_orphan)
 
     if inspection.embedded_book_id is not None:
-        _assert_snapshot(inspection)
-        return ResolvedBookIdentity(
-            book_id=book_id,
-            source_fingerprint=inspection.source_fingerprint,
-            source_size=inspection.source_size,
-            source_mtime_ns=inspection.source_mtime_ns,
-        )
+        return resolved
 
     format_name = source_format(inspection.source)
     if format_name == PDF_FORMAT:
-        persisted_id = embed_pdf_book_id(
-            inspection.source, book_id, inspection.source_snapshot
-        )
+        try:
+            persisted_id = embed_pdf_book_id(
+                inspection.source, book_id, inspection.source_snapshot
+            )
+        except (OSError, PyPdfError, ValueError):
+            # Fall back only while the inspected PDF is still unchanged.
+            # Recheck carriers in case a sidecar appeared during embedding.
+            _assert_snapshot(inspection)
+            exact_sidecar = read_exact_sidecar(inspection.source)
+            if exact_sidecar is not None and exact_sidecar.book_id != book_id:
+                raise BookIdentityConflict(
+                    f"Sidecar book ID {exact_sidecar.book_id!r} conflicts with {book_id!r}"
+                )
+            return _persist_sidecar(
+                inspection, resolved, selected_orphan if exact_sidecar is None else None
+            )
     else:
         persisted_id = ensure_embedded_book_id(
             inspection.source, preferred_book_id=book_id
@@ -244,6 +241,18 @@ def resolve_book_identity(
         source_size=post_write[2],
         source_mtime_ns=post_write[3],
     )
+
+
+def _persist_sidecar(
+    inspection: BookIdentityInspection,
+    resolved: ResolvedBookIdentity,
+    orphan: Optional[SidecarIdentity],
+) -> ResolvedBookIdentity:
+    if orphan is not None:
+        adopt_sidecar(orphan, inspection.source)
+    write_sidecar(inspection.source, resolved.book_id, resolved.source_fingerprint)
+    _assert_snapshot(inspection)
+    return resolved
 
 
 def _source_snapshot(path: Path) -> tuple[int, int, int, int]:

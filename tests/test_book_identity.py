@@ -5,7 +5,8 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
+from pypdf.errors import PdfReadError
 
 from epub_browser.book_identity import (
     BOOK_ID_STORAGE_EMBEDDED,
@@ -72,7 +73,7 @@ class BookIdentityTests(unittest.TestCase):
         self.assertEqual(read_embedded_book_id(self.source), "sidecar_id")
         self.assertEqual(sidecar_path_for(self.source).read_bytes(), sidecar_before)
 
-    def test_encrypted_pdf_requires_sidecar_storage(self):
+    def test_embedded_mode_falls_back_to_sidecar_for_encrypted_pdf(self):
         source = self.root / "encrypted.pdf"
         writer = PdfWriter()
         writer.add_blank_page(200, 300)
@@ -80,13 +81,75 @@ class BookIdentityTests(unittest.TestCase):
         writer.write(source)
         before = source.read_bytes()
 
-        with self.assertRaisesRegex(ValueError, "encrypted PDF"):
-            resolve_book_identity(inspect_book_identity(source), BOOK_ID_STORAGE_EMBEDDED)
+        resolved = resolve_book_identity(inspect_book_identity(source), BOOK_ID_STORAGE_EMBEDDED)
+        self.assertEqual(read_exact_sidecar(source).book_id, resolved.book_id)
+        self.assertEqual(read_exact_sidecar(source).source_fingerprint, source_sha256(source))
+        repeated = resolve_book_identity(inspect_book_identity(source), BOOK_ID_STORAGE_EMBEDDED)
+        self.assertEqual(repeated.book_id, resolved.book_id)
+        self.assertEqual(source.read_bytes(), before)
+
+    def test_pdf_embed_failure_uses_existing_book_id(self):
+        source = self.root / "book.pdf"
+        writer = PdfWriter()
+        writer.add_blank_page(200, 300)
+        writer.write(source)
+        before = source.read_bytes()
+        with mock.patch(
+            "epub_browser.book_identity.embed_pdf_book_id",
+            side_effect=PdfReadError("Object not found"),
+        ):
+            resolved = resolve_book_identity(
+                inspect_book_identity(source),
+                BOOK_ID_STORAGE_EMBEDDED,
+                external_candidates=(ExternalBookIdentity("Server record", "existing_id", True),),
+            )
+        self.assertEqual(resolved.book_id, "existing_id")
+        self.assertEqual(read_exact_sidecar(source).book_id, "existing_id")
+        self.assertEqual(source.read_bytes(), before)
+
+    def test_pdf_embed_failure_does_not_write_sidecar_after_source_changes(self):
+        source = self.root / "changed.pdf"
+        writer = PdfWriter()
+        writer.add_blank_page(200, 300)
+        writer.write(source)
+
+        def change_source(*_args):
+            with source.open("ab") as stream:
+                stream.write(b"\n% changed by another process\n")
+            raise OSError("source changed")
+
+        with mock.patch("epub_browser.book_identity.embed_pdf_book_id", side_effect=change_source):
+            with self.assertRaisesRegex(BookIdentityError, "source changed"):
+                resolve_book_identity(inspect_book_identity(source), BOOK_ID_STORAGE_EMBEDDED)
         self.assertFalse(sidecar_path_for(source).exists())
 
-        resolved = resolve_book_identity(inspect_book_identity(source), "sidecar")
-        self.assertEqual(read_exact_sidecar(source).book_id, resolved.book_id)
-        self.assertEqual(source.read_bytes(), before)
+    def test_pdf_embedding_preserves_page_objects_with_nonzero_generation(self):
+        source = self.root / "reused-page-object.pdf"
+        pdf = bytearray(b"%PDF-1.4\n")
+        entries = [b"0000000000 65535 f \n"]
+        for number, generation, body in (
+            (1, 0, b"<< /Type /Catalog /Pages 2 0 R >>"),
+            (2, 0, b"<< /Type /Pages /Count 1 /Kids [4 1 R] >>"),
+            (3, 0, b"<< /Title (Reused page object) >>"),
+            (4, 1, b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 300] >>"),
+        ):
+            entries.append(f"{len(pdf):010d} {generation:05d} n \n".encode())
+            pdf.extend(f"{number} {generation} obj\n".encode() + body + b"\nendobj\n")
+        startxref = len(pdf)
+        pdf.extend(b"xref\n0 5\n" + b"".join(entries))
+        pdf.extend(b"trailer\n<< /Size 5 /Root 1 0 R /Info 3 0 R >>\n")
+        pdf.extend(f"startxref\n{startxref}\n%%EOF\n".encode())
+        source.write_bytes(pdf)
+
+        resolved = resolve_book_identity(inspect_book_identity(source), "embedded")
+
+        self.assertTrue(source.read_bytes().startswith(pdf))
+        self.assertFalse(sidecar_path_for(source).exists())
+        reader = PdfReader(source, strict=True)
+        self.assertEqual(reader.metadata.title, "Reused page object")
+        self.assertEqual(reader.metadata["/EpubBrowserBookId"], resolved.book_id)
+        self.assertEqual(len(reader.pages), 1)
+        self.assertEqual(reader.pages[0].indirect_reference.generation, 1)
 
     def test_explicit_pdf_source_parent_contributes_orphan_sidecars(self):
         source = self.root / "old.PDF"

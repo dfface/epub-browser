@@ -71,7 +71,8 @@ def _add_book_id_storage(parser: argparse.ArgumentParser) -> None:
         default=BOOK_ID_STORAGE_SIDECAR,
         help=(
             "Store stable IDs in visible sidecars (default) or embed them in "
-            "EPUB OPF and PDF document metadata"
+            "EPUB OPF and PDF document metadata. PDFs use a sidecar if the "
+            "metadata update fails and the source is unchanged"
         ),
     )
 
