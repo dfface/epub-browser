@@ -56,9 +56,10 @@ Server 的 PDF 书籍页、目录和 `chapter_<n>.html` 同样在请求时动态
 Session 鉴权且支持 Range 的同源路由交付；不得暴露绝对路径、绕过书籍可见性，也不得加入
 PAT/OpenAPI 的原始文件下载接口。SSG 则只在静态书籍目录写出一个 `document.pdf`。
 
-PDF 的稳定 ID 必须写入相邻 sidecar；`--book-id-storage=embedded` 对 PDF 只允许回退到
-sidecar，绝不能修改 PDF 字节。监控目录中书籍消失时使用软删除，重新出现且 ID 相同时恢复
-原记录及关联数据，不得重新生成内部书籍身份。
+PDF 的稳定 ID 默认写入相邻 sidecar。`--book-id-storage=embedded` 在转换前通过增量更新将
+ID 写入 PDF 文档信息字典；签名或加密的 PDF 必须使用 sidecar。缓存仍逐字节复制写入 ID
+后的源文件。监控目录中书籍消失时使用软删除，重新出现且 ID 相同时恢复原记录及关联数据，
+不得重新生成内部书籍身份。
 
 ## 何时修改 Server 内容修订
 

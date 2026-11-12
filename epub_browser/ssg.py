@@ -38,7 +38,6 @@ from .sidecar_identity import (
     sidecar_path_for,
 )
 from .source_format import (
-    PDF_EMBEDDED_STORAGE_NOTICE,
     EPUB_FORMAT,
     PDF_FORMAT,
     is_supported_source,
@@ -141,10 +140,14 @@ class SSGPublisher:
                         source,
                         orphan_sidecars=orphan_sidecars,
                     )
+                    defer_identity = (
+                        format_name == PDF_FORMAT
+                        and self.config.book_id_storage != BOOK_ID_STORAGE_EMBEDDED
+                    )
                     identity = resolve_book_identity(
                         inspection,
                         self.config.book_id_storage,
-                        persist=format_name != PDF_FORMAT,
+                        persist=not defer_identity,
                     )
                     book_id = identity.book_id
                     if format_name == EPUB_FORMAT:
@@ -168,9 +171,7 @@ class SSGPublisher:
                         source_format=format_name,
                         source_fingerprint=identity.source_fingerprint,
                         pdf_metadata=pdf_metadata,
-                        identity_inspection=(
-                            inspection if format_name == PDF_FORMAT else None
-                        ),
+                        identity_inspection=inspection if defer_identity else None,
                     ))
                 except Exception as error:
                     failures.append((source, str(error)))
@@ -234,11 +235,6 @@ class SSGPublisher:
         unique = tuple(sorted(set(discovered), key=str))
         if not unique:
             raise SSGBuildError("No EPUB or PDF files were discovered")
-        if (
-            self.config.book_id_storage == BOOK_ID_STORAGE_EMBEDDED
-            and any(source_format(path) == PDF_FORMAT for path in unique)
-        ):
-            self.reporter.notice(PDF_EMBEDDED_STORAGE_NOTICE)
         return unique
 
     def _validate_output_target(self, sources: Sequence[Path]) -> None:
@@ -465,11 +461,9 @@ class SSGPublisher:
 
     def _persist_pdf_identities(self, prepared: Sequence[_PreparedBook]) -> None:
         for book in prepared:
-            if book.source_format != PDF_FORMAT:
-                continue
             inspection = book.identity_inspection
             if inspection is None:
-                raise SSGBuildError("PDF identity was not prepared")
+                continue
             resolved = resolve_book_identity(
                 inspection,
                 self.config.book_id_storage,
@@ -488,14 +482,13 @@ class SSGPublisher:
     ) -> tuple[_SidecarState, ...]:
         paths = set()
         for book in prepared:
-            if book.source_format != PDF_FORMAT:
+            if book.identity_inspection is None:
                 continue
             paths.add(sidecar_path_for(book.source))
-            if book.identity_inspection is not None:
-                paths.update(
-                    sidecar.path
-                    for sidecar in book.identity_inspection.matching_orphans
-                )
+            paths.update(
+                sidecar.path
+                for sidecar in book.identity_inspection.matching_orphans
+            )
         return tuple(
             _SidecarState(
                 path=path,

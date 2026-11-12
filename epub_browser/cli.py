@@ -70,8 +70,8 @@ def _add_book_id_storage(parser: argparse.ArgumentParser) -> None:
         choices=BOOK_ID_STORAGE_CHOICES,
         default=BOOK_ID_STORAGE_SIDECAR,
         help=(
-            "Store stable IDs in visible sidecars (default) or EPUB OPF metadata; "
-            "embedded storage is EPUB-only and PDF always uses a sidecar"
+            "Store stable IDs in visible sidecars (default) or embed them in "
+            "EPUB OPF and PDF document metadata"
         ),
     )
 

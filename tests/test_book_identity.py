@@ -5,6 +5,8 @@ import zipfile
 from pathlib import Path
 from unittest import mock
 
+from pypdf import PdfWriter
+
 from epub_browser.book_identity import (
     BOOK_ID_STORAGE_EMBEDDED,
     BookIdentityConflict,
@@ -70,32 +72,35 @@ class BookIdentityTests(unittest.TestCase):
         self.assertEqual(read_embedded_book_id(self.source), "sidecar_id")
         self.assertEqual(sidecar_path_for(self.source).read_bytes(), sidecar_before)
 
-    def test_pdf_uses_sidecar_when_embedded_storage_is_requested(self):
-        source = self.root / "book.PDF"
-        source.write_bytes(b"%PDF-1.4\n%%EOF\n")
+    def test_encrypted_pdf_requires_sidecar_storage(self):
+        source = self.root / "encrypted.pdf"
+        writer = PdfWriter()
+        writer.add_blank_page(200, 300)
+        writer.encrypt("protected")
+        writer.write(source)
         before = source.read_bytes()
 
-        resolved = resolve_book_identity(
-            inspect_book_identity(source), BOOK_ID_STORAGE_EMBEDDED
-        )
+        with self.assertRaisesRegex(ValueError, "encrypted PDF"):
+            resolve_book_identity(inspect_book_identity(source), BOOK_ID_STORAGE_EMBEDDED)
+        self.assertFalse(sidecar_path_for(source).exists())
 
+        resolved = resolve_book_identity(inspect_book_identity(source), "sidecar")
         self.assertEqual(read_exact_sidecar(source).book_id, resolved.book_id)
         self.assertEqual(source.read_bytes(), before)
 
     def test_explicit_pdf_source_parent_contributes_orphan_sidecars(self):
         source = self.root / "old.PDF"
-        source.write_bytes(b"%PDF-1.4\nold\n%%EOF\n")
-        first = resolve_book_identity(
-            inspect_book_identity(source), BOOK_ID_STORAGE_EMBEDDED
-        )
+        writer = PdfWriter()
+        writer.add_blank_page(200, 300)
+        writer.write(source)
+        first = resolve_book_identity(inspect_book_identity(source), "sidecar")
         orphan = sidecar_path_for(source)
         moved = self.root / "moved.pdf"
         source.rename(moved)
 
         orphan_sidecars = discover_orphan_sidecars((moved,), (moved,))
         second = resolve_book_identity(
-            inspect_book_identity(moved, orphan_sidecars=orphan_sidecars),
-            BOOK_ID_STORAGE_EMBEDDED,
+            inspect_book_identity(moved, orphan_sidecars=orphan_sidecars), "sidecar"
         )
 
         self.assertEqual(orphan_sidecars, (orphan,))

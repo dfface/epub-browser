@@ -16,7 +16,7 @@ from pathlib import Path
 from unittest import mock
 
 from starlette.testclient import TestClient
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
 
 from epub_browser.asset_publisher import AssetPublisher
 from epub_browser.auth import AuthConfig, AuthService, BootstrapCredentials
@@ -1263,56 +1263,47 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(summary.active_books, ())
         manager.shutdown()
 
-    def test_pdf_reconcile_discovers_directory_and_explicit_sources_without_identity_mutation(self):
+    def test_pdf_reconcile_embeds_id_and_reuses_the_updated_cache(self):
         self.source.unlink()
-        directory_pdf = self.source_dir / "directory.PDF"
-        self._write_pdf(directory_pdf, title="Directory PDF", pages=1)
-        explicit_dir = self.root / "explicit"
-        explicit_dir.mkdir()
-        explicit_pdf = explicit_dir / "explicit.pdf"
-        self._write_pdf(explicit_pdf, title="Explicit PDF", pages=2)
-        before = {
-            directory_pdf: directory_pdf.read_bytes(),
-            explicit_pdf: explicit_pdf.read_bytes(),
-        }
-        manager = ServerLibraryManager(
-            server_dir=self.server_dir,
-            sources=(self.source_dir, explicit_pdf),
-            state_store=self.store,
-            migration_manager=self.migration,
-            reporter=Reporter(True),
-            book_id_storage="embedded",
-        )
+        source = self.source_dir / "directory.PDF"
+        self._write_pdf(source, title="Embedded PDF", pages=2)
+        before = source.read_bytes()
+        manager = self._manager(book_id_storage="embedded")
 
-        with contextlib.redirect_stderr(io.StringIO()) as stderr:
-            first = manager.reconcile()
-            second = manager.reconcile(trigger="watch")
-
+        first = manager.reconcile()
         self.assertEqual(first.failed, 0)
-        self.assertEqual(first.converted, 2)
+        self.assertEqual(first.converted, 1)
+        book = first.active_books[0]
+        embedded = source.read_bytes()
+        self.assertEqual(PdfReader(source).metadata["/EpubBrowserBookId"], book.book_id)
+        self.assertTrue(embedded.startswith(before))
+        self.assertFalse(sidecar_path_for(source).exists())
+        document = manager.public_dir / "book" / book.book_id / "pdf" / "document.pdf"
+        self.assertEqual(document.read_bytes(), embedded)
+
+        second = manager.reconcile(trigger="watch")
         self.assertEqual(second.failed, 0)
-        self.assertEqual(second.reused, 2)
-        self.assertEqual(len(first.active_books), 2)
-        self.assertEqual(len(second.active_books), 2)
-        for source, original in before.items():
-            self.assertEqual(source.read_bytes(), original)
-            self.assertTrue(sidecar_path_for(source).is_file())
-            record = self.store.book_by_source(source)
-            self.assertEqual(record.source_format, "pdf")
-            self.assertEqual(
-                (
-                    manager.public_dir
-                    / "book"
-                    / record.book_id
-                    / "pdf"
-                    / "document.pdf"
-                ).read_bytes(),
-                original,
-            )
-        output = stderr.getvalue()
-        self.assertEqual(output.count("Embedded book ID storage is EPUB-only"), 1)
-        self.assertIn("PDF identities use adjacent sidecars", output)
+        self.assertEqual(second.reused, 1)
+        self.assertEqual(source.read_bytes(), embedded)
+
+        moved = self.source_dir / "renamed.pdf"
+        source.rename(moved)
+        restored = manager.reconcile(trigger="watch")
+        self.assertEqual(restored.failed, 0)
+        self.assertEqual(restored.active_books[0].book_id, book.book_id)
+        self.assertEqual(moved.read_bytes(), embedded)
+        self.assertEqual(document.read_bytes(), embedded)
         manager.shutdown()
+
+        sidecar_manager = self._manager()
+        try:
+            switched = sidecar_manager.reconcile()
+            self.assertEqual(switched.failed, 0)
+            self.assertEqual(switched.reused, 1)
+            self.assertEqual(read_exact_sidecar(moved).book_id, book.book_id)
+            self.assertEqual(moved.read_bytes(), embedded)
+        finally:
+            sidecar_manager.shutdown()
 
     def test_rejects_managed_and_source_directory_nesting(self):
         nested_server = self.source_dir / "server"
