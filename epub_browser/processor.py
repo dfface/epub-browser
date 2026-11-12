@@ -144,8 +144,6 @@ body.sepia .k-nav,body.dark .k-nav{border-color:#666}
 .k-toc a{color:inherit;text-decoration:none;display:block}
 .k-toc .sec{color:#666;font-size:14px}
 body.dark .k-toc .sec{color:#9a9a9a}
-.k-footer{padding:0 16px 24px;color:#666;font-size:13px}
-body.dark .k-footer{color:#9a9a9a}
 """
 
 _KINDLE_READER_JS = r"""
@@ -332,8 +330,6 @@ body.sepia .k-book .k-toc a[aria-current]{background:#e6d8ba}
 body.dark .k-book .k-toc a[aria-current]{background:#333}
 .k-book .k-toc .sec{padding-top:13px;font-weight:bold}
 .k-book .k-toc li:last-child a{border-bottom:0}
-.k-book .k-footer{padding:8px 0 18px}
-.k-book .k-footer a{color:inherit;display:inline-block;min-height:44px;line-height:44px}
 @media (max-width:360px){.k-book-hero .k-cover{width:75px;height:104px;margin-right:12px}}
 """
 
@@ -3335,7 +3331,6 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     <h2 data-i18n="contents">{html.escape(kindle_labels["contents"])}</h2>
     <div class="k-toc" lang="{book_language}"><ul>{toc_html}</ul></div>
 </section>
-<p class="k-footer"><a href="index.html?full=1" data-i18n="openFullReader">Open full reader</a></p>
 </main>
 {render_kindle_dock(self.urls, locale or "en", tools=tools)}
 <script>
