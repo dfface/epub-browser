@@ -1,6 +1,9 @@
 """Dependency-free Server dashboard for legacy Kindle browsers."""
 
 import json
+from datetime import datetime
+from functools import lru_cache
+from zoneinfo import ZoneInfo, available_timezones
 from html import escape
 from typing import Callable
 
@@ -10,6 +13,17 @@ from .locales import SUPPORTED_LOCALES
 
 KINDLE_WIDGETS = ("clock", "calendar", "memo", "default")
 KINDLE_MEMO_MAX_LENGTH = 4000
+
+
+@lru_cache(maxsize=1)
+def kindle_timezones():
+    return tuple(sorted(available_timezones()))
+
+
+def kindle_timezone_offset(zone):
+    if not zone:
+        return None
+    return int(datetime.now(ZoneInfo(zone)).utcoffset().total_seconds())
 
 
 def valid_kindle_memo(text):
@@ -210,7 +224,9 @@ def render_kindle_dashboard_widgets(settings, locale, active):
     pomodoro = _render_pomodoro(copy) if settings["pomodoro"] else ""
     pomodoro_script = _POMODORO_JS if pomodoro else ""
     visible = '' if active else ' style="display:none"'
-    panels = f'<section id="kDashboardWidgets" class="k-dashboard" data-k-view{visible}>{clock}{widgets}{agenda}</section>'
+    offset = kindle_timezone_offset(settings.get("timezone"))
+    timezone_attr = f' data-timezone-offset="{offset}"' if offset is not None else ""
+    panels = f'<section id="kDashboardWidgets" class="k-dashboard" data-k-view{visible}{timezone_attr}>{clock}{widgets}{agenda}</section>'
     return panels + pomodoro, _DASHBOARD_JS + pomodoro_script
 
 
@@ -265,6 +281,9 @@ body.dark #kDays td.today{background:#eee;color:#111}
 
 _DASHBOARD_JS = r"""
 (function () {
+  var dashboard = document.getElementById('kDashboardWidgets');
+  var offsetAttr = dashboard.getAttribute('data-timezone-offset');
+  var timezoneOffset = offsetAttr === null ? null : Number(offsetAttr);
   var clock = document.getElementById('kClock');
   var clockDate = document.getElementById('kClockDate');
   var hour = document.getElementById('kHour');
@@ -278,6 +297,7 @@ _DASHBOARD_JS = r"""
   var calendarUnavailable = false;
   var calendarLoaded = false;
   var calendarPartial = false;
+  var calendarLocalized = false;
   var locale = document.documentElement.lang;
   var lastDate = '';
   function weekdays() {
@@ -288,6 +308,7 @@ _DASHBOARD_JS = r"""
   function label(date, options, fallback) {
     try {
       if (window.Intl && Intl.DateTimeFormat) {
+        options.timeZone = 'UTC';
         return new Intl.DateTimeFormat(locale, options).format(date);
       }
     } catch (error) {}
@@ -296,27 +317,36 @@ _DASHBOARD_JS = r"""
   function setText(node, text) {
     if (node.textContent !== text) node.textContent = text;
   }
+  // Treat calendar dates as UTC internally so device daylight saving does not
+  // interfere with calculations for a different time zone.
+  function wallDate(date) {
+    var offset = timezoneOffset === null ? -date.getTimezoneOffset() * 60 : timezoneOffset;
+    return new Date(date.getTime() + offset * 1000);
+  }
   function eventDate(text) {
     if (!text) return null;
-    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
-      var parts = text.split('-');
-      return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    var parts = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2}))?/);
+    if (!parts) return null;
+    // The server already projects timed events into the selected zone.
+    if (calendarLocalized || text.length === 10 || text.length === 19) {
+      return new Date(Date.UTC(Number(parts[1]), Number(parts[2]) - 1, Number(parts[3]),
+        Number(parts[4] || 0), Number(parts[5] || 0), Number(parts[6] || 0)));
     }
     var parsed = new Date(text);
-    return isNaN(parsed.getTime()) ? null : parsed;
+    return isNaN(parsed.getTime()) ? null : wallDate(parsed);
   }
   function eventOnDay(event, day) {
     var start = eventDate(event.start);
     if (!start) return false;
     var end = eventDate(event.end) || start;
-    var tomorrow = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+    var tomorrow = new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate() + 1));
     return start < tomorrow && (end > day || start >= day);
   }
   function drawAgenda(now) {
     if (!agenda) return;
     agenda.innerHTML = '';
-    var startDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    var endDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+    var startDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    var endDay = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 7));
     for (var i = 0; i < events.length && agenda.children.length < 12; i++) {
       var event = events[i];
       var start = eventDate(event.start);
@@ -325,12 +355,12 @@ _DASHBOARD_JS = r"""
       var row = document.createElement('li');
       var time = document.createElement('time');
       var shown = start < startDay ? startDay : start;
-      var dateLabel = shown.getFullYear() + '-' + pad(shown.getMonth() + 1) + '-' + pad(shown.getDate());
+      var dateLabel = shown.getUTCFullYear() + '-' + pad(shown.getUTCMonth() + 1) + '-' + pad(shown.getUTCDate());
       time.setAttribute('datetime', shown === start ? event.start : dateLabel);
       time.textContent = label(shown, {month: 'short', day: 'numeric'},
-        pad(shown.getMonth() + 1) + '/' + pad(shown.getDate()));
+        pad(shown.getUTCMonth() + 1) + '/' + pad(shown.getUTCDate()));
       if (shown === start && event.start.length > 10) {
-        time.textContent += ' · ' + pad(start.getHours()) + ':' + pad(start.getMinutes());
+        time.textContent += ' · ' + pad(start.getUTCHours()) + ':' + pad(start.getUTCMinutes());
       }
       row.appendChild(time);
       row.appendChild(document.createTextNode(event.title));
@@ -352,6 +382,7 @@ _DASHBOARD_JS = r"""
           var payload = JSON.parse(xhr.responseText);
           calendarUnavailable = payload.unavailable;
           calendarPartial = payload.partial === true;
+          calendarLocalized = payload.localized === true;
           if (!calendarUnavailable) events = payload.events;
         } catch (error) { calendarUnavailable = true; }
       }
@@ -362,33 +393,33 @@ _DASHBOARD_JS = r"""
     xhr.send(null);
   }
   function update() {
-    var now = new Date();
+    var now = wallDate(new Date());
     if (clock) {
-      var hours = pad(now.getHours());
-      var minutes = pad(now.getMinutes());
+      var hours = pad(now.getUTCHours());
+      var minutes = pad(now.getUTCMinutes());
       setText(hour, hours);
       setText(minute, minutes);
       var time = hours + ':' + minutes;
       if (clock.getAttribute('datetime') !== time) clock.setAttribute('datetime', time);
     }
-    var dateKey = now.toDateString();
+    var dateKey = now.getUTCFullYear() + '/' + now.getUTCMonth() + '/' + now.getUTCDate();
     if (lastDate === dateKey) return;
     lastDate = dateKey;
-    var year = now.getFullYear();
-    var m = now.getMonth();
+    var year = now.getUTCFullYear();
+    var m = now.getUTCMonth();
     if (clockDate) {
       setText(clockDate, label(now, {weekday: 'long', month: 'long', day: 'numeric'},
-        year + '/' + pad(m + 1) + '/' + pad(now.getDate())));
+        year + '/' + pad(m + 1) + '/' + pad(now.getUTCDate())));
     }
     if (!days) return;
-    var first = (new Date(year, m, 1).getDay() + 6) % 7;
-    var count = new Date(year, m + 1, 0).getDate();
+    var first = (new Date(Date.UTC(year, m, 1)).getUTCDay() + 6) % 7;
+    var count = new Date(Date.UTC(year, m + 1, 0)).getUTCDate();
     setText(month, label(now, {year: 'numeric', month: 'long'}, year + ' / ' + pad(m + 1)));
     var rows = '<thead><tr>';
     var fallbackDays = weekdays();
     for (var i = 0; i < 7; i++) {
       var heading = document.createElement('span');
-      heading.textContent = label(new Date(2024, 0, i + 1), {weekday: 'short'}, fallbackDays[i]);
+      heading.textContent = label(new Date(Date.UTC(2024, 0, i + 1)), {weekday: 'short'}, fallbackDays[i]);
       rows += '<th scope="col">' + heading.innerHTML + '</th>';
     }
     rows += '</tr></thead><tbody>';
@@ -396,11 +427,11 @@ _DASHBOARD_JS = r"""
       rows += '<tr>';
       for (var col = 0; col < 7; col++) {
         var day = offset + col - first + 1;
-        var today = day === now.getDate();
+        var today = day === now.getUTCDate();
         rows += '<td' + (today ? ' class="today" aria-current="date"' : '') + '>';
         if (day > 0 && day <= count) {
           var marked = false;
-          var date = new Date(year, m, day);
+          var date = new Date(Date.UTC(year, m, day));
           for (var e = 0; e < events.length && !marked; e++) marked = eventOnDay(events[e], date);
           rows += marked ? '<span class="event-day">' + day + '</span>' : day;
         }
@@ -410,6 +441,21 @@ _DASHBOARD_JS = r"""
     }
     days.innerHTML = rows + '</tbody>';
     drawAgenda(now);
+  }
+  function refreshTimezone() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', '/api/kindle/screensaver/timezone', true);
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4 || xhr.status !== 200) return;
+      try {
+        var offset = JSON.parse(xhr.responseText).offset;
+        if ((offset === null || typeof offset === 'number') && offset !== timezoneOffset) {
+          timezoneOffset = offset;
+          update();
+        }
+      } catch (error) {}
+    };
+    xhr.send(null);
   }
   function refreshMemo() {
     var xhr = new XMLHttpRequest();
@@ -432,6 +478,10 @@ _DASHBOARD_JS = r"""
     window.kActivateDashboard = null;
     if (clock || days) {
       update();
+      if (timezoneOffset !== null) {
+        refreshTimezone();
+        window.setInterval(refreshTimezone, 300000);
+      }
       (function tick() {
         window.setTimeout(function () {
           update();

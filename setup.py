@@ -54,6 +54,7 @@ setup(
         "Authlib>=1.6.11,<1.7",
         "httpx>=0.27,<1.0",
         "icalendar>=6,<8",
+        "tzdata",
         "recurring-ical-events>=3.6,<4",
         "mdict-utils==1.3.14",
         "pypdf>=6.0,<7.0",

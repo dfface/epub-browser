@@ -632,7 +632,7 @@ body.auth-page {
     border-top: 1px solid var(--account-border);
 }
 
-.account-kindle-fields :is(textarea, input) {
+.account-kindle-fields :is(textarea, input, select) {
     box-sizing: border-box;
     width: 100%;
     min-height: 44px;
@@ -648,7 +648,7 @@ body.auth-page {
     resize: vertical;
 }
 
-.account-kindle-fields :is(textarea, input):focus-visible {
+.account-kindle-fields :is(textarea, input, select):focus-visible {
     outline: 2px solid var(--account-primary);
     outline-offset: 2px;
 }

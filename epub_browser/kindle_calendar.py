@@ -2,6 +2,7 @@
 
 from contextlib import suppress
 from datetime import date, datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 from functools import lru_cache
 from gzip import GzipFile
 from http.client import HTTPException, HTTPSConnection
@@ -177,11 +178,12 @@ def calendar_events(payload, today):
 
 
 @lru_cache(maxsize=96)
-def load_calendar_events(user_id, url, refresh_window):
+def load_calendar_events(user_id, url, refresh_window, zone_name=""):
     """Cache a short rolling agenda for this account and exact feed URL."""
     try:
         payload = _fetch_calendar(calendar_url(url))
-        return calendar_events(payload, datetime.now(timezone.utc).date())
+        zone = ZoneInfo(zone_name) if zone_name else timezone.utc
+        return calendar_events(payload, datetime.now(zone).date())
     except (HTTPException, OSError, ValueError, TypeError, OverflowError, KeyError, EOFError, CompressionError):
         # Provider URLs can contain private subscription keys. Keep them out of
         # errors and logs.

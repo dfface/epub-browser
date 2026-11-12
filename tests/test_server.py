@@ -5918,6 +5918,35 @@ class ServerKindleTests(unittest.TestCase):
             options, calendar_url="https://127.0.0.1/private.ics"
         )).status_code, 400)
 
+    def test_kindle_timezone_is_saved_and_projects_calendar_events(self):
+        settings = "/api/account/kindle-screensaver"
+        offset = "/api/kindle/screensaver/timezone"
+        options = {"clock": True, "calendar": True, "memo": True, "default": False}
+        initial = self.client.get(settings).json()
+        self.assertEqual(initial["timezone"], "")
+        self.assertIn("Asia/Kathmandu", initial["timezones"])
+        self.assertIsNone(self.client.get(offset).json()["offset"])
+        self.assertEqual(self.client.put(settings, json=dict(
+            options, timezone="../../UTC",
+        )).json()["code"], "invalid_kindle_timezone")
+        saved = self.client.put(settings, json=dict(
+            options, timezone="Asia/Kathmandu", calendar_url="https://example.com/feed.ics",
+        ))
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(self.client.get(offset).json()["offset"], 20700)
+        self.assertIn('data-timezone-offset="20700"', self.client.get("/kindle/screensaver").text)
+        events = [
+            {"title": "Call", "start": "2026-11-12T20:00:00+00:00", "end": ""},
+            {"title": "Holiday", "start": "2026-11-13", "end": "2026-11-14"},
+        ]
+        with mock.patch("epub_browser.server.load_calendar_events", return_value=events):
+            agenda = self.client.get("/api/kindle/screensaver/calendar").json()["events"]
+        self.assertEqual(agenda[0]["start"], "2026-11-13T01:45:00+05:45")
+        self.assertEqual(agenda[1], events[1])
+        self.assertEqual(self.client.put(settings, json=options).json()["timezone"], "Asia/Kathmandu")
+        self.assertEqual(self.client.put(settings, json=dict(options, timezone="")).json()["timezone"], "")
+        self.assertIsNone(self.client.get(offset).json()["offset"])
+
     def test_kindle_merges_calendar_feeds_even_if_one_is_unavailable(self):
         options = {"clock": True, "calendar": True, "memo": True, "default": False}
         urls = ["webcal://calendar.example.com/first", "https://calendar.example.com/second",
@@ -5926,7 +5955,7 @@ class ServerKindleTests(unittest.TestCase):
         self.assertEqual(saved.status_code, 200)
         self.assertEqual(saved.json()["calendar_urls"], [url.replace("webcal:", "https:") for url in urls[:3]])
         event = {"start": "2026-11-12", "end": "", "title": "Shared event"}
-        def load(_user, url, _window):
+        def load(_user, url, _window, _zone_name):
             return None if url.endswith("offline") else [event]
         with mock.patch("epub_browser.server.load_calendar_events", side_effect=load):
             agenda = self.client.get("/api/kindle/screensaver/calendar").json()
@@ -5989,7 +6018,12 @@ class ServerKindleTests(unittest.TestCase):
         self.assertNotIn("secret", bob.get(path).text)
         options = {"clock": True, "calendar": False, "memo": False, "default": True}
         self.assertEqual(self.client.put(settings, json=options).status_code, 200)
-        self.assertEqual(self.client.get(settings).json(), dict(options, memo_text="<b>secret</b>", calendar_url="", calendar_urls=[], pomodoro=False))
+        preferences = self.client.get(settings).json()
+        self.assertIn("UTC", preferences.pop("timezones"))
+        self.assertEqual(preferences, dict(
+            options, memo_text="<b>secret</b>", calendar_url="", calendar_urls=[],
+            pomodoro=False, timezone="",
+        ))
         self.assertNotIn('id="kMemo"', self.client.get(path).text)
         self.assertNotIn('id="kCalendar"', self.client.get(path).text)
         self.assertEqual(self.client.get("/kindle", follow_redirects=False).headers["location"], path)
