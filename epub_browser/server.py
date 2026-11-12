@@ -3145,16 +3145,15 @@ window.location.assign(payload.redirect||'/');
         data = await json_object(request)
         if data is None:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
-        if not isinstance(data, dict) or 'recent_reading_limit' not in data:
-            return response(
-                error_payload('invalid_general_settings', 'Invalid general settings'),
-                400,
-            )
+        changes = {
+            key: data[key]
+            for key in ('recent_reading_limit', 'reading_insights_rank_limit')
+            if key in data
+        }
         try:
-            settings = await run_db(
-                store.set_general_settings,
-                recent_reading_limit=data['recent_reading_limit'],
-            )
+            if not changes or any(value is None for value in changes.values()):
+                raise ValueError
+            settings = await run_db(store.set_general_settings, **changes)
         except ValueError:
             return response(
                 error_payload('invalid_general_settings', 'Invalid general settings'),
@@ -5557,6 +5556,35 @@ window.location.assign(payload.redirect||'/');
             )
         return response({'insights': insights})
 
+    async def reading_insight_sessions(request):
+        principal = require_principal(request)
+        query = parse_qs(request.url.query, keep_blank_values=True)
+        try:
+            if set(query) - {'date', 'timezone', 'page'} or any(len(value) != 1 for value in query.values()):
+                raise ValueError
+            selected_date = query['date'][0]
+            page = query.get('page', ['1'])[0]
+            if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', selected_date) or not re.fullmatch(r'[1-9][0-9]{0,8}', page):
+                raise ValueError
+            result = await run_db(
+                store.reading_insight_sessions,
+                principal.user_id, date.fromisoformat(selected_date), query['timezone'][0], int(page),
+            )
+        except (KeyError, ValueError, OverflowError):
+            return response(error_payload('invalid_reading_insights', 'Invalid reading insights'), 400)
+        return response(result)
+
+    async def book_reading_insights(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if not await run_db(store.can_read_book, principal.user_id, principal.role, book_id):
+            return forbidden_book_response()
+        try:
+            result = await run_db(store.book_reading_insights, principal.user_id, book_id)
+        except KeyError:
+            return forbidden_book_response()
+        return response({'insights': result})
+
     def valid_webhook_configuration(data):
         if not isinstance(data, dict):
             return None
@@ -5757,6 +5785,8 @@ window.location.assign(payload.redirect||'/');
         Route('/api/reading-sessions/{book_id}/summary', reading_session_summary, methods=['GET']),
         Route('/api/reading-sessions/{book_id}/heartbeat', reading_session_heartbeat, methods=['POST']),
         Route('/api/reading-insights', reading_insights, methods=['GET']),
+        Route('/api/reading-insights/sessions', reading_insight_sessions, methods=['GET']),
+        Route('/api/books/{book_id}/insights', book_reading_insights, methods=['GET']),
         Route('/api/ai/status', ai_status, methods=['GET']),
         Route('/api/books/{book_id}/metadata', book_effective_metadata, methods=['GET']),
         Route('/api/books/{book_id}/dictionary/lookup', dictionary_lookup, methods=['POST']),

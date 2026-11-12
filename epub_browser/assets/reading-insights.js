@@ -21,15 +21,7 @@
     return [date.getUTCFullYear(), String(date.getUTCMonth() + 1).padStart(2, '0'), String(date.getUTCDate()).padStart(2, '0')].join('-');
   }
 
-  function endpoint(target, period, anchor, timezone) {
-    var path = '/api/reading-insights?period=' + encodeURIComponent(period) +
-      '&anchor=' + encodeURIComponent(anchor) + '&timezone=' + encodeURIComponent(timezone);
-    return target.EpubBrowserURL && typeof target.EpubBrowserURL.publicPath === 'function'
-      ? target.EpubBrowserURL.publicPath(path) : path;
-  }
-
-  function bookPath(target, bookId) {
-    var path = '/book/' + encodeURIComponent(bookId) + '/index.html';
+  function publicPath(target, path) {
     return target.EpubBrowserURL && typeof target.EpubBrowserURL.publicPath === 'function'
       ? target.EpubBrowserURL.publicPath(path) : path;
   }
@@ -47,8 +39,16 @@
       anchor: localIsoDate(),
       timezone: 'UTC',
       insights: null,
+      bookId: '',
+      book: null,
+      bookOrigin: null,
+      sessions: null,
+      sessionPage: 1,
+      reportStatus: '',
+      sessionStatus: '',
+      request: null,
+      tooltipTimer: null,
       selectedDay: '',
-      loading: false,
       root: null,
       view: {},
       modal: null,
@@ -173,19 +173,6 @@
         : formatDay(value);
     }
 
-    function sessionDate(value) {
-      var date = new Date(value);
-      try {
-        var parts = new intl().DateTimeFormat('en-CA', {
-          timeZone: state.timezone, year: 'numeric', month: '2-digit', day: '2-digit'
-        }).formatToParts(date);
-        var values = {};
-        parts.forEach(function(part) { values[part.type] = part.value; });
-        if (values.year && values.month && values.day) return values.year + '-' + values.month + '-' + values.day;
-      } catch (error) {}
-      return localIsoDate(date);
-    }
-
     function append(parent, tag, className, text) {
       var item = documentTarget.createElement(tag);
       if (className) item.className = className;
@@ -194,41 +181,97 @@
       return item;
     }
 
+    function hideTooltip() {
+      clearTimeout(state.tooltipTimer);
+      if (state.view.tooltip) state.view.tooltip.hidden = true;
+    }
+
+    function deferTooltipHide() {
+      clearTimeout(state.tooltipTimer);
+      state.tooltipTimer = setTimeout(hideTooltip, 220);
+    }
+
     function attachTooltip(trigger, label) {
-      if (!trigger || !label) return;
-      trigger.setAttribute('aria-describedby', 'readingInsightsTooltip');
+      trigger.addEventListener('mouseenter', show);
+      trigger.addEventListener('focus', show);
+      trigger.addEventListener('mouseleave', deferTooltipHide);
+      trigger.addEventListener('blur', deferTooltipHide);
       function show() {
         var tooltip = state.view.tooltip;
         if (!tooltip) return;
+        clearTimeout(state.tooltipTimer);
         tooltip.textContent = label;
         tooltip.hidden = false;
         if (!trigger.getBoundingClientRect || !tooltip.style) return;
         var rect = trigger.getBoundingClientRect();
-        tooltip.style.left = Math.round(rect.left + rect.width / 2) + 'px';
-        tooltip.style.top = Math.round(rect.top) + 'px';
+        var half = tooltip.offsetWidth / 2;
+        var left = Math.min(target.innerWidth - half - 8, Math.max(half + 8, rect.left + rect.width / 2));
+        var headerBottom = state.modal?.querySelector('.reading-insights-modal-header').getBoundingClientRect().bottom || 0;
+        var below = rect.top - tooltip.offsetHeight - 6 < headerBottom;
+        tooltip.classList.toggle('is-below', below);
+        tooltip.style.left = Math.round(left) + 'px';
+        tooltip.style.top = Math.round(below ? rect.bottom : rect.top) + 'px';
       }
-      function hide() {
-        if (state.view.tooltip) state.view.tooltip.hidden = true;
-      }
-      trigger.addEventListener('mouseenter', show);
-      trigger.addEventListener('focus', show);
-      trigger.addEventListener('mouseleave', hide);
-      trigger.addEventListener('blur', hide);
     }
 
-    function setBusy(busy) {
-      state.loading = busy;
-      if (state.root) state.root.setAttribute('aria-busy', busy ? 'true' : 'false');
-      (state.view.periodButtons || []).forEach(function(button) { button.disabled = busy; });
-      (state.view.dayButtons || []).forEach(function(button) { button.disabled = busy; });
-      if (state.view.previousRange) state.view.previousRange.disabled = busy;
-      if (state.view.nextRange) state.view.nextRange.disabled = busy;
-      if (state.view.todayRange) state.view.todayRange.disabled = busy;
-      (state.view.metricButtons || []).forEach(function(button) { button.disabled = busy; });
+    function arrowNavigation(items, initial, columnStep) {
+      items.forEach(function(item, index) {
+        item.setAttribute('tabindex', index === initial ? '0' : '-1');
+        item.addEventListener('focus', function() {
+          items[initial].setAttribute('tabindex', '-1');
+          item.setAttribute('tabindex', '0');
+          initial = index;
+        });
+        item.addEventListener('keydown', function(event) {
+          var rtl = target.getComputedStyle?.(item).direction === 'rtl';
+          var next = {
+            ArrowLeft: index + (rtl ? columnStep : -columnStep),
+            ArrowRight: index + (rtl ? -columnStep : columnStep),
+            ArrowUp: index - 1,
+            ArrowDown: index + 1,
+            Home: 0,
+            End: items.length - 1
+          }[event.key];
+          if (next === undefined) return;
+          event.preventDefault();
+          items[Math.max(0, Math.min(items.length - 1, next))].focus();
+        });
+      });
     }
 
-    function setLive(message) {
-      if (state.view.live) state.view.live.textContent = message;
+    function statusPanel(parent, retry) {
+      var panel = append(parent, 'div', 'reading-insights-status');
+      var message = append(panel, 'p', '');
+      message.setAttribute('role', 'status');
+      var button = append(panel, 'button', 'reading-insights-action', translate(target, 'readingInsights.retry', 'Retry'));
+      button.type = 'button';
+      button.hidden = true;
+      button.addEventListener('click', function() {
+        if (state.root.focus) state.root.focus({ preventScroll: true });
+        retry();
+      });
+      return { message: message, retry: button };
+    }
+
+    function renderStatus(panel, status) {
+      var message = status === 'loading'
+        ? translate(target, 'readingInsights.loading', 'Loading reading insights…')
+        : status === 'error'
+          ? translate(target, 'readingInsights.error', 'Unable to load reading insights. Please try again.')
+          : '';
+      panel.message.textContent = message;
+      panel.retry.hidden = status !== 'error';
+    }
+
+    function bookButton(parent, className, label, bookId, source) {
+      var button = append(parent, 'button', className, label);
+      button.type = 'button';
+      button.addEventListener('click', function() {
+        state.bookOrigin = { bookId: bookId, source: source };
+        showBook(bookId);
+      });
+      state.view.bookButtons[source + ':' + bookId] = button;
+      return button;
     }
 
     function periodLabel(period) {
@@ -291,20 +334,26 @@
     }
 
     function build(targetRoot) {
+      hideTooltip();
       targetRoot.replaceChildren();
       targetRoot.className = 'reading-insights-page';
       targetRoot.setAttribute('tabindex', '-1');
       targetRoot.setAttribute('aria-labelledby', 'readingInsightsTitle');
       if (state.modal) {
         state.modal.querySelector('.reading-insights-header-label span').textContent = translate(target, 'readingInsights.navigation', 'Reading insights');
+        state.modal.classList.toggle('is-book', Boolean(state.bookId));
+        state.backButton.hidden = !state.bookId || !canReturnToTime();
+        state.backButton.querySelector('span').textContent = translate(target, 'readingInsights.backToOverview', 'Back to reading insights');
         state.closeButton.setAttribute('aria-label', translate(target, 'readingInsights.close', 'Close'));
       }
 
-      var heading = append(targetRoot, 'section', 'reading-insights-heading');
-      append(heading, 'p', 'reading-insights-kicker', translate(target, 'readingInsights.privateKicker', 'Private to your account'));
-      var title = append(heading, 'h1', '', translate(target, 'readingInsights.title', 'Reading insights'));
+      if (state.bookId) {
+        buildBook(targetRoot);
+        return;
+      }
+
+      var title = append(targetRoot, 'h1', 'reading-insights-visually-hidden', translate(target, 'readingInsights.title', 'Reading insights'));
       title.id = 'readingInsightsTitle';
-      append(heading, 'p', '', translate(target, 'readingInsights.intro', 'See when you actively read and where your time went.'));
 
       var controls = append(targetRoot, 'section', 'reading-insights-controls');
       var periods = append(controls, 'div', 'reading-insights-periods');
@@ -334,12 +383,13 @@
       nextRange.setAttribute('data-reading-insights-next', '');
       nextRange.innerHTML = '<i class="fas fa-chevron-right" aria-hidden="true"></i>';
       nextRange.addEventListener('click', function() { nextRangeForPeriod(); });
-      var live = append(targetRoot, 'p', 'reading-insights-live', translate(target, 'readingInsights.loading', 'Loading reading insights…'));
-      live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.setAttribute('aria-atomic', 'true');
+      var status = statusPanel(targetRoot, load);
       var tooltip = append(targetRoot, 'div', 'reading-insights-tooltip');
       tooltip.id = 'readingInsightsTooltip';
       tooltip.setAttribute('role', 'tooltip');
       tooltip.hidden = true;
+      tooltip.addEventListener('mouseenter', function() { clearTimeout(state.tooltipTimer); });
+      tooltip.addEventListener('mouseleave', deferTooltipHide);
       var summary = append(targetRoot, 'section', 'reading-insights-summary');
       summary.setAttribute('aria-label', translate(target, 'readingInsights.summaryLabel', 'Reading summary'));
       var totalCard = append(summary, 'article', 'reading-insights-summary-card');
@@ -347,22 +397,25 @@
       var total = append(totalCard, 'strong', '', '—');
       var bookCard = append(summary, 'article', 'reading-insights-summary-card');
       append(bookCard, 'p', '', translate(target, 'readingInsights.topBook', 'Top book'));
-      var topBook = append(bookCard, 'a', 'reading-insights-summary-link', '—');
-      var analytics = append(targetRoot, 'section', 'reading-insights-analytics');
-      var analyticsTitle = append(analytics, 'h2', '', translate(target, 'readingInsights.activity', 'Reading activity'));
-      analyticsTitle.id = 'readingInsightsActivityTitle';
-      analytics.setAttribute('aria-labelledby', analyticsTitle.id);
+      var topBook = append(bookCard, 'div', '');
+      var books = append(targetRoot, 'section', 'reading-insights-rank');
+      append(books, 'h2', 'reading-insights-card-title', translate(target, 'readingInsights.rankedBooks', 'Top books by reading time'));
+      var bookList = append(books, 'ol', 'reading-insights-book-list');
+      bookList.setAttribute('role', 'list');
+      var analytics = append(targetRoot, 'div', 'reading-insights-analytics');
       var analyticsGrid = append(analytics, 'div', 'reading-insights-analytics-grid');
       var heatmapCard = append(analyticsGrid, 'article', 'reading-insights-analytics-card reading-insights-heatmap-card');
-      append(heatmapCard, 'h3', '', translate(target, 'readingInsights.activityHeatmap', 'Activity calendar'));
-      var heatmapRange = append(heatmapCard, 'p', 'reading-insights-analytics-description');
+      append(heatmapCard, 'h2', 'reading-insights-card-title', translate(target, 'readingInsights.activityHeatmap', 'Activity calendar'));
+      var calendarHint = append(heatmapCard, 'p', 'reading-insights-card-hint',
+        translate(target, 'readingInsights.calendarHint', 'Select a square to view that day’s reading activity.'));
+      calendarHint.id = 'readingInsightsCalendarHint';
       var heatmapScroll = append(heatmapCard, 'div', 'reading-insights-heatmap-scroll');
-      heatmapScroll.setAttribute('tabindex', '0');
       heatmapScroll.setAttribute('aria-label', translate(target, 'readingInsights.activityHeatmap', 'Activity calendar'));
       var heatmapMonths = append(heatmapScroll, 'div', 'reading-insights-heatmap-months');
       heatmapMonths.setAttribute('aria-hidden', 'true');
       var heatmap = append(heatmapScroll, 'div', 'reading-insights-heatmap');
       heatmap.setAttribute('role', 'group');
+      heatmap.setAttribute('aria-describedby', calendarHint.id);
       heatmap.setAttribute('aria-label', translate(target, 'readingInsights.activityHeatmap', 'Activity calendar'));
       var legend = append(heatmapCard, 'div', 'reading-insights-heatmap-legend');
       append(legend, 'span', '', translate(target, 'readingInsights.activityLess', 'Less'));
@@ -380,8 +433,7 @@
       activityInfo.innerHTML = '<i class="fas fa-circle-info" aria-hidden="true"></i>';
       attachTooltip(activityInfo, activityScale);
       var trendCard = append(analyticsGrid, 'article', 'reading-insights-analytics-card reading-insights-trend-card');
-      append(trendCard, 'h3', '', translate(target, 'readingInsights.trend', 'Trend chart'));
-      var trendRange = append(trendCard, 'p', 'reading-insights-analytics-description');
+      var trendTitle = append(trendCard, 'h2', 'reading-insights-card-title');
       var metricButtons = ['duration', 'books'].map(function(metric) {
         var key = metric === 'duration' ? 'readingInsights.trend.duration' : 'readingInsights.trend.books';
         var fallback = metric === 'duration' ? 'Reading time' : 'Books read';
@@ -399,34 +451,51 @@
       var trendAxis = append(trendCard, 'div', 'reading-insights-trend-axis');
       var trendYAxis = append(trendAxis, 'div', 'reading-insights-trend-y-axis');
       var trendChart = append(trendAxis, 'div', 'reading-insights-trend-chart');
-      trendChart.setAttribute('role', 'img');
+      trendChart.setAttribute('role', 'group');
       var trendXAxis = append(trendCard, 'div', 'reading-insights-trend-x-axis');
       var trendValue = append(trendCard, 'p', 'reading-insights-trend-value', '—');
       var days = append(targetRoot, 'section', 'reading-insights-days');
-      var daysTitle = append(days, 'h2', '', translate(target, 'readingInsights.days', 'Days'));
+      var daysTitle = append(days, 'h2', 'reading-insights-card-title', translate(target, 'readingInsights.days', 'Days'));
       daysTitle.id = 'readingInsightsDaysTitle';
       days.setAttribute('aria-labelledby', daysTitle.id);
       var dayList = append(days, 'div', 'reading-insights-day-list');
-      var sessions = append(targetRoot, 'section', 'reading-insights-sessions');
-      var selectedDay = append(sessions, 'h2', '', translate(target, 'readingInsights.selectedDay', 'Selected day'));
+      var sessions = append(days, 'section', 'reading-insights-session-detail');
+      var sessionHeading = append(sessions, 'div', 'reading-insights-session-heading');
+      var selectedDay = append(sessionHeading, 'h2', 'reading-insights-card-title', translate(target, 'readingInsights.selectedDay', 'Selected day'));
+      var selectedDuration = append(sessionHeading, 'span', 'reading-insights-selected-duration');
       selectedDay.id = 'readingInsightsSelectedDay';
+      selectedDay.setAttribute('tabindex', '-1');
       sessions.setAttribute('aria-labelledby', selectedDay.id);
+      var sessionStatus = statusPanel(sessions, function() { return loadSessions(state.sessionPage); });
       var sessionList = append(sessions, 'ol', 'reading-insights-session-list');
-      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, live: live, tooltip: tooltip, total: total, topBook: topBook, analytics: analytics, analyticsTitle: analyticsTitle, analyticsGrid: analyticsGrid, heatmapCard: heatmapCard, heatmap: heatmap, heatmapMonths: heatmapMonths, heatmapRange: heatmapRange, trendChart: trendChart, trendValue: trendValue, trendRange: trendRange, trendYAxis: trendYAxis, trendXAxis: trendXAxis, metricButtons: metricButtons, days: days, dayList: dayList, selectedDay: selectedDay, sessions: sessions, sessionList: sessionList, dayButtons: [] };
+      var pagination = append(sessions, 'div', 'reading-insights-range');
+      var previousSessions = append(pagination, 'button', '', translate(target, 'readingInsights.previousSessions', 'Previous sessions'));
+      var nextSessions = append(pagination, 'button', '', translate(target, 'readingInsights.nextSessions', 'Next sessions'));
+      previousSessions.type = nextSessions.type = 'button';
+      function changeSessionPage(step) {
+        if (selectedDay.focus) selectedDay.focus();
+        loadSessions(state.sessionPage + step);
+      }
+      previousSessions.addEventListener('click', function() { changeSessionPage(-1); });
+      nextSessions.addEventListener('click', function() { changeSessionPage(1); });
+      state.view = { periodButtons: periodButtons, previousRange: previousRange, nextRange: nextRange, todayRange: todayRange, rangeLabel: rangeLabel, status: status, summary: summary, tooltip: tooltip, total: total, topBook: topBook, analytics: analytics, heatmapCard: heatmapCard, heatmap: heatmap, heatmapMonths: heatmapMonths, heatmapScroll: heatmapScroll, trendChart: trendChart, trendValue: trendValue, trendTitle: trendTitle, trendYAxis: trendYAxis, trendXAxis: trendXAxis, metricButtons: metricButtons, days: days, daysTitle: daysTitle, dayList: dayList, selectedDay: selectedDay, selectedDuration: selectedDuration, sessions: sessions, sessionList: sessionList, sessionStatus: sessionStatus, previousSessions: previousSessions, nextSessions: nextSessions, books: books, bookList: bookList, bookButtons: {}, dayButtons: [] };
       updatePeriodControls();
       updateRangeControls();
     }
 
     function renderSessions() {
-      var sessions = state.insights && Array.isArray(state.insights.sessions) ? state.insights.sessions : [];
-      var matching = sessions.filter(function(session) { return sessionDate(session.started_at) === state.selectedDay; })
-        .sort(function(left, right) { return new Date(left.started_at) - new Date(right.started_at); });
+      var payload = state.sessions;
+      renderStatus(state.view.sessionStatus, state.sessionStatus);
+      state.view.previousSessions.hidden = !payload || state.sessionPage <= 1;
+      state.view.nextSessions.hidden = !payload || !payload.has_more;
       state.view.sessionList.replaceChildren();
+      if (!payload) return;
+      var matching = payload.sessions;
       if (!matching.length) {
         append(state.view.sessionList, 'li', 'reading-insights-empty', translate(target, 'readingInsights.emptyDay', 'No active reading recorded for this day.'));
         return;
       }
-      matching.forEach(function(session) {
+      matching.forEach(function(session, index) {
         var time = formatTime(session.started_at);
         var book = session.book_title || translate(target, 'readingInsights.unknownBook', 'Unknown book');
         var chapter = session.chapter_label || translate(target, 'readingInsights.unknownChapter', 'Unknown chapter');
@@ -435,9 +504,11 @@
         item.setAttribute('aria-label', [time, book, chapter, duration].join(' '));
         append(item, 'time', 'reading-insights-session-time', time);
         var details = append(item, 'span', 'reading-insights-session-details');
-        var bookLink = append(details, 'a', 'reading-insights-session-book', book);
-        if (session.book_id) bookLink.setAttribute('href', bookPath(target, session.book_id));
-        else bookLink.removeAttribute('href');
+        if (session.book_id) {
+          bookButton(details, 'reading-insights-session-book reading-insights-text-button', book, session.book_id, 'session-' + index);
+        } else {
+          append(details, 'span', 'reading-insights-session-book', book);
+        }
         var chapterLink = append(details, 'a', 'reading-insights-session-chapter', chapter);
         if (session.book_id && Number.isInteger(session.chapter_index) && session.chapter_index >= 0) {
           chapterLink.setAttribute('href', chapterPath(target, session.book_id, session.chapter_index));
@@ -447,15 +518,10 @@
     }
 
     function renderActivity() {
+      hideTooltip();
       var activity = state.insights && state.insights.activity;
       var days = activity && Array.isArray(activity.days) ? activity.days : [];
       var metric = state.activityMetric === 'books' ? 'book_count' : 'active_seconds';
-      if (state.view.heatmapRange) {
-        var heatmapRangeText = days.length
-          ? formatDateRange('overview', days[days.length - 1].date)
-          : translate(target, 'readingInsights.activityRange', 'Past year');
-        state.view.heatmapRange.textContent = heatmapRangeText;
-      }
       if (state.view.heatmap) {
         state.view.heatmap.replaceChildren();
         if (state.view.heatmapMonths) state.view.heatmapMonths.replaceChildren();
@@ -479,7 +545,8 @@
           }
           for (var index = 0; index < leadingDays; index += 1) append(state.view.heatmap, 'span', 'reading-insights-heatmap-spacer');
         }
-        days.forEach(function(day) {
+        var recent = days.findLastIndex(function(day) { return day.date <= localIsoDate(); });
+        var cells = days.map(function(day) {
           var seconds = Math.max(0, Number(day.active_seconds) || 0);
           var count = Math.max(0, Number(day.book_count) || 0);
           var label = formatDay(day.date) + ': ' + formatDuration(seconds) + '. ' + translate(
@@ -492,39 +559,65 @@
           cell.type = 'button';
           cell.setAttribute('aria-label', label);
           attachTooltip(cell, label);
-          cell.addEventListener('click', function() { setPeriod('day', day.date); });
+          cell.addEventListener('click', function() {
+            if (state.root.focus) state.root.focus({ preventScroll: true });
+            setPeriod('day', day.date);
+          });
+          return cell;
         });
+        if (cells.length) {
+          recent = Math.max(0, recent);
+          arrowNavigation(cells, recent, 7);
+          var scroller = state.view.heatmapScroll;
+          if (scroller.getBoundingClientRect && scroller.scrollWidth > scroller.clientWidth) {
+            var bounds = scroller.getBoundingClientRect();
+            var current = cells[recent].getBoundingClientRect();
+            var rtl = target.getComputedStyle(scroller).direction === 'rtl';
+            scroller.scrollLeft += rtl ? current.left - bounds.left - 12 : current.right - bounds.right + 12;
+          }
+        }
       }
       (state.view.metricButtons || []).forEach(function(button) {
-        var isBooksMetric = button.getAttribute('data-reading-insights-metric') === 'books';
-        button.hidden = state.period === 'day' && isBooksMetric;
+        button.hidden = state.period === 'day';
         var isSelected = button.getAttribute('data-reading-insights-metric') === state.activityMetric;
         button.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
       });
       var trend = state.insights && state.insights.trend || {};
       var trendPoints = Array.isArray(trend.points) ? trend.points : [];
       var trendGranularity = trend.granularity || 'day';
-      var trendRangeText = trend.start_date && trend.end_date
-        ? formatDateRange(trendGranularity === 'month' ? 'overview' : trendGranularity === 'hour' ? 'day' : state.period, state.anchor)
-        : formatDateRange(state.period, state.anchor);
-      if (state.view.trendRange) state.view.trendRange.textContent = trendRangeText;
       var values = trendPoints.map(function(point) { return Math.max(0, Number(point[metric]) || 0); });
-      var total = values.reduce(function(sum, value) { return sum + value; }, 0);
+      var duration = formatDuration(state.insights?.total_active_seconds);
+      var count = state.insights?.books_read_count || 0;
       var trendValueText = metric === 'active_seconds'
-        ? translate(target, 'readingInsights.trendTotalDuration', 'Total reading time: ' + formatDuration(total), { duration: formatDuration(total) })
-        : translate(target, 'readingInsights.trendTotalBooks', 'Total books read: ' + total, { count: total });
-      if (state.view.trendValue) {
-        state.view.trendValue.textContent = trendValueText;
+        ? translate(target, 'readingInsights.trendTotalDuration', 'Total reading time: ' + duration, { duration: duration })
+        : translate(target, 'readingInsights.trendTotalBooks', 'Total books read: ' + count, { count: count });
+      state.view.trendValue.textContent = trendValueText;
+      state.view.trendValue.hidden = metric === 'active_seconds';
+      var monthly = state.period === 'overview';
+      var title;
+      if (state.period === 'day') {
+        title = translate(target, 'readingInsights.hourlyReading', 'Reading time by hour');
+      } else if (metric === 'book_count') {
+        title = monthly
+          ? translate(target, 'readingInsights.monthlyBooks', 'Books read per month')
+          : translate(target, 'readingInsights.dailyBooks', 'Books read per day');
+      } else {
+        title = monthly
+          ? translate(target, 'readingInsights.monthlyDuration', 'Monthly reading time')
+          : translate(target, 'readingInsights.dailyDuration', 'Daily reading time');
       }
+      state.view.trendTitle.textContent = title;
       if (!state.view.trendChart) return;
       var maximum = trendScaleMaximum(Math.max.apply(Math, values.concat([1])), metric);
       if (state.view.trendYAxis) {
         state.view.trendYAxis.replaceChildren();
         [maximum, maximum / 2, 0].forEach(function(value) {
+          if (metric === 'book_count' && !Number.isInteger(value)) return;
           var label = metric === 'active_seconds'
             ? formatDuration(Math.round(value))
-            : String(Math.round(value));
-          append(state.view.trendYAxis, 'span', 'reading-insights-trend-y-tick', label);
+            : String(value);
+          append(state.view.trendYAxis, 'span', 'reading-insights-trend-y-tick', label)
+            .setAttribute('style', '--reading-insights-tick-y:' + (90 - value / maximum * 75) + '%');
         });
       }
       if (state.view.trendXAxis) {
@@ -537,10 +630,7 @@
           });
         }
       }
-      var trendTitleKey = metric === 'active_seconds' ? 'readingInsights.trend.duration' : 'readingInsights.trend.books';
-      var trendTitleFallback = metric === 'active_seconds' ? 'Reading time' : 'Books read';
-      var trendAriaLabel = translate(target, trendTitleKey, trendTitleFallback) + ': ' + trendValueText;
-      state.view.trendChart.setAttribute('aria-label', trendAriaLabel);
+      state.view.trendChart.setAttribute('aria-label', title + ' · ' + trendValueText);
       state.view.trendChart.replaceChildren();
       if (!trendPoints.length || !documentTarget.createElementNS) return;
       var svg = documentTarget.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -554,13 +644,13 @@
       });
       var area = documentTarget.createElementNS('http://www.w3.org/2000/svg', 'path');
       area.setAttribute('class', 'reading-insights-trend-area');
-      area.setAttribute('d', 'M ' + points.join(' L ') + ' L 100,40 L 0,40 Z');
+      area.setAttribute('d', 'M ' + points.join(' L ') + ' L 100,36 L 0,36 Z');
       var line = documentTarget.createElementNS('http://www.w3.org/2000/svg', 'path');
       line.setAttribute('class', 'reading-insights-trend-line');
       line.setAttribute('d', 'M ' + points.join(' L '));
       svg.appendChild(area);
       svg.appendChild(line);
-      trendPoints.forEach(function(point, index) {
+      var pointButtons = trendPoints.map(function(point, index) {
         var value = values[index];
         var x = values.length === 1 ? 50 : index * 100 / (values.length - 1);
         var y = 36 - value / maximum * 30;
@@ -573,84 +663,254 @@
         hitArea.setAttribute('aria-label', pointLabel);
         hitArea.setAttribute('style', '--reading-insights-point-x:' + x.toFixed(2) + '%;--reading-insights-point-y:' + (y / 40 * 100).toFixed(2) + '%');
         attachTooltip(hitArea, pointLabel);
+        hitArea.addEventListener('click', function() { hitArea.focus(); });
+        return hitArea;
       });
+      arrowNavigation(pointButtons, 0, 1);
       state.view.trendChart.appendChild(svg);
     }
 
     function renderInsights() {
-      var insights = state.insights || {};
-      var days = Array.isArray(insights.days) ? insights.days : [];
-      if (!state.selectedDay || !days.some(function(day) { return day.date === state.selectedDay; })) {
+      renderStatus(state.view.status, state.reportStatus);
+      var insights = state.insights;
+      var isOverview = state.period === 'overview';
+      state.view.summary.hidden = state.view.analytics.hidden = !insights;
+      var hasDates = !isOverview && state.period !== 'day';
+      state.view.days.hidden = !insights || isOverview;
+      state.view.daysTitle.hidden = state.view.dayList.hidden = !hasDates;
+      state.view.days.setAttribute('aria-labelledby', hasDates ? 'readingInsightsDaysTitle' : 'readingInsightsSelectedDay');
+      state.view.sessions.hidden = !insights || isOverview;
+      state.view.books.hidden = !insights || !insights.books?.length || (state.period === 'day' && insights.books.length === 1);
+      if (!insights) return;
+
+      var days = insights.days || [];
+      if (!state.selectedDay) {
         var today = localIsoDate();
         state.selectedDay = days.some(function(day) { return day.date === today; })
           ? today : (days.length ? days[days.length - 1].date : state.anchor);
       }
       state.view.total.textContent = formatDuration(insights.total_active_seconds);
-      var topBookText = insights.top_book
-        ? insights.top_book.title + ' · ' + formatDuration(insights.top_book.active_seconds) : '—';
-      state.view.topBook.textContent = topBookText;
-      if (insights.top_book && insights.top_book.book_id) {
-        state.view.topBook.setAttribute('href', bookPath(target, insights.top_book.book_id));
+      state.view.topBook.replaceChildren();
+      var top = insights.top_book;
+      if (top) {
+        renderBookRow(state.view.topBook, top, 'top');
       } else {
-        state.view.topBook.removeAttribute('href');
+        append(state.view.topBook, 'strong', '', '—');
       }
+      state.view.bookList.replaceChildren();
+      (insights.books || []).forEach(function(book, index) {
+        var row = append(state.view.bookList, 'li', '');
+        renderBookRow(row, book, 'ranked', index + 1);
+      });
       if (state.period === 'day') state.activityMetric = 'duration';
-      renderActivity();
-      var isOverview = state.period === 'overview';
-      state.view.analyticsTitle.hidden = !isOverview;
       state.view.heatmapCard.hidden = !isOverview;
-      state.view.analyticsGrid.className = 'reading-insights-analytics-grid' + (isOverview ? '' : ' is-trend-only');
-      state.view.days.hidden = state.period === 'day' || state.period === 'overview';
-      state.view.sessions.hidden = state.period === 'overview';
+      renderActivity();
+      var isMonth = state.period === 'month';
+      state.view.dayList.className = 'reading-insights-day-list ' + (isMonth ? 'is-month' : 'is-week');
       state.view.dayList.replaceChildren();
+      if (isMonth && days.length) {
+        for (var weekday = 1; weekday <= 7; weekday += 1) {
+          append(state.view.dayList, 'span', 'reading-insights-weekday',
+            formatDayShort('2024-01-0' + weekday)).setAttribute('aria-hidden', 'true');
+        }
+        var leading = (new Date(days[0].date + 'T12:00:00Z').getUTCDay() + 6) % 7;
+        for (var blank = 0; blank < leading; blank += 1) append(state.view.dayList, 'span', '');
+      }
       state.view.dayButtons = days.map(function(day) {
         var button = append(state.view.dayList, 'button', 'reading-insights-day-button');
         button.type = 'button';
+        button.setAttribute('data-date', day.date);
         button.setAttribute('aria-pressed', day.date === state.selectedDay ? 'true' : 'false');
         var dayLabel = formatDay(day.date);
         button.setAttribute('aria-label', dayLabel + ': ' + formatDuration(day.active_seconds));
-        append(button, 'span', 'reading-insights-day-name', formatDayShort(day.date));
-        append(button, 'span', 'reading-insights-day-date', formatDayNumber(day.date));
+        if (!isMonth) append(button, 'span', 'reading-insights-day-name', formatDayShort(day.date));
+        append(button, 'span', 'reading-insights-day-date', new intl().NumberFormat(locale()).format(Number(day.date.slice(-2))));
+        if (day.active_seconds > 0) button.className += ' has-reading';
         append(button, 'strong', 'reading-insights-day-duration', formatDuration(day.active_seconds));
         button.addEventListener('click', function() { selectDay(day.date); });
         return button;
       });
-      state.view.selectedDay.textContent = state.selectedDay
-        ? selectedDayLabel(state.selectedDay)
-        : translate(target, 'readingInsights.selectedDay', 'Selected day');
+      updateSessionHeading();
       renderSessions();
-      setLive(days.length ? translate(target, 'readingInsights.loaded', 'Reading insights updated.') : translate(target, 'readingInsights.empty', 'No active reading recorded yet.'));
+    }
+
+    function renderBookRow(parent, book, source, rank) {
+      var button = bookButton(parent, 'reading-insights-book-row' + (rank ? ' reading-insights-ranked-book' : ''), '', book.book_id, source);
+      if (rank) append(button, 'span', 'reading-insights-book-rank', new intl().NumberFormat(locale()).format(rank)).setAttribute('aria-hidden', 'true');
+      append(button, 'span', 'reading-insights-book-name', book.title);
+      append(button, 'span', 'reading-insights-book-duration', formatDuration(book.active_seconds));
+      var arrow = append(button, 'i', 'fas fa-chevron-right');
+      arrow.setAttribute('aria-hidden', 'true');
+    }
+
+    function canReturnToTime() {
+      return state.bookOrigin || state.opener?.hasAttribute('data-reading-insights-show-overview');
+    }
+
+    function buildBook(targetRoot) {
+      var heading = append(targetRoot, 'section', 'reading-insights-heading reading-insights-book-heading');
+      var identity = append(heading, 'div', '');
+      var label = append(identity, 'p', 'reading-insights-book-label', translate(target, 'readingInsights.bookReport', 'Book reading stats'));
+      var title = append(identity, 'h1', '');
+      title.id = 'readingInsightsTitle';
+      if (!state.modal && canReturnToTime()) {
+        var back = append(heading, 'button', 'reading-insights-action', translate(target, 'readingInsights.backToOverview', 'Back to reading insights'));
+        back.type = 'button';
+        back.addEventListener('click', backToTime);
+      }
+      var bookLink = append(heading, 'a', 'reading-insights-book-link reading-insights-text-button',
+        translate(target, 'reader.openBookHome', 'Open book home'));
+      bookLink.setAttribute('href', publicPath(target, '/book/' + encodeURIComponent(state.bookId) + '/index.html'));
+      var status = statusPanel(targetRoot, load);
+      var summary = append(targetRoot, 'section', 'reading-insights-book-summary');
+      state.view = { status: status, summary: summary, name: title, label: label, bookLink: bookLink };
+    }
+
+    function renderBook() {
+      renderStatus(state.view.status, state.reportStatus);
+      var book = state.book;
+      state.view.summary.hidden = state.view.bookLink.hidden = !book;
+      state.view.label.hidden = !book;
+      state.view.name.textContent = book ? book.title : state.view.label.textContent;
+      if (!book) return;
+      state.view.summary.replaceChildren();
+      var metrics = append(state.view.summary, 'dl', 'reading-insights-book-metrics');
+      var dates = append(state.view.summary, 'dl', 'reading-insights-book-dates');
+      function metric(group, label, value, timestamp) {
+        var card = append(group, 'div', '');
+        append(card, 'dt', '', label);
+        var description = append(card, 'dd', '');
+        if (timestamp) append(description, 'time', '', value).setAttribute('datetime', timestamp);
+        else description.textContent = value;
+      }
+      function readDate(timestamp) {
+        return timestamp ? new intl().DateTimeFormat(locale(), {
+          dateStyle: 'medium', timeStyle: 'short', timeZone: state.timezone
+        }).format(new Date(timestamp)) : '—';
+      }
+      metric(metrics, translate(target, 'readingInsights.total', 'Active reading'), formatDuration(book.active_seconds));
+      metric(metrics, translate(target, 'readingInsights.annotations', 'Annotations'), new intl().NumberFormat(locale()).format(book.annotation_count));
+      metric(dates, translate(target, 'readingInsights.firstRead', 'First read'), readDate(book.first_read_at), book.first_read_at);
+      metric(dates, translate(target, 'readingInsights.lastRead', 'Last read'), readDate(book.last_read_at), book.last_read_at);
+    }
+
+    function refresh() {
+      if (state.bookId) renderBook();
+      else renderInsights();
+      updateRangeControls();
+    }
+
+    function cancelRequest() {
+      if (state.request) state.request.abort();
+      state.request = null;
+    }
+
+    async function fetchReport(path, success, failure) {
+      cancelRequest();
+      var controller = new AbortController();
+      state.request = controller;
+      var timer = setTimeout(function() { controller.abort(); }, 30000);
+      try {
+        var response = await target.EpubBrowserAuth.fetch(publicPath(target, path), {
+          method: 'GET', signal: controller.signal
+        });
+        if (!response || !response.ok) throw new Error('reading_insights_request_failed');
+        var payload = await response.json();
+        if (state.request !== controller) return null;
+        return success(payload);
+      } catch (error) {
+        if (state.request === controller) failure();
+        return null;
+      } finally {
+        clearTimeout(timer);
+        if (state.request === controller) state.request = null;
+      }
     }
 
     function load() {
-      if (!target.EpubBrowserAuth || typeof target.EpubBrowserAuth.fetch !== 'function') {
-        setLive(translate(target, 'readingInsights.error', 'Unable to load reading insights. Please try again.'));
-        return Promise.resolve(null);
-      }
-      setBusy(true);
-      setLive(translate(target, 'readingInsights.loading', 'Loading reading insights…'));
-      return Promise.resolve(target.EpubBrowserAuth.fetch(endpoint(target, state.period, state.anchor, state.timezone), { method: 'GET' }))
-        .then(function(response) {
-          if (!response || !response.ok) throw new Error('reading_insights_request_failed');
-          return response.json();
-        })
-        .then(function(payload) {
-          state.insights = payload && payload.insights ? payload.insights : {};
-          renderInsights();
-          return state.insights;
-        })
-        .catch(function() {
-          setLive(translate(target, 'readingInsights.error', 'Unable to load reading insights. Please try again.'));
-          return null;
-        })
-        .finally(function() { setBusy(false); updateRangeControls(); });
+      state.reportStatus = 'loading';
+      refresh();
+      var path = state.bookId ? '/api/books/' + encodeURIComponent(state.bookId) + '/insights'
+        : '/api/reading-insights?period=' + encodeURIComponent(state.period) +
+          '&anchor=' + encodeURIComponent(state.anchor) + '&timezone=' + encodeURIComponent(state.timezone);
+      return fetchReport(path, function(payload) {
+        if (!payload.insights) throw new Error('reading_insights_payload_invalid');
+        if (state.bookId) state.book = payload.insights;
+        else state.insights = payload.insights;
+        state.reportStatus = '';
+        refresh();
+        if (!state.bookId && state.period !== 'overview') return loadSessions(1);
+        return payload.insights;
+      }, function() {
+        state.reportStatus = 'error';
+        refresh();
+      });
+    }
+
+    function loadSessions(page) {
+      state.sessionPage = page;
+      state.sessions = null;
+      state.sessionStatus = 'loading';
+      renderSessions();
+      var path = '/api/reading-insights/sessions?date=' + encodeURIComponent(state.selectedDay) +
+        '&timezone=' + encodeURIComponent(state.timezone) + '&page=' + page;
+      return fetchReport(path, function(payload) {
+        if (!Array.isArray(payload.sessions)) throw new Error('reading_insights_payload_invalid');
+        state.sessions = payload;
+        state.sessionStatus = '';
+        renderSessions();
+        return payload;
+      }, function() {
+        state.sessionStatus = 'error';
+        renderSessions();
+      });
+    }
+
+    function updateSessionHeading() {
+      state.view.selectedDay.textContent = selectedDayLabel(state.selectedDay);
+      var day = state.insights.days?.find(function(item) { return item.date === state.selectedDay; });
+      state.view.selectedDuration.textContent = day ? formatDuration(day.active_seconds) : '';
     }
 
     function selectDay(day) {
-      if (!day || day === state.selectedDay) return Promise.resolve(state.insights);
+      if (!day || day === state.selectedDay || state.period === 'overview') return Promise.resolve(null);
       state.selectedDay = day;
-      renderInsights();
-      return Promise.resolve(state.insights);
+      updateSessionHeading();
+      state.view.dayButtons.forEach(function(button) {
+        button.setAttribute('aria-pressed', button.getAttribute('data-date') === day ? 'true' : 'false');
+      });
+      return loadSessions(1);
+    }
+
+    function focusReport() {
+      if (!state.modal) return;
+      state.modal.querySelector('.reading-insights-dialog').scrollTop = 0;
+      state.root.focus({ preventScroll: true });
+    }
+
+    function showBook(bookId) {
+      state.bookId = bookId;
+      state.book = null;
+      build(state.root);
+      focusReport();
+      return load();
+    }
+
+    function backToTime() {
+      cancelRequest();
+      var origin = state.bookOrigin;
+      state.bookId = '';
+      state.bookOrigin = null;
+      state.reportStatus = '';
+      build(state.root);
+      if (!origin) {
+        focusReport();
+        return load();
+      }
+      refresh();
+      var trigger = state.view.bookButtons[origin.source + ':' + origin.bookId];
+      if (trigger && trigger.focus) trigger.focus();
+      if (state.sessionStatus === 'loading') loadSessions(state.sessionPage);
     }
 
     function shiftAnchor(anchor, period, amount) {
@@ -685,6 +945,9 @@
       state.period = period;
       state.anchor = anchor || localIsoDate();
       state.selectedDay = '';
+      hideTooltip();
+      state.insights = state.sessions = null;
+      state.sessionStatus = '';
       updatePeriodControls();
       updateRangeControls();
       return load();
@@ -700,15 +963,27 @@
       var i18n = target.EpubBrowserI18n;
       if (!state.localeBound && i18n && typeof i18n.onLocaleChange === 'function') {
         state.localeBound = true;
-        i18n.onLocaleChange(function() { if (state.root) { build(state.root); renderInsights(); } });
+        i18n.onLocaleChange(function() {
+          if (state.root && (!state.modal || !state.modal.hidden)) {
+            build(state.root);
+            refresh();
+            focusReport();
+          }
+        });
       }
       return load();
     }
 
     function trapFocus(event) {
-      if (event.key === 'Escape') { event.preventDefault(); close(); return; }
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        if (state.view.tooltip && !state.view.tooltip.hidden) hideTooltip();
+        else close();
+        return;
+      }
       if (event.key !== 'Tab') return;
-      var focusable = state.modal.querySelectorAll('button:not([hidden]):not([disabled]), a[href], [tabindex]:not([tabindex="-1"])');
+      var focusable = Array.from(state.modal.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), [tabindex]'))
+        .filter(function(item) { return item.tabIndex >= 0 && !item.closest('[hidden]'); });
       if (!focusable.length) return;
       var first = focusable[0];
       var last = focusable[focusable.length - 1];
@@ -724,10 +999,12 @@
       modal.setAttribute('role', 'dialog');
       modal.setAttribute('aria-modal', 'true');
       modal.setAttribute('aria-labelledby', 'readingInsightsTitle');
-      modal.innerHTML = '<div class="reading-insights-backdrop" data-reading-insights-close></div><section class="reading-insights-dialog"><header class="reading-insights-modal-header"><span class="reading-insights-header-label"><i class="fas fa-chart-column" aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></span><button type="button" class="reading-insights-icon-button" data-reading-insights-close-button><i class="fas fa-times" aria-hidden="true"></i></button></header><main class="reading-insights-container" data-reading-insights tabindex="-1"></main></section>';
+      modal.innerHTML = '<div class="reading-insights-backdrop" data-reading-insights-close></div><section class="reading-insights-dialog"><header class="reading-insights-modal-header"><button type="button" class="reading-insights-icon-button reading-insights-back-button" hidden><i class="fas fa-arrow-left" aria-hidden="true"></i><span></span></button><span class="reading-insights-header-label"><i class="fas fa-chart-column" aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></span><button type="button" class="reading-insights-icon-button" data-reading-insights-close-button><i class="fas fa-times" aria-hidden="true"></i></button></header><main class="reading-insights-container" data-reading-insights tabindex="-1"></main></section>';
       documentTarget.body.appendChild(modal);
       state.modal = modal;
       state.container = modal.querySelector('.reading-insights-container');
+      state.backButton = modal.querySelector('.reading-insights-back-button');
+      state.backButton.addEventListener('click', backToTime);
       state.closeButton = modal.querySelector('[data-reading-insights-close-button]');
       state.closeButton.addEventListener('click', close);
       modal.querySelector('[data-reading-insights-close]').addEventListener('click', close);
@@ -744,6 +1021,10 @@
         state.period = 'overview';
         state.anchor = localIsoDate();
         state.selectedDay = '';
+        state.bookId = opener && opener.getAttribute('data-book-id') || '';
+        state.bookOrigin = null;
+        state.book = state.insights = state.sessions = null;
+        state.sessionStatus = '';
         state.opener = opener || documentTarget.activeElement;
         state.scrollY = target.scrollY || 0;
         documentTarget.body.classList.add('reading-insights-open');
@@ -757,6 +1038,8 @@
 
     function close() {
       if (!state.modal || state.modal.hidden) return;
+      cancelRequest();
+      hideTooltip();
       state.modal.hidden = true;
       documentTarget.body.classList.remove('reading-insights-open');
       documentTarget.body.style.top = '';

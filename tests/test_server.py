@@ -1,6 +1,6 @@
 import asyncio
 import base64
-from datetime import date
+from datetime import datetime, timedelta, timezone
 import hashlib
 import json
 import logging
@@ -5620,28 +5620,39 @@ class ReadingInsightsAPITests(unittest.TestCase):
         # The week window is the calendar week containing the anchor date.
         # Anchor on today so the heartbeat (which uses the real clock) always
         # falls inside the window regardless of the day the suite runs.
-        anchor = date.today().isoformat()
+        anchor = datetime.now(timezone.utc).date().isoformat()
         insights_url = f"/api/reading-insights?period=week&anchor={anchor}&timezone=UTC"
         insights = self.client.get(insights_url)
         self.assertEqual(insights.status_code, 200)
         self.assertEqual(insights.json()["insights"]["period"], "week")
-        self.assertEqual(len(insights.json()["insights"]["activity"]["days"]), 365)
-        self.assertEqual(insights.json()["insights"]["trend"]["granularity"], "day")
-        self.assertEqual(len(insights.json()["insights"]["trend"]["points"]), 7)
-        self.assertTrue(any(
-            day["book_count"] == 1
-            for day in insights.json()["insights"]["activity"]["days"]
-        ))
-        self.assertEqual(self.bob_client.get("/api/book-reviews/book").json(), {"review": None})
-        self.assertEqual(self.bob_client.get(
-            insights_url
-        ).json()["insights"]["sessions"], [])
-        self.assertTrue(all(
-            day["book_count"] == 0
-            for day in self.bob_client.get(
-                insights_url
-            ).json()["insights"]["activity"]["days"]
-        ))
+        summary = insights.json()["insights"]
+        self.assertNotIn("activity", summary)
+        self.assertNotIn("sessions", summary)
+        self.assertEqual(summary["trend"]["granularity"], "day")
+        self.assertEqual(len(summary["trend"]["points"]), 7)
+        self.assertEqual(summary["top_book"]["book_id"], "book")
+        day_url = f"/api/reading-insights/sessions?date={anchor}&timezone=UTC"
+        self.assertTrue(self.client.get(day_url).json()["sessions"])
+        self.assertEqual(self.bob_client.get(day_url).json()["sessions"], [])
+        self.assertEqual(self.bob_client.get(insights_url).json()["insights"]["total_active_seconds"], 0)
+        self.assertEqual(self.bob_client.get("/api/books/restricted/insights").status_code, 403)
+        self.assertEqual(self.client.get("/api/books/restricted/insights").status_code, 200)
+        self.assertEqual(self.bob_client.get("/api/books/pdf/insights").status_code, 200)
+        book_url = "/api/books/book/insights"
+        report = self.client.get(book_url).json()["insights"]
+        self.assertEqual(report["active_seconds"], 15)
+        self.assertEqual(report["annotation_count"], 0)
+        self.assertLess(report["first_read_at"], report["last_read_at"])
+        self.store.upsert_annotation({
+            "id": "preview-annotation", "book_hash": "book", "chapter_index": 0,
+            "text": "Excerpt", "color": "yellow", "created_at": anchor, "updated_at": anchor,
+        }, user_id=self.alice.user_id)
+        self.assertEqual(self.client.get(book_url).json()["insights"]["annotation_count"], 1)
+        bob_report = self.bob_client.get(book_url).json()["insights"]
+        self.assertEqual(bob_report["active_seconds"], 0)
+        self.assertEqual(bob_report["annotation_count"], 0)
+        self.assertIsNone(bob_report["first_read_at"])
+        self.assertIsNone(bob_report["last_read_at"])
         anonymous = TestClient(self.app)
         self.addCleanup(anonymous.close)
         self.assertEqual(anonymous.get("/api/book-reviews/book").status_code, 401)
@@ -5650,6 +5661,8 @@ class ReadingInsightsAPITests(unittest.TestCase):
             401,
         )
         self.assertEqual(anonymous.get("/api/reading-insights").status_code, 401)
+        self.assertEqual(anonymous.get(day_url).status_code, 401)
+        self.assertEqual(anonymous.get(book_url).status_code, 401)
 
     def test_reading_insights_overview_is_a_natural_year(self):
         response = self.client.get(
@@ -5658,9 +5671,60 @@ class ReadingInsightsAPITests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         insights = response.json()["insights"]
         self.assertEqual(insights["period"], "overview")
-        self.assertEqual(insights["days"][0]["date"], "2026-01-01")
-        self.assertEqual(insights["days"][-1]["date"], "2026-12-31")
+        self.assertNotIn("sessions", insights)
+        self.assertNotIn("days", insights)
+        self.assertEqual(insights["activity"]["days"][0]["date"], "2026-01-01")
+        self.assertEqual(insights["activity"]["days"][-1]["date"], "2026-12-31")
+        self.assertEqual(response.headers.get("content-encoding"), "gzip")
         self.assertEqual(len(insights["activity"]["days"]), 365)
+
+    def test_insight_summary_updates_after_heartbeats_and_daily_sessions_are_paginated(self):
+        summary_url = "/api/reading-insights?period=overview&anchor=2026-08-15&timezone=UTC"
+        day_url = "/api/reading-insights/sessions?date=2026-08-15&timezone=UTC"
+        self.assertEqual(self.client.get(summary_url).json()["insights"]["total_active_seconds"], 0)
+        for minute in range(51):
+            self.store.record_reading_heartbeat(
+                user_id=self.alice.user_id, book_id="book", client_id="tab",
+                client_sequence=minute + 1, chapter_index=0, active_seconds=15,
+                book_title="Book", chapter_label="Opening chapter",
+                received_at=datetime(2026, 8, 15, 12, tzinfo=timezone.utc) + timedelta(minutes=minute),
+            )
+        updated = self.client.get(summary_url).json()["insights"]
+        self.assertEqual(updated["total_active_seconds"], 765)
+        self.assertEqual(updated["books_read_count"], 1)
+        self.assertNotIn("sessions", updated)
+        first = self.client.get(day_url).json()
+        second = self.client.get(day_url + "&page=2").json()
+        self.assertTrue(first["has_more"])
+        self.assertEqual(len(first["sessions"]), 50)
+        self.assertFalse(second["has_more"])
+        self.assertEqual(len(second["sessions"]), 1)
+        self.assertLess(first["sessions"][-1]["started_at"], second["sessions"][0]["started_at"])
+        self.assertEqual(self.client.get(day_url + "&page=0").status_code, 400)
+
+    def test_admin_can_change_reading_rank_size_without_stale_results(self):
+        settings_url = "/api/admin/general-settings"
+        summary_url = "/api/reading-insights?period=overview&anchor=2026-08-15&timezone=UTC"
+        for index, book_id in enumerate(("book", "pdf"), start=1):
+            self.store.record_reading_heartbeat(
+                user_id=self.alice.user_id, book_id=book_id, client_id=f"tab-{index}",
+                client_sequence=1, chapter_index=0, active_seconds=15,
+                book_title=book_id, chapter_label="Opening chapter",
+                received_at=datetime(2026, 8, 15, 12, index, tzinfo=timezone.utc),
+            )
+        initial = self.client.get(settings_url).json()["settings"]
+        self.assertEqual(initial["reading_insights_rank_limit"], 10)
+        self.assertEqual(len(self.client.get(summary_url).json()["insights"]["books"]), 2)
+        self.assertEqual(self.bob_client.put(settings_url, json={"reading_insights_rank_limit": 1}).status_code, 403)
+        self.assertEqual(self.client.put(settings_url, json={"reading_insights_rank_limit": 1}).status_code, 200)
+        limited = self.client.get(summary_url).json()["insights"]
+        self.assertEqual(len(limited["books"]), 1)
+        self.assertEqual(limited["books_read_count"], 2)
+        self.assertEqual(self.client.put(settings_url, json={"reading_insights_rank_limit": 500}).status_code, 200)
+        self.assertEqual(len(self.client.get(summary_url).json()["insights"]["books"]), 2)
+        self.assertEqual(self.client.get(settings_url).json()["settings"]["recent_reading_limit"], initial["recent_reading_limit"])
+        for invalid in (0, -1, True, 1.5, None):
+            self.assertEqual(self.client.put(settings_url, json={"reading_insights_rank_limit": invalid}).status_code, 400)
 
     def test_legacy_reading_insights_url_requires_login_and_returns_to_library(self):
         anonymous = TestClient(self.app)

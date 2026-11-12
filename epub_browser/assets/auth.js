@@ -2163,6 +2163,7 @@
       if (!form || !generalSettings) return;
       var fields = form.elements;
       fields.recent_reading_limit.value = String(generalSettings.recent_reading_limit || 10);
+      fields.reading_insights_rank_limit.value = String(generalSettings.reading_insights_rank_limit || 10);
       var errorEl = element('adminGeneralError');
       if (errorEl) errorEl.hidden = true;
     }
@@ -2173,8 +2174,9 @@
       var fields = form.elements;
       var errorEl = element('adminGeneralError');
       if (errorEl) errorEl.hidden = true;
-      var limit = parseInt(fields.recent_reading_limit.value, 10);
-      if (isNaN(limit) || limit < 1) {
+      var limit = fields.recent_reading_limit.valueAsNumber;
+      var rankLimit = fields.reading_insights_rank_limit.valueAsNumber;
+      if (!Number.isSafeInteger(limit) || limit < 1 || !Number.isSafeInteger(rankLimit) || rankLimit < 1) {
         if (errorEl) {
           errorEl.textContent = t('admin.general.invalidLimit');
           errorEl.hidden = false;
@@ -2184,7 +2186,7 @@
       return authenticatedFetch('/api/admin/general-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recent_reading_limit: limit })
+        body: JSON.stringify({ recent_reading_limit: limit, reading_insights_rank_limit: rankLimit })
       }).then(function(response) {
         if (!response.ok) {
           if (errorEl) {
