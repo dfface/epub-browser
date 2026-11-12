@@ -49,13 +49,13 @@ class ServerPageRenderer:
         self.content_dir = self.public_dir / "book" / self.book_id / "content"
         self.pdf_dir = self.book_dir / "pdf"
 
-    def render_kindle_index(self) -> str:
+    def render_kindle_index(self, *, locale=None, tools=None) -> str:
         """Render the dependency-free minimal reader index (EPUB only)."""
         if self.source_format != EPUB_FORMAT:
             raise ServerPageError("Kindle minimal pages are EPUB-only")
-        return self._processor().create_kindle_index_page()
+        return self._processor().create_kindle_index_page(locale=locale, tools=tools)
 
-    def render_kindle_chapter(self, chapter_index: int) -> str:
+    def render_kindle_chapter(self, chapter_index: int, *, locale=None) -> str:
         """Render the dependency-free minimal reader chapter (EPUB only)."""
         if self.source_format != EPUB_FORMAT:
             raise ServerPageError("Kindle minimal pages are EPUB-only")
@@ -65,6 +65,7 @@ class ServerPageRenderer:
             payload["style_links"],
             chapter_index,
             payload["title"],
+            locale=locale,
         )
 
     def render_index(self, initial_book_review=None) -> str:

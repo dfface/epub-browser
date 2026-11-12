@@ -490,7 +490,6 @@ body.auth-page {
     color: var(--account-primary);
 }
 
-.admin-section-tab.is-active,
 .admin-section-tab[aria-selected="true"] {
     border-color: color-mix(in srgb, var(--account-primary) 25%, var(--account-border));
     background: var(--account-card);
@@ -574,6 +573,101 @@ body.auth-page {
     color: var(--account-text);
     font-size: .8rem;
     font-weight: 650;
+}
+
+.account-kindle-options {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.account-kindle-options legend {
+    margin-bottom: 10px;
+    color: var(--account-muted);
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+.account-kindle-checks {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.account-kindle-options .account-kindle-checks label,
+.account-kindle-options .account-kindle-default {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    min-height: 44px;
+    cursor: pointer;
+}
+
+.account-kindle-checks label {
+    padding: 0 12px;
+    border: 1px solid var(--account-border);
+    border-radius: 8px;
+}
+
+.account-kindle-options input[type="checkbox"] {
+    width: 18px;
+    min-width: 18px;
+    height: 18px;
+    min-height: 18px;
+    flex: 0 0 18px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--account-primary);
+}
+
+.account-kindle-default {
+    padding: 4px 0;
+}
+
+.account-kindle-fields {
+    display: grid;
+    gap: 7px;
+    padding: 16px 0;
+    border-top: 1px solid var(--account-border);
+}
+
+.account-kindle-fields :is(textarea, input) {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+    padding: 9px 12px;
+    border: 1px solid var(--account-border);
+    border-radius: 8px;
+    background: var(--account-bg);
+    color: var(--account-text);
+    font: inherit;
+}
+
+.account-kindle-fields textarea {
+    resize: vertical;
+}
+
+.account-kindle-fields :is(textarea, input):focus-visible {
+    outline: 2px solid var(--account-primary);
+    outline-offset: 2px;
+}
+
+.account-kindle-fields .account-help {
+    margin: 0 0 8px;
+}
+
+.account-kindle-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+@media (max-width: 460px) {
+    .account-kindle-checks {
+        grid-template-columns: 1fr;
+    }
 }
 
 .admin-ai-field-label {
@@ -1795,44 +1889,6 @@ body.auth-page {
     border: 1px solid color-mix(in srgb, var(--account-border) 82%, var(--account-primary));
     border-radius: 12px;
     background: color-mix(in srgb, var(--account-primary) 3%, var(--account-card));
-}
-
-.admin-book-upload-head {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    min-width: 0;
-}
-
-.admin-book-upload-icon {
-    display: grid;
-    flex: 0 0 auto;
-    width: 38px;
-    height: 38px;
-    place-items: center;
-    border-radius: 10px;
-    background: linear-gradient(135deg, var(--account-primary), var(--account-accent));
-    color: #fff;
-    font-size: 1rem;
-    box-shadow: 0 6px 14px color-mix(in srgb, var(--account-primary) 24%, transparent);
-}
-
-.admin-book-upload-heading {
-    min-width: 0;
-}
-
-.admin-book-upload-heading h5 {
-    margin: 0;
-    color: var(--account-text);
-    font-size: .95rem;
-    font-weight: 750;
-    letter-spacing: -.01em;
-}
-
-.admin-book-upload-heading .account-section-copy {
-    margin: 4px 0 0;
-    font-size: .82rem;
-    line-height: 1.55;
 }
 
 .admin-book-upload-form {
@@ -3684,4 +3740,117 @@ body.auth-page {
         animation-duration: .01ms;
         transition-duration: .01ms;
     }
+}
+
+/* Account and administration share one sidebar and an independently scrolling panel. */
+.account-modal .bookshelf-header {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    background: var(--account-card);
+    min-height: 56px;
+}
+
+.account-modal .bookshelf-title {
+    display: flex;
+    grid-column: 1;
+    grid-row: 1;
+    justify-content: flex-start;
+    font-size: 1.15rem;
+    text-align: start;
+}
+
+.account-modal .bookshelf-header-left { grid-column: 2; grid-row: 1; }
+.account-modal .bookshelf-header-right { grid-column: 3; grid-row: 1; }
+
+.settings-workspace {
+    display: grid;
+    grid-template-columns: clamp(168px, 17vw, 232px) minmax(0, 1fr);
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+.settings-nav {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    overflow: auto;
+    padding: 14px 10px;
+    border: 0;
+    border-inline-end: 1px solid var(--account-border);
+    border-radius: 0;
+    background: var(--account-bg);
+}
+
+.settings-nav .admin-section-tab {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 8px 10px;
+    white-space: normal;
+    text-align: start;
+}
+
+.settings-nav .admin-section-tab i {
+    width: 16px;
+    flex: 0 0 16px;
+    text-align: center;
+}
+
+.settings-nav .admin-section-tab[aria-selected="true"] {
+    border-color: var(--account-border);
+    color: var(--account-text);
+    background: var(--account-card);
+}
+
+.account-modal .settings-workspace .account-modal-body {
+    min-width: 0;
+    padding: clamp(18px, 3vw, 38px) clamp(12px, 3vw, 40px);
+    background: var(--account-card);
+}
+
+#accountPanel .settings-workspace .account-layout { max-width: 920px; }
+#accountSecurityPanel .account-oidc-card { margin-bottom: 18px; }
+
+.settings-workspace .account-admin-section {
+    padding: 0;
+    border: 0;
+    background: transparent;
+}
+
+.settings-workspace .account-admin-section > h4 {
+    font-size: 1.35rem;
+    margin-top: 0;
+}
+
+.settings-workspace .account-admin-grid { grid-template-columns: minmax(0, 1fr); }
+
+.settings-workspace .admin-books-table-scroll {
+    max-height: min(64vh, 44rem);
+    overflow: auto;
+    overscroll-behavior: contain;
+}
+
+.settings-workspace .admin-books-table-scroll thead th {
+    top: 0;
+    z-index: 3;
+    background: var(--account-card);
+}
+
+.settings-workspace .admin-books-table-scroll thead th:last-child { z-index: 4; }
+
+@media (max-width: 720px) {
+    .settings-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+
+    .settings-nav {
+        flex-direction: row;
+        padding: 5px 8px;
+        border-inline-end: 0;
+        border-bottom: 1px solid var(--account-border);
+        overflow-x: auto;
+        overflow-y: hidden;
+    }
+
+    .settings-nav .admin-section-tab { white-space: nowrap; }
+    .account-modal .bookshelf-header { gap: 8px; padding-inline: 10px; }
 }

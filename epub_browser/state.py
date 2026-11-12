@@ -35,7 +35,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 22
+DB_SCHEMA_VERSION = 26
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -400,6 +400,39 @@ class StateStore:
                 self._migrate_schema_v21(connection, max(version, 20))
             if version < 22:
                 self._migrate_schema_v22(connection, max(version, 21))
+            if version < 23:
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS kindle_screensavers (
+                        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                        clock INTEGER NOT NULL DEFAULT 1,
+                        calendar INTEGER NOT NULL DEFAULT 1,
+                        memo_visible INTEGER NOT NULL DEFAULT 1,
+                        default_page INTEGER NOT NULL DEFAULT 0,
+                        memo TEXT NOT NULL DEFAULT ''
+                    )
+                """)
+                connection.execute("PRAGMA user_version = 23")
+            if version < 24:
+                columns = connection.execute("PRAGMA table_info(kindle_screensavers)").fetchall()
+                if not any(column["name"] == "calendar_url" for column in columns):
+                    connection.execute(
+                        "ALTER TABLE kindle_screensavers ADD COLUMN calendar_url TEXT NOT NULL DEFAULT ''"
+                    )
+                connection.execute("PRAGMA user_version = 24")
+            if version < 25:
+                columns = connection.execute("PRAGMA table_info(kindle_screensavers)").fetchall()
+                if not any(column["name"] == "pomodoro" for column in columns):
+                    connection.execute(
+                        "ALTER TABLE kindle_screensavers ADD COLUMN pomodoro INTEGER NOT NULL DEFAULT 0"
+                    )
+                connection.execute("PRAGMA user_version = 25")
+            if version < 26:
+                columns = connection.execute("PRAGMA table_info(kindle_screensavers)").fetchall()
+                if not any(column["name"] == "calendar_urls_json" for column in columns):
+                    connection.execute(
+                        "ALTER TABLE kindle_screensavers ADD COLUMN calendar_urls_json TEXT"
+                    )
+                connection.execute("PRAGMA user_version = 26")
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -3097,6 +3130,7 @@ class StateStore:
                     ("annotations", "user_id"),
                     ("book_reviews", "user_id"),
                     ("reading_sessions", "user_id"),
+                    ("kindle_screensavers", "user_id"),
                 ),
             ),
             (
@@ -8375,6 +8409,69 @@ class StateStore:
                 (user_id, book_id),
             ).fetchall()
         return self._merged_active_seconds(rows)
+
+    def get_kindle_screensaver(self, user_id: str) -> dict:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM kindle_screensavers WHERE user_id = ?", (user_id,)
+            ).fetchone()
+        if row is None:
+            return {
+                "clock": True, "calendar": True, "memo": True, "default": False,
+                "text": "", "calendar_url": "", "calendar_urls": [], "pomodoro": False,
+            }
+        urls = (
+            json.loads(row["calendar_urls_json"]) if row["calendar_urls_json"] is not None
+            else ([row["calendar_url"]] if row["calendar_url"] else [])
+        )
+        return {
+            "clock": bool(row["clock"]),
+            "calendar": bool(row["calendar"]),
+            "memo": bool(row["memo_visible"]),
+            "default": bool(row["default_page"]),
+            "text": row["memo"],
+            "calendar_url": urls[0] if urls else "",
+            "calendar_urls": urls,
+            "pomodoro": bool(row["pomodoro"]),
+        }
+
+    def set_kindle_screensaver_preferences(self, user_id: str, preferences: dict) -> None:
+        urls = preferences.get("calendar_urls")
+        if urls is None and "calendar_url" in preferences:
+            urls = [preferences["calendar_url"]] if preferences["calendar_url"] else []
+        feeds = json.dumps(urls) if urls is not None else None
+        first_feed = (urls[0] if urls else "") if urls is not None else None
+        memo = preferences.get("memo_text")
+        pomodoro = preferences.get("pomodoro")
+        with self._connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO kindle_screensavers
+                    (user_id, clock, calendar, memo_visible, default_page, memo,
+                     calendar_url, pomodoro, calendar_urls_json)
+                VALUES (?, ?, ?, ?, ?, COALESCE(?, ''), COALESCE(?, ''), COALESCE(?, 0), ?)
+                ON CONFLICT(user_id) DO UPDATE SET clock = excluded.clock,
+                    calendar = excluded.calendar, memo_visible = excluded.memo_visible,
+                    default_page = excluded.default_page,
+                    memo = COALESCE(?, kindle_screensavers.memo),
+                    calendar_url = COALESCE(?, kindle_screensavers.calendar_url),
+                    pomodoro = COALESCE(?, kindle_screensavers.pomodoro),
+                    calendar_urls_json = COALESCE(excluded.calendar_urls_json, kindle_screensavers.calendar_urls_json)
+                """,
+                (user_id, preferences["clock"], preferences["calendar"],
+                 preferences["memo"], preferences["default"], memo, first_feed,
+                 pomodoro, feeds, memo, first_feed, pomodoro),
+            )
+
+    def set_kindle_memo(self, user_id: str, memo: str) -> None:
+        with self._connection() as connection:
+            connection.execute(
+                """
+                INSERT INTO kindle_screensavers (user_id, memo) VALUES (?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET memo = excluded.memo
+                """,
+                (user_id, memo),
+            )
 
     def get_reading_progress(self, user_id: str, book_hash: str):
         with self._connection() as connection:

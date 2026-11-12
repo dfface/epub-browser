@@ -262,6 +262,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('id="kResume"', index_html)
             self.assertIn('getCookie(', index_html)
             self.assertIn('Continue reading', index_html)
+            self.assertIn('data-k-toc-chapter="2"', index_html)
 
             middle = processor.create_kindle_chapter_page('<p>Text</p>', '', 1, 'Two')
             self.assertIn('class="prev"', middle)
@@ -274,6 +275,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('kToggleClickScroll', middle)
             self.assertIn('data-i18n="tapTurn"', middle)
             self.assertIn("kindle_click_scroll", middle)
+            self.assertIn('id="kReadingMode"', middle)
+            self.assertIn("kindle_reading_mode", middle)
+            self.assertIn('id="kSettingsBackdrop"', middle)
+            self.assertIn('href="kindle.html#chapter-1"', middle)
+            self.assertIn('id="kFontSizeValue"', middle)
 
             first = processor.create_kindle_chapter_page('<p>One</p>', '', 0, 'One')
             last = processor.create_kindle_chapter_page('<p>Three</p>', '', 2, 'Three')
@@ -376,6 +382,25 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertFalse((Path(directory) / 'kindle-library.html').exists())
             library_html = Path(directory, 'index.html').read_text(encoding='utf-8')
             self.assertNotIn('kindle-library.html', library_html)
+
+    def test_ssg_kindle_library_publishes_bounded_catalogue_pages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            urls = SiteURLs("/reader")
+            assets = AssetPublisher(Path('epub_browser/assets'), directory).publish()
+            books = tuple(
+                LibraryBook(f'book-{i:02}', f'Book {i}', (), (), None, chapter_count=2)
+                for i in range(13)
+            )
+            publish_library_shell(root, books, assets, urls, kindle=True)
+            first = (root / 'kindle-library.html').read_text(encoding='utf-8')
+            second = (root / 'kindle-library-2.html').read_text(encoding='utf-8')
+            self.assertEqual(first.count('<li data-book='), 12)
+            self.assertNotIn('data-book="book-12"', first)
+            self.assertEqual(second.count('<li data-book='), 1)
+            self.assertIn('data-book="book-12"', second)
+            self.assertIn('href="/reader/kindle-library-2.html#kAllBooks"', first)
+            self.assertIn('href="/reader/kindle-library.html#kAllBooks"', second)
 
     def test_server_library_shell_writes_no_kindle_entry(self):
         with tempfile.TemporaryDirectory() as directory:

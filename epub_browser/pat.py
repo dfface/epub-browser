@@ -19,6 +19,8 @@ PAT_SCOPES = frozenset({
     "annotations:write",
     "reviews:read",
     "reviews:write",
+    "kindle-memo:read",
+    "kindle-memo:write",
     "admin:data:read",
 })
 
@@ -27,6 +29,7 @@ PAT_WRITE_REQUIRES = {
     "progress:write": "progress:read",
     "annotations:write": "annotations:read",
     "reviews:write": "reviews:read",
+    "kindle-memo:write": "kindle-memo:read",
 }
 
 # token_urlsafe(16) and token_urlsafe(32) produce 22 and 43 unpadded

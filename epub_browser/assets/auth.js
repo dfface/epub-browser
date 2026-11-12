@@ -280,6 +280,8 @@
       } : {
         authentication_required: true,
         csrf_required: true,
+        invalid_kindle_preferences: true,
+        invalid_kindle_calendar_url: true,
         forbidden: true,
         invalid_credentials: true,
         login_throttled: true,
@@ -969,10 +971,57 @@
         : panel.active);
     }
 
+    var adminSections = [
+      'overview', 'general', 'users', 'oidc', 'dictionaries', 'ai-configuration',
+      'ai-permissions', 'ai-jobs', 'tags', 'upload', 'books', 'webhooks'
+    ];
+    var activeAccountSection = 'profile';
+
+    function setActiveAccountSection(section) {
+      var nav = element('accountSectionNav');
+      if (!nav) return;
+      var tabs = Array.prototype.slice.call(nav.querySelectorAll('[data-account-section]'));
+      if (!tabs.some(function(tab) { return tab.getAttribute('data-account-section') === section; })) return;
+      activeAccountSection = section;
+      tabs.forEach(function(tab) {
+        var selected = tab.getAttribute('data-account-section') === section;
+        tab.setAttribute('aria-selected', String(selected));
+        if (tab.classList) tab.classList.toggle('is-active', selected);
+        tab.tabIndex = selected ? 0 : -1;
+        var panel = element(tab.getAttribute('aria-controls'));
+        if (panel) panel.hidden = !selected;
+      });
+      resetSettingsScroll('accountPanel');
+    }
+
+    function resetSettingsScroll(panelId) {
+      var panel = element(panelId);
+      var body = panel && panel.querySelector && panel.querySelector('.account-modal-body');
+      if (body) body.scrollTop = 0;
+    }
+
+    function bindSettingsTabKeys(nav) {
+      if (!nav) return;
+      nav.addEventListener('keydown', function(event) {
+        var tabs = Array.prototype.slice.call(nav.querySelectorAll('[role="tab"]'));
+        var index = tabs.indexOf(event.target);
+        if (index < 0) return;
+        var next = index;
+        if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = tabs.length - 1;
+        else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+        else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+        else return;
+        event.preventDefault();
+        tabs[next].click();
+        tabs[next].focus();
+      });
+    }
+
     function sectionForAdminControl(control) {
       if (!control || typeof control.getAttribute !== 'function') return '';
       var section = control.getAttribute('data-admin-section');
-      return ['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books', 'general'].indexOf(section) !== -1
+      return adminSections.indexOf(section) !== -1
         ? section : '';
     }
 
@@ -980,13 +1029,14 @@
 
     function setActiveAdminSection(section) {
       var activeTab = null;
-      if (['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books', 'general'].indexOf(section) === -1) return;
+      if (adminSections.indexOf(section) === -1) return;
       activeAdminSection = section;
       if (!root.document || typeof root.document.querySelectorAll !== 'function') return;
       Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-section]')).forEach(function(control) {
         var selected = sectionForAdminControl(control) === section;
         if (control.getAttribute && control.getAttribute('role') === 'tab') {
           control.setAttribute('aria-selected', String(selected));
+          control.tabIndex = selected ? 0 : -1;
           if (control.classList) control.classList.toggle('is-active', selected);
           if (selected) activeTab = control;
         }
@@ -994,6 +1044,7 @@
       Array.prototype.slice.call(root.document.querySelectorAll('[data-admin-panel]')).forEach(function(panel) {
         panel.hidden = panel.getAttribute('data-admin-panel') !== section || !adminPanelIsAvailable(panel);
       });
+      resetSettingsScroll('adminPanel');
       if (activeTab && typeof activeTab.scrollIntoView === 'function') {
         activeTab.scrollIntoView({ block: 'nearest', inline: 'center' });
       }
@@ -1007,7 +1058,7 @@
       if (!match) return '';
       try {
         var section = decodeURIComponent(match[1]);
-        return ['overview', 'users', 'oidc', 'dictionaries', 'ai-configuration', 'ai-permissions', 'ai-jobs', 'tags', 'webhooks', 'books'].indexOf(section) !== -1
+        return adminSections.indexOf(section) !== -1
           ? section : '';
       } catch (error) {
         return '';
@@ -1444,6 +1495,8 @@
         'annotations:write': 'account.pats.scope.annotationsWrite',
         'reviews:read': 'account.pats.scope.reviewsRead',
         'reviews:write': 'account.pats.scope.reviewsWrite',
+        'kindle-memo:read': 'account.kindle.memoRead',
+        'kindle-memo:write': 'account.kindle.memoWrite',
         'admin:data:read': 'account.pats.scope.adminDataRead'
       };
       return t(keys[scope] || 'account.pats.unknownScope', { scope: scope });
@@ -3571,14 +3624,47 @@
       if (indicator) indicator.hidden = !loading;
     }
 
+    var kindleSettingsPath = '/api/account/kindle-screensaver';
+    var kindleWidgetKeys = ['clock', 'calendar', 'memo', 'pomodoro', 'default'];
+
+    function setKindleSettingsStatus(key) {
+      var status = element('kindleSettingsStatus');
+      if (!status) return;
+      if (key) status.setAttribute('data-i18n', key);
+      else status.removeAttribute('data-i18n');
+      status.textContent = key ? t(key) : '';
+    }
+
+    function loadKindleSettings() {
+      var form = element('kindleSettingsForm');
+      if (!form) return Promise.resolve();
+      var fields = form.querySelector('fieldset');
+      fields.disabled = true;
+      setKindleSettingsStatus('');
+      return authenticatedFetch(kindleSettingsPath).then(function(response) {
+        if (!response.ok) return showResponseError(response, 'account');
+        return readJson(response).then(function(settings) {
+          kindleWidgetKeys.forEach(function(key) {
+            form.elements.namedItem(key).checked = settings[key] === true;
+          });
+          var memo = form.elements.namedItem('memo_text');
+          var calendar = form.elements.namedItem('calendar_urls');
+          memo.defaultValue = memo.value = settings.memo_text || '';
+          calendar.defaultValue = calendar.value = (settings.calendar_urls || []).join('\n');
+          fields.disabled = false;
+        });
+      }).catch(function() { showStatus('account.error.network', 'error'); });
+    }
+
     function openPanel() {
       var panel = element('accountPanel');
       if (!panel) return;
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
+      setActiveAccountSection(activeAccountSection);
       setSurfaceLoading('accountPanel', 'accountPanelLoading', true);
       renderAccountOidc();
-      Promise.all([loadSessions(), loadPersonalAccessTokens()]).then(function() {
+      Promise.all([loadSessions(), loadPersonalAccessTokens(), loadKindleSettings()]).then(function() {
         setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
       }, function() {
         setSurfaceLoading('accountPanel', 'accountPanelLoading', false);
@@ -3719,6 +3805,14 @@
       if (root.document && typeof root.document.addEventListener === 'function') {
         root.document.addEventListener('keydown', handleAdminBookEditorKeydown);
       }
+      var accountNav = element('accountSectionNav');
+      if (accountNav) {
+        Array.prototype.forEach.call(accountNav.querySelectorAll('[data-account-section]'), function(tab) {
+          tab.addEventListener('click', function() { setActiveAccountSection(tab.getAttribute('data-account-section')); });
+        });
+      }
+      bindSettingsTabKeys(accountNav);
+      bindSettingsTabKeys(element('adminSectionNav'));
       adminSectionControls.forEach(function(control) {
         control.addEventListener('click', function() {
           var section = sectionForAdminControl(control);
@@ -3798,13 +3892,44 @@
           redirectToLogin();
         }).catch(function() { showStatus('account.error.network', 'error'); });
       });
+      var kindleForm = element('kindleSettingsForm');
+      if (kindleForm) kindleForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        var fields = kindleForm.querySelector('fieldset');
+        if (fields.disabled) return;
+        var settings = {};
+        kindleWidgetKeys.forEach(function(key) {
+          settings[key] = kindleForm.elements.namedItem(key).checked;
+        });
+        var memoField = kindleForm.elements.namedItem('memo_text');
+        var calendarField = kindleForm.elements.namedItem('calendar_urls');
+        if (memoField.value !== memoField.defaultValue) settings.memo_text = memoField.value;
+        if (calendarField.value !== calendarField.defaultValue) settings.calendar_urls = calendarField.value.split(/\r?\n/).map(function(url) { return url.trim(); }).filter(Boolean);
+        fields.disabled = true;
+        setKindleSettingsStatus('');
+        authenticatedFetch(kindleSettingsPath, {
+          method: 'PUT',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(settings)
+        }).then(function(response) {
+          if (!response.ok) return showResponseError(response, 'account');
+          return readJson(response).then(function(saved) {
+            memoField.defaultValue = memoField.value = saved.memo_text || '';
+            calendarField.defaultValue = calendarField.value = (saved.calendar_urls || []).join('\n');
+            setKindleSettingsStatus('settings.saved');
+          });
+        }).catch(function() {
+          showStatus('account.error.network', 'error');
+        }).then(function() { fields.disabled = false; });
+      });
       if (patCreateForm) {
         patCreateForm.addEventListener('change', function(event) {
           var required = {
             'bookshelf:write': 'bookshelf:read',
             'progress:write': 'progress:read',
             'annotations:write': 'annotations:read',
-            'reviews:write': 'reviews:read'
+            'reviews:write': 'reviews:read',
+            'kindle-memo:write': 'kindle-memo:read'
           };
           var readScope = event.target && required[event.target.value];
           if (!readScope || !event.target.checked || !patCreateForm.querySelector) return;
