@@ -14,7 +14,7 @@ import re
 import secrets
 import sqlite3
 
-from .i18n_bundles import i18n_core_immutable_url, render_i18n_bootstrap, resolve_request_locale
+from .i18n_bundles import get_bundle, i18n_core_immutable_url, render_i18n_bootstrap, resolve_request_locale
 import time
 from contextlib import asynccontextmanager
 from datetime import date, datetime, timezone
@@ -105,6 +105,8 @@ from .server_library import (
 )
 from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import EPUB_FORMAT, PDF_FORMAT, is_supported_source
+from .kindle import KINDLE_WIDGETS, valid_kindle_memo
+from .kindle_calendar import CALENDAR_REFRESH_SECONDS, calendar_url, load_calendar_events
 from .site import LibraryBook, render_kindle_library_page, render_library_shell
 from .urls import SiteURLs
 from .version import ReleaseLookup, render_footer
@@ -525,7 +527,7 @@ def _request_expects_html(request):
         return False
     path = request.url.path
     return (
-        path in {'/', '/index.html'}
+        path in {'/', '/index.html', '/kindle', '/kindle/screensaver'}
         or path.endswith('.html')
         or 'text/html' in request.headers.get('accept', '').lower()
     )
@@ -4268,6 +4270,8 @@ window.location.assign(payload.redirect||'/');
         """Project visible book records onto the read-only minimal shelf."""
         books = []
         for record in store.visible_books(principal):
+            if record.source_format != EPUB_FORMAT:
+                continue
             try:
                 metadata = json.loads(record.metadata_json)
             except (TypeError, json.JSONDecodeError):
@@ -4283,38 +4287,130 @@ window.location.assign(payload.redirect||'/');
                     title=record.title,
                     authors=authors,
                     tags=tuple(tags) if isinstance(tags, (list, tuple)) else (),
-                    cover=metadata.get("cover"),
+                    cover=(f"/book/{record.book_id}/{metadata['cover']}"
+                           if metadata.get("cover") else None),
                     source_format=record.source_format,
                 )
             )
         return books
 
-    async def kindle_library_page(request):
-        # Authenticated, read-only minimal shelf: the rendered list never
-        # carries management actions, and the Kindle surfaces keep progress
-        # read-write while heartbeats stay report-only; nothing here displays
-        # insights back or mutates the shelf.  The user's bookshelf groups
-        # render as plain nested lists, read-only, from the authenticated
-        # SQLite document (never from client input).
+    async def kindle_library_page(request, *, show_dashboard=False):
         principal = require_principal(request)
 
-        def _kindle_shelf():
-            books = kindle_library_books(principal)
-            row = store.get_bookshelf(principal.user_id)
-            if row is None:
-                return books, None
-            try:
-                return books, json.loads(row[1])
-            except (TypeError, json.JSONDecodeError):
-                return books, None
+        def page_number(key):
+            value = request.query_params.get(key, "")
+            return int(value) if re.fullmatch(r"[0-9]{1,9}", value) else 1
 
-        books, shelf = await run_db(_kindle_shelf)
+        def load_shelf():
+            books = kindle_library_books(principal)
+            visible = {book.book_id for book in books}
+            limit = store.get_general_settings()["recent_reading_limit"]
+            recent = []
+            for row in store.list_reading_progress(principal.user_id):
+                book_id = row["book_id"]
+                chapter = row["chapter_index"]
+                if book_id not in visible:
+                    continue
+                cache = Path(base_directory) / "book" / book_id / "content"
+                if not (cache / f"chapter_{chapter}.json").is_file():
+                    continue
+                recent.append((book_id, chapter))
+                if len(recent) == limit:
+                    break
+            row = store.get_bookshelf(principal.user_id)
+            try:
+                shelf = json.loads(row[1]) if row is not None else None
+            except (TypeError, json.JSONDecodeError):
+                shelf = None
+            return books, shelf, recent, store.get_kindle_screensaver(principal.user_id)
+
+        books, shelf, recent, dashboard = await run_db(load_shelf)
         markup = await run_render(
-            render_kindle_library_page, books, SiteURLs(), shelf=shelf
+            render_kindle_library_page, books, SiteURLs(), shelf=shelf, recent=recent,
+            locale=resolve_request_locale(request), dashboard=dashboard, show_dashboard=show_dashboard,
+            catalog_page=page_number("catalog_page"), shelf_page=page_number("shelf_page"),
+            query=request.query_params.get("q", ""),
         )
-        target = HTMLResponse(markup, headers={'Cache-Control': 'no-cache'})
-        return await apply_security_headers(
-            target, markup=markup, inline_scripts=True
+        target = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
+        return await apply_security_headers(target, markup=markup, inline_scripts=True)
+
+    async def kindle_entry(request):
+        principal = require_principal(request)
+        settings = await run_db(store.get_kindle_screensaver, principal.user_id)
+        target = '/kindle/screensaver' if settings['default'] else '/kindle-library.html'
+        return RedirectResponse(target, status_code=303, headers={'Cache-Control': 'private, no-store'})
+
+    async def kindle_screensaver(request):
+        return await kindle_library_page(request, show_dashboard=True)
+
+    async def kindle_screensaver_memo(request):
+        principal = require_principal(request)
+        settings = await run_db(store.get_kindle_screensaver, principal.user_id)
+        return response({'memo': settings['text'] if settings['memo'] else ''},
+                        cache_control='private, no-store')
+
+    async def kindle_screensaver_calendar(request):
+        principal = require_principal(request)
+        settings = await run_db(store.get_kindle_screensaver, principal.user_id)
+        urls = settings["calendar_urls"] if settings["calendar"] else []
+        window = int(time.monotonic() // CALENDAR_REFRESH_SECONDS)
+        feeds = await asyncio.gather(*(
+            run_io(load_calendar_events, principal.user_id, url, window) for url in urls
+        ))
+        events = {}
+        failures = 0
+        for feed in feeds:
+            if feed is None:
+                failures += 1
+                continue
+            for event in feed:
+                key = (event.get("start", ""), event.get("end", ""), event["title"])
+                events[key] = event
+        return response(
+            {"events": [events[key] for key in sorted(events)[:500]],
+             "unavailable": bool(feeds) and failures == len(feeds),
+             "partial": 0 < failures < len(feeds)},
+            cache_control="private, no-store",
+        )
+
+    async def kindle_screensaver_preferences(request):
+        principal = require_principal(request)
+        if request.method == 'PUT':
+            try:
+                data = await request.json()
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                data = None
+            locale = resolve_request_locale(request)
+
+            def invalid(code):
+                message = get_bundle(locale)['account.error.' + code]
+                return response(error_payload(code, message), 400, cache_control='private, no-store')
+
+            if (
+                not isinstance(data, dict)
+                or any(type(data.get(key)) is not bool for key in KINDLE_WIDGETS)
+                or ("pomodoro" in data and type(data["pomodoro"]) is not bool)
+                or ("memo_text" in data and not valid_kindle_memo(data["memo_text"]))
+            ):
+                return invalid("invalid_kindle_preferences")
+            if "calendar_urls" in data or "calendar_url" in data:
+                urls = data.get("calendar_urls", [data.get("calendar_url")])
+                try:
+                    if not isinstance(urls, list) or len(urls) > 8:
+                        raise ValueError("Invalid calendar list")
+                    data["calendar_urls"] = list(dict.fromkeys(
+                        url for value in urls if (url := calendar_url(value))
+                    ))
+                except ValueError:
+                    return invalid("invalid_kindle_calendar_url")
+            await run_db(store.set_kindle_screensaver_preferences, principal.user_id, data)
+        settings = await run_db(store.get_kindle_screensaver, principal.user_id)
+        return response(
+            {**{key: settings[key] for key in KINDLE_WIDGETS},
+             "memo_text": settings["text"], "calendar_url": settings["calendar_url"],
+             "calendar_urls": settings["calendar_urls"],
+             "pomodoro": settings["pomodoro"]},
+            cache_control='private, no-store',
         )
 
     async def openapi_schema(request):
@@ -4610,10 +4706,14 @@ window.location.assign(payload.redirect||'/');
                         )
                     if kindle_page_allowed:
                         if book_relative_path == 'kindle.html':
-                            markup = await run_render(renderer.render_kindle_index)
+                            dashboard = await run_db(store.get_kindle_screensaver, principal.user_id)
+                            tools = {"pomodoro": dashboard["pomodoro"]}
+                            markup = await run_render(
+                                renderer.render_kindle_index, locale=resolve_request_locale(request), tools=tools,
+                            )
                             dynamic_response = HTMLResponse(
                                 markup,
-                                headers={'Cache-Control': 'no-cache'},
+                                headers={'Cache-Control': 'private, no-cache'},
                             )
                             return await apply_security_headers(
                                 dynamic_response,
@@ -4629,10 +4729,11 @@ window.location.assign(payload.redirect||'/');
                             markup = await run_render(
                                 renderer.render_kindle_chapter,
                                 int(kindle_chapter_match.group(1)),
+                                locale=resolve_request_locale(request),
                             )
                             dynamic_response = HTMLResponse(
                                 markup,
-                                headers={'Cache-Control': 'no-cache'},
+                                headers={'Cache-Control': 'private, no-cache'},
                             )
                             return await apply_security_headers(
                                 dynamic_response,
@@ -5598,6 +5699,11 @@ window.location.assign(payload.redirect||'/');
         Route('/index.html', library_index),
         *(
             [
+                Route('/kindle', kindle_entry),
+                Route('/kindle/screensaver', kindle_screensaver),
+                Route('/api/kindle/screensaver/memo', kindle_screensaver_memo),
+                Route('/api/kindle/screensaver/calendar', kindle_screensaver_calendar),
+                Route('/api/account/kindle-screensaver', kindle_screensaver_preferences, methods=['GET', 'PUT']),
                 Route(
                     '/kindle-library.html',
                     kindle_library_page,

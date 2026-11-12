@@ -335,6 +335,7 @@ class SSGPublisher:
                 tags=converted.metadata.tags,
                 cover=cover,
                 source_format=converted.metadata.source_format,
+                chapter_count=converted.chapter_count,
             )
         finally:
             cleanup = getattr(processor, "cleanup", None)

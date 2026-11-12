@@ -5817,10 +5817,188 @@ class ServerKindleTests(unittest.TestCase):
         client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
         return client
 
+    def test_kindle_library_resumes_only_visible_epubs(self):
+        for book_id in ("book", "pdf"):
+            saved = self.client.put(
+                f"/api/reading-progress/{book_id}", json={"chapter_index": 0}
+            )
+            self.assertEqual(saved.status_code, 200)
+        shelf = self.client.get("/kindle-library.html")
+        self.assertIn("Continue reading", shelf.text)
+        self.assertIn('href="/book/book/kindle_chapter_0.html#resume"', shelf.text)
+        self.assertNotIn("/book/pdf/kindle", shelf.text)
+
+    def test_kindle_continue_reading_uses_admin_limit(self):
+        public = Path(self.directory.name)
+        for book_id in ("second", "third"):
+            self._write_server_content_cache(public, book_id, book_id, "Opening chapter")
+            self.store.resolve_book(public / (book_id + ".epub"), None, book_id,
+                                    {"title": book_id}, preferred_book_id=book_id)
+        for book_id in ("book", "second", "third"):
+            self.client.put(f"/api/reading-progress/{book_id}", json={"chapter_index": 0})
+        for limit in (1, 3):
+            self.assertEqual(self.client.put(
+                "/api/admin/general-settings", json={"recent_reading_limit": limit}
+            ).status_code, 200)
+            shelf = self.client.get("/kindle-library.html")
+            recent = shelf.text.split('id="kRecent"', 1)[1].split("</ul>", 1)[0]
+            self.assertEqual(recent.count("kindle_chapter_0.html"), limit)
+
+    def test_kindle_catalog_and_nested_shelf_are_paginated_independently(self):
+        public = Path(self.directory.name)
+        ids = [f"extra-{i:02}" for i in range(13)]
+        for book_id in ids:
+            self.store.resolve_book(
+                public / f"{book_id}.epub", None, book_id, {"title": book_id},
+                preferred_book_id=book_id,
+            )
+        self.store.create_bookshelf(
+            self.alice.user_id, 1,
+            {"groups": {"group": {"name": "Reading queue", "items": ids}}},
+        )
+
+        def panel(response, name):
+            self.assertEqual(response.status_code, 200)
+            return response.text.split(f'id="{name}"', 1)[1].split("</section>", 1)[0]
+
+        first = self.client.get("/kindle-library.html")
+        self.assertEqual(panel(first, "kAllBooks").count('<li data-book='), 12)
+        self.assertEqual(panel(first, "kBookshelf").count('<li data-book='), 12)
+        second = self.client.get("/kindle-library.html?shelf_page=2")
+        self.assertEqual(panel(second, "kAllBooks").count('<li data-book='), 12)
+        self.assertIn("Reading queue", panel(second, "kBookshelf"))
+        self.assertEqual(panel(second, "kBookshelf").count('<li data-book='), 1)
+        last = self.client.get("/kindle-library.html?catalog_page=999")
+        self.assertEqual(panel(last, "kAllBooks").count('<li data-book='), 2)
+        results = self.client.get("/kindle-library.html?q=extra-12")
+        self.assertEqual(panel(results, "kAllBooks").count('<li data-book='), 1)
+        self.assertIn('data-book="extra-12"', panel(results, "kAllBooks"))
+
+    def test_kindle_ui_locale_and_navigation_are_shared_across_reader_surfaces(self):
+        self.client.cookies.set("epub_browser_locale", "zh-CN")
+        paths = ("/kindle-library.html", "/book/book/kindle.html", "/book/book/kindle_chapter_0.html")
+        for path in paths:
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('<html lang="zh-CN">', response.text)
+                if path != paths[2]:
+                    dock = response.text.split('id="kDock"', 1)[1].split("</nav>", 1)[0]
+                    self.assertIn('data-i18n="screensaver"', dock)
+                    self.assertIn('data-i18n="settings"', dock)
+                if path == paths[0]:
+                    self.assertIn('id="kLanguage"', response.text)
+                    self.assertNotIn('id="kFontSizeValue"', response.text)
+                elif path == paths[2]:
+                    self.assertNotIn('id="kDock"', response.text)
+                    self.assertIn('id="kFontSizeValue"', response.text)
+                    self.assertIn('href="kindle.html#chapter-0"', response.text)
+
+    def test_kindle_account_edits_memo_and_subscribes_to_calendar(self):
+        settings = "/api/account/kindle-screensaver"
+        dashboard_calendar = "/api/kindle/screensaver/calendar"
+        options = {"clock": True, "calendar": True, "memo": True, "default": False}
+        saved = self.client.put(settings, json=dict(
+            options, memo_text="<private>", calendar_url="webcal://example.com/feed.ics?key=token"
+        ))
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["memo_text"], "<private>")
+        self.assertEqual(saved.json()["calendar_url"], "https://example.com/feed.ics?key=token")
+        self.assertIn("&lt;private&gt;", self.client.get("/kindle/screensaver").text)
+        self.assertNotIn("key=token", self.client.get("/kindle/screensaver").text)
+        with mock.patch("epub_browser.server.load_calendar_events", return_value=[{"title": "Appointment"}]) as load:
+            self.assertEqual(self.client.get(dashboard_calendar).json()["events"], [{"title": "Appointment"}])
+            self.assertEqual(load.call_args.args[1], "https://example.com/feed.ics?key=token")
+            bob = self.store.create_user("bob", hash_password("bob-secret"))
+            bob_client = self._login(bob.username, "bob-secret")
+            self.assertEqual(bob_client.get(dashboard_calendar).json()["events"], [])
+            self.assertEqual(bob_client.get(settings).json()["calendar_url"], "")
+            self.assertEqual(load.call_count, 1)
+        self.assertEqual(self.client.put(settings, json=dict(
+            options, calendar_url="https://127.0.0.1/private.ics"
+        )).status_code, 400)
+
+    def test_kindle_merges_calendar_feeds_even_if_one_is_unavailable(self):
+        options = {"clock": True, "calendar": True, "memo": True, "default": False}
+        urls = ["webcal://calendar.example.com/first", "https://calendar.example.com/second",
+                "https://calendar.example.com/offline", "https://calendar.example.com/first"]
+        saved = self.client.put("/api/account/kindle-screensaver", json=dict(options, calendar_urls=urls))
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["calendar_urls"], [url.replace("webcal:", "https:") for url in urls[:3]])
+        event = {"start": "2026-11-12", "end": "", "title": "Shared event"}
+        def load(_user, url, _window):
+            return None if url.endswith("offline") else [event]
+        with mock.patch("epub_browser.server.load_calendar_events", side_effect=load):
+            agenda = self.client.get("/api/kindle/screensaver/calendar").json()
+        self.assertEqual(agenda, {"events": [event], "unavailable": False, "partial": True})
+        invalid = self.client.put("/api/account/kindle-screensaver", json=dict(
+            options, calendar_urls=["https://127.0.0.1/calendar"]
+        ))
+        self.assertEqual(invalid.status_code, 400)
+
+    def test_kindle_pomodoro_is_opt_in_per_account(self):
+        settings = "/api/account/kindle-screensaver"
+        dashboard = "/kindle/screensaver"
+        self.assertFalse(self.client.get(settings).json()["pomodoro"])
+        self.assertNotIn('id="kPomodoro"', self.client.get(dashboard).text)
+        options = {"clock": False, "calendar": False, "memo": False, "default": False}
+        self.assertTrue(self.client.put(settings, json=dict(options, pomodoro=True)).json()["pomodoro"])
+        self.assertIn('id="kPomodoro"', self.client.get(dashboard).text)
+        self.assertTrue(self.client.put(settings, json=options).json()["pomodoro"])
+        self.assertEqual(self.client.put(settings, json=dict(options, pomodoro=1)).status_code, 400)
+        self.store.create_user("bob", hash_password("bob-secret"))
+        bob = self._login("bob", "bob-secret")
+        self.assertNotIn('id="kPomodoro"', bob.get(dashboard).text)
+        self.assertFalse(self.client.put(settings, json=dict(options, pomodoro=False)).json()["pomodoro"])
+
+    def test_kindle_library_and_dashboard_share_the_bottom_navigation(self):
+        for path, active in (
+            ("/kindle-library.html", "kLibraryView"),
+            ("/kindle/screensaver", "kDashboardWidgets"),
+        ):
+            page = self.client.get(path)
+            self.assertEqual(page.status_code, 200)
+            self.assertIn(f'id="kDock" data-default="{active}"', page.text)
+            self.assertIn('href="#kLibraryView"', page.text)
+            self.assertIn('href="#kDashboardWidgets"', page.text)
+            self.assertIn('href="#kHomeSettings"', page.text)
+            self.assertEqual(page.text.count('id="kLibraryView"'), 1)
+
+    def test_kindle_screensaver_preferences_and_private_memo(self):
+        path = "/kindle/screensaver"
+        settings = "/api/account/kindle-screensaver"
+        memo = "/api/v1/me/kindle-memo"
+        with TestClient(self.app) as anonymous:
+            self.assertEqual(anonymous.get(path, follow_redirects=False).status_code, 303)
+            self.assertEqual(anonymous.get(memo).status_code, 401)
+
+        def bearer(user, scopes):
+            token = self.store.create_personal_access_token(
+                user.user_id, "Memo", scopes, expires_at=None
+            )
+            return {"Authorization": "Bearer " + token.raw_token}
+
+        reader = bearer(self.alice, ["kindle-memo:read"])
+        writer = bearer(self.alice, ["kindle-memo:read", "kindle-memo:write"])
+        self.assertEqual(self.client.put(memo, headers=reader, json={"memo": "secret"}).status_code, 403)
+        self.assertEqual(self.client.put(memo, headers=writer, json={"memo": "<b>secret</b>"}).status_code, 200)
+        self.assertEqual(self.client.get(memo, headers=reader).json(), {"memo": "<b>secret</b>"})
+        self.assertIn("&lt;b&gt;secret&lt;/b&gt;", self.client.get(path).text)
+        self.store.create_user("bob", hash_password("bob-secret"))
+        bob = self._login("bob", "bob-secret")
+        self.assertNotIn("secret", bob.get(path).text)
+        options = {"clock": True, "calendar": False, "memo": False, "default": True}
+        self.assertEqual(self.client.put(settings, json=options).status_code, 200)
+        self.assertEqual(self.client.get(settings).json(), dict(options, memo_text="<b>secret</b>", calendar_url="", calendar_urls=[], pomodoro=False))
+        self.assertNotIn('id="kMemo"', self.client.get(path).text)
+        self.assertNotIn('id="kCalendar"', self.client.get(path).text)
+        self.assertEqual(self.client.get("/kindle", follow_redirects=False).headers["location"], path)
+        self.assertEqual(self.client.get(memo, headers=reader).json(), {"memo": "<b>secret</b>"})
+
     def test_kindle_surfaces_are_served_and_minimal(self):
         index = self.client.get("/")
         self.assertEqual(index.status_code, 200)
-        self.assertIn("kindle-library.html", index.text)
+        self.assertIn("location.replace('kindle')", index.text)
 
         shelf = self.client.get("/kindle-library.html")
         self.assertEqual(shelf.status_code, 200)

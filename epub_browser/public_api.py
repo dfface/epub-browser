@@ -14,6 +14,8 @@ from typing import Callable, Optional, Tuple
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.routing import Match, Route
 
+from .i18n_bundles import get_bundle, resolve_request_locale
+from .kindle import KINDLE_MEMO_MAX_LENGTH, valid_kindle_memo
 from .pat import AuthenticatedPAT, PAT_SCOPES
 from .server_concurrency import run_db, run_render
 from .server_pages import ServerPageError, ServerPageRenderer
@@ -744,6 +746,22 @@ async def _admin_ai_results(request, authenticated):
     return _admin_items_response(items)
 
 
+async def _kindle_memo(request, authenticated):
+    store = _context(request).store
+    user_id = authenticated.principal.user_id
+    if request.method in ("GET", "HEAD"):
+        settings = await run_db(store.get_kindle_screensaver, user_id)
+        memo = settings["text"]
+    else:
+        data = await _json_object(request)
+        memo = data.get("memo") if isinstance(data, dict) else None
+        if not valid_kindle_memo(memo):
+            message = get_bundle(resolve_request_locale(request))["apiDocs.error.invalidKindleMemo"]
+            return public_api_error("invalid_memo", message.format(limit=KINDLE_MEMO_MAX_LENGTH), 400)
+        await run_db(store.set_kindle_memo, user_id, memo)
+    return JSONResponse({"memo": memo}, headers={"Cache-Control": "private, no-store"})
+
+
 def public_api_operations():
     return (
         PublicAPIOperation(
@@ -793,6 +811,8 @@ def public_api_operations():
         PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("GET",), "reviews:read", "Get a review", "getMyReview", _review_item),
         PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("PUT",), "reviews:write", "Create or replace a review", "putMyReview", _review_item),
         PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("DELETE",), "reviews:write", "Delete a review", "deleteMyReview", _review_item),
+        PublicAPIOperation("/api/v1/me/kindle-memo", ("GET",), "kindle-memo:read", "Read the token owner's Kindle memo", "getMyKindleMemo", _kindle_memo),
+        PublicAPIOperation("/api/v1/me/kindle-memo", ("PUT",), "kindle-memo:write", "Replace the token owner's Kindle memo", "putMyKindleMemo", _kindle_memo),
         PublicAPIOperation("/api/v1/admin/users", ("GET",), "admin:data:read", "List public account metadata", "listAdminUsers", _admin_users),
         PublicAPIOperation("/api/v1/admin/users/{user_id}/bookshelf", ("GET",), "admin:data:read", "Read a user's bookshelf", "getAdminUserBookshelf", _admin_bookshelf),
         PublicAPIOperation("/api/v1/admin/users/{user_id}/progress", ("GET",), "admin:data:read", "Read a user's progress", "listAdminUserProgress", _admin_progress),
@@ -951,6 +971,16 @@ def openapi_document():
                     "403": {"description": "Insufficient scope"},
                 },
             }
+    memo_content = {"application/json": {"schema": {
+        "type": "object",
+        "required": ["memo"],
+        "properties": {"memo": {"type": "string", "maxLength": KINDLE_MEMO_MAX_LENGTH}},
+    }}}
+    memo_path = paths["/api/v1/me/kindle-memo"]
+    for method in ("get", "put"):
+        memo_path[method]["responses"]["200"]["content"] = memo_content
+    memo_path["put"]["requestBody"] = {"required": True, "content": memo_content}
+    memo_path["put"]["responses"]["400"] = {"description": "Invalid memo"}
     paths["/api/v1/books/{book_id}/chapters"]["get"]["responses"]["200"]["content"] = {
         "application/json": {"schema": {"type": "object", "properties": {
             "items": {"type": "array", "items": {"$ref": "#/components/schemas/ChapterListItem"}},

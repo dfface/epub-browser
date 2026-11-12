@@ -47,11 +47,21 @@ SERVER_ACCOUNT_PANEL = '''
     <span class="account-panel-loading-spinner" aria-hidden="true"></span>
     <span data-i18n="account.loading">Loading account settings…</span>
 </div>
+<div class="settings-workspace">
+<nav class="settings-nav" id="accountSectionNav" role="tablist" aria-labelledby="accountTitle">
+    <button type="button" class="admin-section-tab is-active" id="accountProfileTab" role="tab" aria-selected="true" aria-controls="accountProfilePanel" data-account-section="profile"><i class="fas fa-user" aria-hidden="true"></i><span data-i18n="account.profile">Profile</span></button>
+    <button type="button" class="admin-section-tab" id="accountSecurityTab" role="tab" aria-selected="false" aria-controls="accountSecurityPanel" data-account-section="security"><i class="fas fa-lock" aria-hidden="true"></i><span data-i18n="account.security">Security</span></button>
+    <button type="button" class="admin-section-tab" id="accountTokensTab" role="tab" aria-selected="false" aria-controls="accountTokensPanel" data-account-section="tokens"><i class="fas fa-key" aria-hidden="true"></i><span data-i18n="account.pats.title">Personal access tokens</span></button>
+    {kindle_settings_tab}
+</nav>
 <div class="account-modal-body"><div class="account-layout">
+<div role="tabpanel" id="accountProfilePanel" aria-labelledby="accountProfileTab" data-account-panel="profile">
 <section class="account-card account-profile-card" aria-labelledby="accountProfileTitle">
     <h3 id="accountProfileTitle" data-i18n="account.profile">Profile</h3>
     <p id="accountIdentity"></p>
 </section>
+</div>
+<div role="tabpanel" id="accountSecurityPanel" aria-labelledby="accountSecurityTab" data-account-panel="security" hidden>
 <section class="account-card account-card-wide account-oidc-card" id="accountOidcCard" aria-labelledby="accountOidcTitle" hidden>
     <div class="account-section-heading">
         <div><h3 id="accountOidcTitle" data-i18n="account.oidc.title">Connected identity</h3><p class="account-help" data-i18n="account.oidc.description">Connect your account to the configured sign-in provider.</p></div>
@@ -79,6 +89,9 @@ SERVER_ACCOUNT_PANEL = '''
     <ul class="account-list" id="sessionList"></ul>
 </section>
 </div>
+</div>
+{kindle_settings_panel}
+<div role="tabpanel" id="accountTokensPanel" aria-labelledby="accountTokensTab" data-account-panel="tokens" hidden>
 <section class="account-card account-card-wide account-pat-card" aria-labelledby="accountPatTitle">
     <div class="account-section-heading">
         <div><h3 id="accountPatTitle" data-i18n="account.pats.title">Personal access tokens</h3><p class="account-help" data-i18n="account.pats.description">Use scoped tokens with the external API.</p></div>
@@ -97,6 +110,7 @@ SERVER_ACCOUNT_PANEL = '''
             <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.progress">Progress</strong><label><input type="checkbox" name="scopes" value="progress:read"> <span data-i18n="account.pats.scope.progressRead">Read progress</span></label><label><input type="checkbox" name="scopes" value="progress:write"> <span data-i18n="account.pats.scope.progressWrite">Update progress</span></label></div>
             <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.annotations">Annotations</strong><label><input type="checkbox" name="scopes" value="annotations:read"> <span data-i18n="account.pats.scope.annotationsRead">Read annotations</span></label><label><input type="checkbox" name="scopes" value="annotations:write"> <span data-i18n="account.pats.scope.annotationsWrite">Update annotations</span></label></div>
             <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.reviews">Reviews</strong><label><input type="checkbox" name="scopes" value="reviews:read"> <span data-i18n="account.pats.scope.reviewsRead">Read reviews</span></label><label><input type="checkbox" name="scopes" value="reviews:write"> <span data-i18n="account.pats.scope.reviewsWrite">Update reviews</span></label></div>
+            <div class="account-pat-scope-group"><strong data-i18n="account.kindle.memo">Memo</strong><label><input type="checkbox" name="scopes" value="kindle-memo:read"> <span data-i18n="account.kindle.memoRead">Read Kindle memo</span></label><label><input type="checkbox" name="scopes" value="kindle-memo:write"> <span data-i18n="account.kindle.memoWrite">Update Kindle memo</span></label></div>
             <div class="account-pat-scope-group" id="patAdminScopeLabel" hidden><strong data-i18n="account.pats.group.administration">Administration</strong><label><input type="checkbox" name="scopes" value="admin:data:read"> <span data-i18n="account.pats.scope.adminDataRead">Read all users' non-secret data</span></label></div>
         </fieldset>
         <div class="account-pat-form-footer"><p class="account-pat-warning" id="patExpirationHelp" data-i18n="account.pats.neverExpiresWarning">Never-expiring tokens remain valid until you revoke them.</p><button type="submit" id="patCreateSubmit" class="bookshelf-action-btn account-primary-action" data-i18n="account.pats.create">Create token</button></div>
@@ -110,7 +124,8 @@ SERVER_ACCOUNT_PANEL = '''
     <ul class="account-list account-pat-list" id="patList"></ul>
     <p id="patLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
 </section>
-</div></div>
+</div>
+</div></div></div>
     </div>
 </div>
 <div class="bookshelf-modal account-modal admin-modal" id="adminPanel" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="adminTitle" hidden>
@@ -126,23 +141,22 @@ SERVER_ACCOUNT_PANEL = '''
     <span class="account-panel-loading-spinner" aria-hidden="true"></span>
     <span data-i18n="admin.loading">Loading administration…</span>
 </div>
-<div class="account-modal-body"><div class="account-layout">
-<section class="account-admin account-admin-console" id="adminConsole" aria-labelledby="adminTitle">
-    <p class="account-admin-intro" data-i18n="admin.description">Manage users and access to restricted books.</p>
-    <nav class="admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Administration sections" data-i18n-aria-label="admin.sectionNavigation">
-        <button type="button" class="admin-section-tab is-active" id="adminSectionOverviewTab" role="tab" aria-selected="true" aria-controls="adminOverviewSection" data-admin-section="overview" data-i18n="admin.overview">Overview</button>
-        <button type="button" class="admin-section-tab" id="adminSectionGeneralTab" role="tab" aria-selected="false" aria-controls="adminGeneralSection" data-admin-section="general" data-i18n="admin.general">General</button>
-        <button type="button" class="admin-section-tab" id="adminSectionUsersTab" role="tab" aria-selected="false" aria-controls="adminUsersSection" data-admin-section="users" data-i18n="admin.users">Users</button>
-        <button type="button" class="admin-section-tab" id="adminSectionOidcTab" role="tab" aria-selected="false" aria-controls="adminOidcSection" data-admin-section="oidc" data-i18n="admin.oidc.title">OIDC login</button>
-        <button type="button" class="admin-section-tab" id="adminSectionDictionariesTab" role="tab" aria-selected="false" aria-controls="adminDictionariesSection" data-admin-section="dictionaries" data-i18n="admin.dictionaries">Dictionaries</button>
-        <button type="button" class="admin-section-tab" id="adminSectionAiConfigurationTab" role="tab" aria-selected="false" aria-controls="adminAiConfigurationSection" data-admin-section="ai-configuration" data-i18n="admin.ai.configuration">AI configuration</button>
-        <button type="button" class="admin-section-tab" id="adminSectionAiPermissionsTab" role="tab" aria-selected="false" aria-controls="adminAiPermissionsSection" data-admin-section="ai-permissions" data-i18n="admin.ai.permissions">AI permissions</button>
-        <button type="button" class="admin-section-tab" id="adminSectionAiJobsTab" role="tab" aria-selected="false" aria-controls="adminAiJobsSection" data-admin-section="ai-jobs" data-i18n="admin.ai.jobs.title">AI jobs</button>
-        <button type="button" class="admin-section-tab" id="adminSectionTagsTab" role="tab" aria-selected="false" aria-controls="adminTagsSection" data-admin-section="tags" data-i18n="admin.tags">Tag management</button>
-        <button type="button" class="admin-section-tab" id="adminSectionBooksTab" role="tab" aria-selected="false" aria-controls="adminBooksSection" data-admin-section="books" data-i18n="admin.books">Book management</button>
-        <button type="button" class="admin-section-tab" id="adminSectionWebhooksTab" role="tab" aria-selected="false" aria-controls="adminWebhooksSection" data-admin-section="webhooks" data-i18n="admin.webhooks.title">WebHooks</button>
+<div class="settings-workspace" id="adminConsole">
+    <nav class="settings-nav admin-section-nav" id="adminSectionNav" role="tablist" aria-label="Administration sections" data-i18n-aria-label="admin.sectionNavigation">
+        <button type="button" class="admin-section-tab is-active" id="adminSectionOverviewTab" role="tab" aria-selected="true" aria-controls="adminOverviewSection" data-admin-section="overview"><i class="fas fa-chart-pie" aria-hidden="true"></i><span data-i18n="admin.overview">Overview</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionGeneralTab" role="tab" aria-selected="false" aria-controls="adminGeneralSection" data-admin-section="general"><i class="fas fa-gear" aria-hidden="true"></i><span data-i18n="admin.general">General</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionUsersTab" role="tab" aria-selected="false" aria-controls="adminUsersSection" data-admin-section="users"><i class="fas fa-users" aria-hidden="true"></i><span data-i18n="admin.users">Users</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionOidcTab" role="tab" aria-selected="false" aria-controls="adminOidcSection" data-admin-section="oidc"><i class="fas fa-shield-halved" aria-hidden="true"></i><span data-i18n="admin.oidc.title">OIDC login</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionDictionariesTab" role="tab" aria-selected="false" aria-controls="adminDictionariesSection" data-admin-section="dictionaries"><i class="fas fa-book" aria-hidden="true"></i><span data-i18n="admin.dictionaries">Dictionaries</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionAiConfigurationTab" role="tab" aria-selected="false" aria-controls="adminAiConfigurationSection" data-admin-section="ai-configuration"><i class="fas fa-sliders" aria-hidden="true"></i><span data-i18n="admin.ai.configuration">AI configuration</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionAiPermissionsTab" role="tab" aria-selected="false" aria-controls="adminAiPermissionsSection" data-admin-section="ai-permissions"><i class="fas fa-lock" aria-hidden="true"></i><span data-i18n="admin.ai.permissions">AI permissions</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionAiJobsTab" role="tab" aria-selected="false" aria-controls="adminAiJobsSection" data-admin-section="ai-jobs"><i class="fas fa-list-check" aria-hidden="true"></i><span data-i18n="admin.ai.jobs.title">AI jobs</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionTagsTab" role="tab" aria-selected="false" aria-controls="adminTagsSection" data-admin-section="tags"><i class="fas fa-tags" aria-hidden="true"></i><span data-i18n="admin.tags">Tag management</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionUploadTab" role="tab" aria-selected="false" aria-controls="adminUploadSection" data-admin-section="upload"><i class="fas fa-upload" aria-hidden="true"></i><span data-i18n="admin.books.uploadTitle">Upload book</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionBooksTab" role="tab" aria-selected="false" aria-controls="adminBooksSection" data-admin-section="books"><i class="fas fa-book-open" aria-hidden="true"></i><span data-i18n="admin.books">Book management</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionWebhooksTab" role="tab" aria-selected="false" aria-controls="adminWebhooksSection" data-admin-section="webhooks"><i class="fas fa-link" aria-hidden="true"></i><span data-i18n="admin.webhooks.title">WebHooks</span></button>
     </nav>
-    <div class="account-admin-grid">
+    <div class="account-modal-body"><div class="account-layout account-admin-grid">
     <section class="account-admin-section account-card-wide admin-overview-section" id="adminOverviewSection" role="tabpanel" aria-labelledby="adminSectionOverviewTab" data-admin-panel="overview">
         <h4 data-i18n="admin.overview">Overview</h4>
         <p class="account-section-copy" data-i18n="admin.overviewDescription">Review the state of your library and jump straight to the area that needs attention.</p>
@@ -319,17 +333,10 @@ SERVER_ACCOUNT_PANEL = '''
         <section class="admin-webhook-history" aria-labelledby="adminWebhookDeliveriesTitle"><h5 id="adminWebhookDeliveriesTitle" data-i18n="admin.webhooks.deliveries">Recent deliveries</h5><ul class="account-list admin-webhook-deliveries" id="adminWebhookDeliveries"></ul></section>
         <p id="adminWebhookLive" class="sr-only visually-hidden" aria-live="polite" aria-atomic="true"></p>
     </section>
-    <section class="account-admin-section account-card-wide" id="adminBooksSection" role="tabpanel" aria-labelledby="adminSectionBooksTab" data-admin-panel="books" hidden>
-        <h4 id="adminBooksTitle" data-i18n="admin.books">Book management</h4>
-        <p class="account-section-copy" data-i18n="admin.booksDescription">Manage book metadata, visibility, member access, tags, AI reading classification, and AI results.</p>
+    <section class="account-admin-section account-card-wide" id="adminUploadSection" role="tabpanel" aria-labelledby="adminSectionUploadTab" data-admin-panel="upload" hidden>
+        <h4 id="adminBookUploadTitle" data-i18n="admin.books.uploadTitle">Upload book</h4>
+        <p class="account-section-copy" id="adminBookUploadDescription" data-i18n="admin.books.uploadDescription">Upload an EPUB or PDF file to add it to the library. The file is stored on the server and converted automatically.</p>
         <section class="admin-book-upload" id="adminBookUploadSurface" aria-labelledby="adminBookUploadTitle">
-            <div class="admin-book-upload-head">
-                <span class="admin-book-upload-icon" aria-hidden="true"><i class="fas fa-file-arrow-up"></i></span>
-                <div class="admin-book-upload-heading">
-                    <h5 id="adminBookUploadTitle" data-i18n="admin.books.uploadTitle">Upload book</h5>
-                    <p class="account-section-copy" id="adminBookUploadDescription" data-i18n="admin.books.uploadDescription">Upload an EPUB or PDF file to add it to the library. The file is stored on the server and converted automatically.</p>
-                </div>
-            </div>
             <form id="adminBookUploadForm" class="admin-book-upload-form">
                 <label class="admin-book-dropzone" id="adminBookDropzone" for="adminBookUploadFile">
                     <i class="fas fa-cloud-arrow-up admin-book-dropzone-icon" aria-hidden="true"></i>
@@ -347,6 +354,10 @@ SERVER_ACCOUNT_PANEL = '''
                 </div>
             </form>
         </section>
+    </section>
+    <section class="account-admin-section account-card-wide" id="adminBooksSection" role="tabpanel" aria-labelledby="adminSectionBooksTab" data-admin-panel="books" hidden>
+        <h4 id="adminBooksTitle" data-i18n="admin.books">Book management</h4>
+        <p class="account-section-copy" data-i18n="admin.booksDescription">Manage book metadata, visibility, member access, tags, AI reading classification, and AI results.</p>
         <div id="adminBookTableSurface" class="admin-books-workspace" hidden>
             <div class="account-form admin-books-controls" role="search" aria-labelledby="adminBooksTitle">
                 <label class="admin-book-search-control" for="adminBookSearch"><span data-i18n="admin.books.searchLabel">Search books</span><input id="adminBookSearch" type="search" autocomplete="off" data-i18n-placeholder="admin.books.searchPlaceholder" placeholder="Search by title, author, or tag"></label>
@@ -365,7 +376,7 @@ SERVER_ACCOUNT_PANEL = '''
                     <button type="button" class="bookshelf-action-btn account-primary-action" id="adminBookBulkGrant" data-i18n="admin.books.bulk.grant">Grant access</button>
                 </div>
             </section>
-            <div class="account-table-scroll admin-books-table-scroll">
+            <div class="account-table-scroll admin-books-table-scroll" role="region" aria-labelledby="adminBooksTitle" tabindex="0">
                 <table class="account-admin-table">
                     <caption class="sr-only visually-hidden" data-i18n="admin.books.tableLabel">Books</caption>
                     <thead><tr><th scope="col" class="admin-book-select-column"><input type="checkbox" id="adminBookSelectPage" data-i18n-aria-label="admin.books.bulk.selectPage" aria-label="Select visible books"></th><th scope="col" data-i18n="admin.books.header.book">Book</th><th scope="col" data-i18n="admin.books.header.access">Visibility and access</th><th scope="col" data-i18n="admin.books.header.profile">AI profile and tags</th><th scope="col" data-i18n="admin.books.header.results">AI results</th><th scope="col" data-i18n="admin.books.header.updated">Updated</th><th scope="col" data-i18n="admin.books.header.action">Actions</th></tr></thead>
@@ -377,9 +388,8 @@ SERVER_ACCOUNT_PANEL = '''
         </div>
         <ul class="account-list" id="adminBookLegacyList"></ul>
     </section>
-    </div>
-</section>
-</div></div>
+    </div></div>
+</div>
     </div>
     <div class="admin-book-editor-modal" id="adminBookEditorModal" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="adminBookEditorModalTitle" hidden>
         <div class="admin-book-editor-dialog">
@@ -455,7 +465,7 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
   <section class="reading-insights-days" aria-labelledby="readingInsightsDaysTitle"><h2 id="readingInsightsDaysTitle" data-i18n="readingInsights.days">Days</h2><div class="reading-insights-day-list" data-reading-insights-days></div></section>
   <section class="reading-insights-sessions" aria-labelledby="readingInsightsSelectedDay"><h2 id="readingInsightsSelectedDay" data-reading-insights-selected-day data-i18n="readingInsights.selectedDay">Selected day</h2><ol data-reading-insights-sessions></ol></section>
 </main>
-{SERVER_ACCOUNT_PANEL}
+{render_account_panel()}
 {render_footer(datetime.now().year, release_api_url='/api/version')}
 <script src="/assets/cache-boundary.js" defer></script>
 <script src="/assets/notification.js" defer></script>
@@ -468,3 +478,42 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
 <script>document.addEventListener("DOMContentLoaded",function(){{function start(){{if(!window.EpubBrowserAuth||!window.EpubReadingInsights)return;window.EpubBrowserAuth.init().then(function(session){{if(session)window.EpubReadingInsights.mount(document.querySelector("[data-reading-insights]"));}});}}if(window.EpubBrowserCacheBoundary)window.EpubBrowserCacheBoundary.start(start);else start();}});</script>
 </body>
 </html>'''
+
+
+def render_account_panel(kindle=False):
+    if not kindle:
+        return SERVER_ACCOUNT_PANEL.replace("{kindle_settings_tab}", "").replace("{kindle_settings_panel}", "")
+    tab = """<button type="button" class="admin-section-tab" id="accountKindleTab" role="tab" aria-selected="false" aria-controls="accountKindlePanel" data-account-section="kindle"><i class="fas fa-tablet-screen-button" aria-hidden="true"></i><span data-i18n="account.kindle.screensaver">Kindle screensaver</span></button>"""
+    settings = """
+<section class="account-card account-card-wide" id="accountKindlePanel" role="tabpanel" aria-labelledby="accountKindleTab" data-account-panel="kindle" hidden>
+    <div class="account-section-heading">
+        <h3 id="kindleSettingsTitle" data-i18n="account.kindle.screensaver">Kindle screensaver</h3>
+        <a class="account-docs-link" href="/kindle/screensaver" data-i18n="account.kindle.open">Open screensaver</a>
+    </div>
+    <form class="account-form" id="kindleSettingsForm" method="post">
+        <fieldset class="account-kindle-options" disabled>
+            <legend data-i18n="account.kindle.display">Display</legend>
+            <div class="account-kindle-checks">
+                <label><input type="checkbox" name="clock"> <span data-i18n="account.kindle.clock">Clock</span></label>
+                <label><input type="checkbox" name="calendar"> <span data-i18n="account.kindle.calendar">Calendar</span></label>
+                <label><input type="checkbox" name="memo"> <span data-i18n="account.kindle.memo">Memo</span></label>
+                <label><input type="checkbox" name="pomodoro"> <span data-i18n="account.kindle.pomodoro">Pomodoro timer</span></label>
+            </div>
+            <label class="account-kindle-default"><input type="checkbox" name="default"> <span data-i18n="account.kindle.default">Open screensaver when entering Kindle mode</span></label>
+            <div class="account-kindle-fields">
+                <label for="kindleMemoText" data-i18n="account.kindle.memo">Memo</label>
+                <textarea id="kindleMemoText" name="memo_text" rows="4" maxlength="4000" aria-describedby="kindleMemoHelp"></textarea>
+                <p class="account-help" id="kindleMemoHelp" data-i18n="account.kindle.memoHelp">Only your account can read this memo.</p>
+                <label for="kindleCalendarUrl" data-i18n="account.kindle.subscription">Calendar subscription</label>
+                <textarea id="kindleCalendarUrl" name="calendar_urls" rows="4" maxlength="16391" placeholder="https://" autocomplete="off" spellcheck="false" aria-describedby="kindleCalendarHelp"></textarea>
+                <p class="account-help" id="kindleCalendarHelp" data-i18n="account.kindle.subscriptionHelp">Enter up to eight HTTPS or webcal iCalendar links, one per line.</p>
+            </div>
+            <div class="account-kindle-actions">
+                <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="settings.save">Save</button>
+                <span id="kindleSettingsStatus" role="status"></span>
+            </div>
+        </fieldset>
+    </form>
+</section>
+"""
+    return SERVER_ACCOUNT_PANEL.replace("{kindle_settings_tab}", tab).replace("{kindle_settings_panel}", settings)

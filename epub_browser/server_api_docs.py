@@ -12,6 +12,7 @@ _GROUPS = (
     ("progress", "apiDocs.group.progress", "Reading progress"),
     ("annotations", "apiDocs.group.annotations", "Annotations"),
     ("reviews", "apiDocs.group.reviews", "Reviews"),
+    ("kindle-memo", "account.kindle.memo", "Memo"),
     ("admin", "apiDocs.group.admin", "Administrator data"),
 )
 

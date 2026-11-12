@@ -679,13 +679,13 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertIn('href="kindle_chapter_0.html"', index)
             self.assertIn('id="kResume"', index)
             # the minimal book home links back to the minimal library
-            self.assertIn('href="kindle-library.html"', index)
+            self.assertIn('href="/kindle-library.html"', index)
             self.assertIn("Continue reading", index)
 
             chapter = (book / "kindle_chapter_0.html").read_text(encoding="utf-8")
             self.assertIn("<h1>One</h1>", chapter)
             self.assertIn("Text", chapter)
-            self.assertIn('href="kindle.html"', chapter)
+            self.assertIn('href="kindle.html#chapter-0"', chapter)
             # Tap-to-turn toggle is part of the minimal reader output.
             self.assertIn('id="kClickScroll"', chapter)
             self.assertIn('kToggleClickScroll', chapter)

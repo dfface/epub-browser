@@ -25,7 +25,7 @@ from .asset_publisher import (
     SERVER_ONLY_ASSET_PREFIXES,
     rewrite_asset_urls,
 )
-from .i18n_bundles import render_i18n_runtime_and_inline
+from .i18n_bundles import get_bundle, render_i18n_runtime_and_inline
 from .epub_parsing import (
     EPUBParseError,
     allowed_entity_name,
@@ -44,15 +44,17 @@ from .epub_parsing import (
     validate_manifest_ids,
     validate_spine_references,
 )
+from .kindle import kindle_locale_script, kindle_message, render_kindle_dock
+from .locales import normalize_locale
 from .models import BookMetadata, ConvertedBook
 from .reporting import Reporter
 from .server_chrome import (
     SERVER_ACCOUNT_CONTROL,
-    SERVER_ACCOUNT_PANEL,
     SERVER_ACCOUNT_STYLESHEET,
     SERVER_AUTH_SCRIPT,
     SERVER_LOCALE_CONTROL,
     SERVER_LOCALE_SCRIPT,
+    render_account_panel,
 )
 from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .urls import SiteURLs, rewrite_root_urls
@@ -94,34 +96,48 @@ _KINDLE_READER_CSS = """\
 body{margin:0;padding:0;background-color:#fff!important;color:#111!important;font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.65}
 body.sepia{background-color:#f3e9d2!important;color:#3c2f1a!important}
 body.dark{background-color:#161616!important;color:#c9c9c9!important}
-.k-header{padding:10px 14px;border-bottom:1px solid #999;line-height:1.4}
+/* Nested controls share an 8px corner inside 12px panels with a 4px inset. */
+.k-surface,#kRecent li:first-child a,#kCatalog a{border-radius:12px}
+.k-surface{box-sizing:border-box;border:1px solid #aaa;border-bottom-width:2px;background:#fff}
+body.dark .k-surface{background:#161616;border-color:#777}
+body.sepia .k-surface{background:#f3e9d2;border-color:#86795e}
+.k-control{display:inline-block;box-sizing:border-box;min-height:44px;padding:10px 14px;
+  color:inherit;background:transparent;border:1px solid #888;border-radius:8px;text-decoration:none;font:inherit}
+.k-dock{position:fixed;z-index:5;bottom:0;left:0;right:0;margin:0 auto;
+  max-width:720px;display:table;width:100%;height:58px;table-layout:fixed;padding:3px;border-radius:12px 12px 0 0;
+  font:16px/1.3 Arial,sans-serif}
+.k-dock>a{display:table-cell;height:49px;vertical-align:middle;text-align:center;color:inherit;
+  text-decoration:none;font-size:.85em;word-wrap:break-word;border:1px solid transparent;border-radius:8px}
+.k-dock [aria-current]{border-color:currentColor;font-weight:bold}
+#kFontSizeValue{display:inline-block;min-width:48px;text-align:center}
+.k-control:focus,.k-surface a:focus,.k-surface button:focus{outline:2px solid;outline-offset:2px}
+.k-header{padding:10px 16px;border-bottom:1px solid;line-height:1.4;font-family:Arial,sans-serif}
+.k-header a,.k-header button{display:inline-block;min-height:24px;padding:9px 0}
+.k-header button{float:right;background:none;border:0;color:inherit;font:inherit;text-decoration:underline}
+.k-cover{display:block;position:relative;box-sizing:border-box;overflow:hidden;border:1px solid #777;border-radius:3px;text-align:center}
+.k-cover img{position:absolute;top:0;right:0;bottom:0;left:0;max-width:100%;max-height:100%;margin:auto}
+.k-cover-placeholder:before{content:"";position:absolute;top:0;bottom:0;left:13%;border-left:1px solid #777}
+.k-cover-placeholder:after{content:"";position:absolute;top:32%;left:28%;right:16%;height:14%;border-top:1px solid #777;border-bottom:1px solid #777}
+.k-reader-header{max-width:680px;margin:0 auto}
+.k-reader-settings{display:none;position:fixed;z-index:10}
 body.sepia .k-header,body.dark .k-header{border-color:#666}
 .k-header a{color:inherit;text-decoration:none;font-weight:bold;font-size:15px}
-.k-chapter{display:block;margin-top:2px;color:#666;font-size:14px;font-weight:normal}
-body.dark .k-chapter{color:#9a9a9a}
-.k-content{padding:18px 16px 36px;max-width:640px;margin:0 auto;word-wrap:break-word}
+.k-content{padding:22px 20px 32px;max-width:640px;margin:0 auto;word-wrap:break-word;line-height:1.7}
 body.sepia .k-content{color:#3c2f1a!important}
 body.dark .k-content{color:#c9c9c9!important}
+body[data-k-font="serif"] #kText,body[data-k-font="serif"] #kText *{font-family:Georgia,"Times New Roman",serif!important}
+body[data-k-font="sans"] #kText,body[data-k-font="sans"] #kText *{font-family:Arial,sans-serif!important}
 .k-content img{max-width:100%;height:auto}
-.k-content a{color:#0b57d0}
-body.dark .k-content a{color:#8ab4f8}
+.k-content a{color:inherit;text-decoration:underline}
 .k-nav{overflow:hidden;border-top:1px solid #999;padding:12px 14px;max-width:640px;margin:0 auto}
 body.sepia .k-nav,body.dark .k-nav{border-color:#666}
-.k-nav a{color:inherit;text-decoration:none;padding:6px 0}
+.k-nav a{color:inherit;text-decoration:none;padding:10px 14px;border:1px solid;font-family:Arial,sans-serif}
 .k-nav .prev{float:left}
 .k-nav .next{float:right}
-.k-bar{border-top:1px solid #999;padding:12px 14px;text-align:center}
-body.sepia .k-bar,body.dark .k-bar{border-color:#666}
-.k-controls{padding:8px 14px 10px;text-align:center}
-.k-bar button,.k-controls button{background:none;border:1px solid #666;color:inherit;padding:7px 16px;margin:0 4px;font-size:14px;font-family:inherit}
-.k-controls button.k-on{background:#666;color:#fff;font-weight:bold}
-body.sepia .k-controls button.k-on,body.dark .k-controls button.k-on{background:#bbb;color:#111}
-.k-meta{padding:0 16px;color:#666;font-size:14px}
-body.dark .k-meta{color:#9a9a9a}
-.k-resume{display:block;margin:14px 16px;padding:10px;border:1px solid #666;text-align:center;text-decoration:none;color:inherit;font-size:15px}
 .k-toc{padding:4px 16px 30px;max-width:640px;margin:0 auto}
 .k-toc ul{list-style:none;margin:0;padding:0}
 .k-toc li{padding:5px 0;line-height:1.45}
+.k-toc li[class^="lvl-"] a{padding:9px 0;border-bottom:1px solid #888}
 .k-toc li.lvl-1{padding-left:16px}
 .k-toc li.lvl-2{padding-left:32px}
 .k-toc li.lvl-3{padding-left:48px}
@@ -132,13 +148,13 @@ body.dark .k-toc .sec{color:#9a9a9a}
 body.dark .k-footer{color:#9a9a9a}
 """
 
-_KINDLE_READER_JS = """\
+_KINDLE_READER_JS = r"""
 function getCookie(key) {
   var cookies = document.cookie.split('; ');
   for (var i = 0; i < cookies.length; i++) {
     var parts = cookies[i].split('=');
     if (parts[0] === key) {
-      return decodeURIComponent(parts.slice(1).join('='));
+      try { return decodeURIComponent(parts.slice(1).join('=')); } catch (error) { return null; }
     }
   }
   return null;
@@ -150,16 +166,55 @@ function setCookie(key, value, days) {
     date.setTime(date.getTime() + days * 86400000);
     expires = '; expires=' + date.toUTCString();
   }
-  document.cookie = key + '=' + encodeURIComponent(value) + expires + '; path=/';
+  document.cookie = key + '=' + encodeURIComponent(value) + expires + '; path=/; SameSite=Lax';
+}
+function kHistoryKey() {
+  var root = window.location.pathname.replace(/(?:book\/[^/]+\/)?[^/]+$/, '');
+  return 'kindle_recent_' + encodeURIComponent(root);
+}
+function kRememberBook(book) {
+  var key = kHistoryKey();
+  var saved = (getCookie(key) || '').split(',');
+  var recent = [book];
+  for (var i = 0; i < saved.length && recent.length < 12; i++) {
+    if (saved[i] && recent.indexOf(saved[i]) < 0) recent.push(saved[i]);
+  }
+  setCookie(key, recent.join(','), 365);
 }
 var K_THEMES = ['light', 'sepia', 'dark'];
 var K_FONT_SIZES = [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 42, 48];
+function kMarkChoice(attribute, value) {
+  var choices = document.querySelectorAll('[' + attribute + ']');
+  for (var i = 0; i < choices.length; i++) {
+    choices[i].setAttribute('aria-pressed', choices[i].getAttribute(attribute) === value ? 'true' : 'false');
+  }
+}
 function applyTheme(theme) {
+  if (K_THEMES.indexOf(theme) === -1) theme = 'light';
   document.body.className = theme;
+  kMarkChoice('data-k-theme', theme);
+}
+function kSelectTheme(theme) {
+  setCookie('kindle_theme', theme, 365);
+  applyTheme(theme);
+}
+function kApplyFontChoice(choice) {
+  if (choice !== 'serif' && choice !== 'sans') choice = 'book';
+  document.body.setAttribute('data-k-font', choice);
+  kMarkChoice('data-k-font-choice', choice);
+}
+function kSelectFont(choice) {
+  setCookie('kindle_font_family', choice, 365);
+  kApplyFontChoice(choice);
+  if (window.kReaderRelayout) window.kReaderRelayout();
 }
 function applyFont(size) {
+  var text = document.getElementById('kText');
+  if (!text) return;
   var pixels = K_FONT_SIZES[size - 1] || K_FONT_SIZES[2];
-  document.body.style.setProperty('font-size', pixels + 'px', 'important');
+  text.style.setProperty('font-size', pixels + 'px', 'important');
+  var value = document.getElementById('kFontSizeValue');
+  if (value) value.textContent = pixels + ' px';
 }
 function kTheme() {
   var current = getCookie('kindle_theme') || 'light';
@@ -169,8 +224,7 @@ function kTheme() {
   }
   if (index < 0) { index = 0; }
   var next = K_THEMES[(index + 1) % K_THEMES.length];
-  setCookie('kindle_theme', next, 365);
-  applyTheme(next);
+  kSelectTheme(next);
 }
 function kFont(delta) {
   var size = parseInt(getCookie('kindle_font_size') || '3', 10);
@@ -178,39 +232,56 @@ function kFont(delta) {
   size = Math.max(1, Math.min(K_FONT_SIZES.length, size + delta));
   setCookie('kindle_font_size', String(size), 365);
   applyFont(size);
+  if (window.kReaderRelayout) window.kReaderRelayout();
 }
 (function () {
   applyTheme(getCookie('kindle_theme') || 'light');
+  kApplyFontChoice(getCookie('kindle_font_family'));
   var size = parseInt(getCookie('kindle_font_size') || '3', 10);
   if (isNaN(size)) { size = 3; }
   applyFont(size);
 })();
-// Tap-to-turn: a tap on the left/right third of the reading area moves to the
-// previous/next screen (snap-aligned). Stays ES5 and cookie-based; the header
-// toggle (kClickScroll) switches it off for readers who prefer plain scroll.
+// Keep the reader layout and tap navigation as independent preferences.
 function kClickScrollOn() {
-  var v = getCookie('kindle_click_scroll');
-  return v === null || v === 'on';
+  return getCookie('kindle_click_scroll') !== 'off';
+}
+function kPagedMode() {
+  var mode = getCookie('kindle_reading_mode');
+  return mode ? mode === 'pages' : kClickScrollOn();
 }
 function kToggleClickScroll() {
+  // Preserve the old layout when moving from the legacy combined setting.
+  if (!getCookie('kindle_reading_mode')) {
+    setCookie('kindle_reading_mode', kPagedMode() ? 'pages' : 'scroll', 365);
+  }
   setCookie('kindle_click_scroll', kClickScrollOn() ? 'off' : 'on', 365);
-  kSyncClickScrollToggle();
+  kSyncReaderToggles();
 }
-function kSyncClickScrollToggle() {
-  var btn = document.getElementById('kClickScroll');
-  if (!btn) return;
-  var on = kClickScrollOn();
-  btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-  btn.className = on ? 'k-on' : '';
+function kToggleReadingMode() {
+  setCookie('kindle_reading_mode', kPagedMode() ? 'scroll' : 'pages', 365);
+  kSyncReaderToggles();
+  if (window.kReaderRelayout) window.kReaderRelayout();
 }
-function kScrollPage(dir) {
-  var vh = window.innerHeight || document.documentElement.clientHeight || 0;
-  if (vh <= 0) return;
-  var st = window.pageYOffset || document.documentElement.scrollTop || 0;
-  var top = dir > 0
-    ? Math.max(0, Math.floor(st / vh) * vh + vh)
-    : Math.max(0, Math.ceil(st / vh) * vh - vh);
-  window.scrollTo(0, top);
+function kSyncReaderToggles() {
+  var tap = document.getElementById('kClickScroll');
+  var mode = document.getElementById('kReadingMode');
+  if (tap) tap.setAttribute('aria-pressed', kClickScrollOn() ? 'true' : 'false');
+  if (mode) mode.setAttribute('aria-pressed', kPagedMode() ? 'true' : 'false');
+}
+function kSettingsOpen() {
+  var settings = document.getElementById('kSettings');
+  return settings && settings.style.display === 'block';
+}
+function kToggleSettings() {
+  var settings = document.getElementById('kSettings');
+  var backdrop = document.getElementById('kSettingsBackdrop');
+  var toggle = document.getElementById('kSettingsToggle');
+  if (!settings || !backdrop || !toggle) return;
+  var open = !kSettingsOpen();
+  settings.style.display = backdrop.style.display = open ? 'block' : 'none';
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) settings.getElementsByTagName('button')[0].focus();
+  else toggle.focus();
 }
 function kIsTurnNode(node) {
   while (node && node !== document.body) {
@@ -221,28 +292,265 @@ function kIsTurnNode(node) {
   return false;
 }
 function kClickTurn(e) {
-  if (!kClickScrollOn()) return;
   var ev = e || window.event;
   if (!ev) return;
+  if (kSettingsOpen() || !kClickScrollOn() || !window.kTurnPage) return;
+  var viewport = document.getElementById('kViewport');
   var target = ev.target || ev.srcElement;
-  if (!target) return;
-  var node = target;
-  var inside = false;
-  while (node && node !== document.body) {
-    if (node.className && String(node.className).indexOf('k-content') !== -1) { inside = true; break; }
-    node = node.parentNode;
-  }
-  if (!inside || kIsTurnNode(target)) return;
-  var w = window.innerWidth || document.documentElement.clientWidth || 0;
-  if (w <= 0) return;
-  if (ev.clientX < w / 3) { if (ev.preventDefault) ev.preventDefault(); kScrollPage(-1); }
-  else if (ev.clientX > (w * 2) / 3) { if (ev.preventDefault) ev.preventDefault(); kScrollPage(1); }
+  if (!viewport || !target || !viewport.contains(target) || kIsTurnNode(target)) return;
+  if (window.getSelection && String(window.getSelection())) return;
+  var bounds = viewport.getBoundingClientRect();
+  var width = bounds.right - bounds.left;
+  if (width <= 0) return;
+  var x = ev.clientX - bounds.left;
+  if (x < width / 3) window.kTurnPage(-1);
+  else if (x > width * 2 / 3) window.kTurnPage(1);
 }
 (function () {
-  kSyncClickScrollToggle();
+  kSyncReaderToggles();
   document.onclick = kClickTurn;
 })();
 """
+
+
+_KINDLE_BOOK_CSS = """
+.k-book{box-sizing:border-box;max-width:720px;margin:0 auto;padding:14px 14px 76px;font-family:Arial,sans-serif}
+.k-book-hero{padding:16px;overflow:hidden;margin-bottom:14px}
+.k-book-hero .k-cover{float:left;width:105px;height:146px;margin-right:18px}
+.k-book-hero h1{font:700 1.55em/1.25 Georgia,serif;margin:4px 0 6px;word-wrap:break-word}
+.k-book-hero p{font-size:.9em;margin:0 0 10px}
+.k-book-action{display:inline-block;min-height:24px;padding:10px 16px;background:#111;color:#fff;
+  font-size:16px;font-weight:bold;text-decoration:none;border:1px solid #111}
+body.dark .k-book-action{background:#eee;color:#111;border-color:#eee}
+.k-book h2{font-size:1.05em;margin:0;padding:10px 14px;border-bottom:1px solid #999}
+.k-book .k-toc{padding:0 14px 6px;max-width:none}
+.k-book .k-toc li{padding-top:0;padding-bottom:0}
+.k-book .k-toc li a{padding-top:13px;padding-bottom:13px}
+.k-book .k-toc a[aria-current="location"]{box-shadow:inset 3px 0 currentColor;
+  padding-left:12px;padding-right:8px;font-weight:bold;background:#e9e9e9}
+body.sepia .k-book .k-toc a[aria-current]{background:#e6d8ba}
+body.dark .k-book .k-toc a[aria-current]{background:#333}
+.k-book .k-toc .sec{padding-top:13px;font-weight:bold}
+.k-book .k-toc li:last-child a{border-bottom:0}
+.k-book .k-footer{padding:8px 0 18px}
+.k-book .k-footer a{color:inherit;display:inline-block;min-height:44px;line-height:44px}
+@media (max-width:360px){.k-book-hero .k-cover{width:75px;height:104px;margin-right:12px}}
+"""
+
+
+_KINDLE_CHAPTER_CSS = """
+.k-reader-header{box-sizing:border-box;padding:0 16px}
+.k-reader-header a,.k-reader-header button{display:inline-block;box-sizing:border-box;min-height:44px;
+  line-height:1.3;margin:0;padding:12px 0;font:inherit;color:inherit;background:none;border:0}
+.k-reader-header button{float:right;font-weight:bold}
+.k-reader-header a{float:left;margin-right:14px}
+.k-reader-header .k-running-title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:12px 0;font-weight:normal}
+.k-reader-header,.k-reader-footer,.k-reader-settings{font:15px/1.4 Arial,sans-serif}
+.k-reader-footer{text-align:center;overflow:hidden}
+.k-reader-footer button{display:none}
+#kSettingsBackdrop{display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:transparent}
+.k-reader-settings{box-sizing:border-box;left:8px;right:8px;bottom:8px;max-width:540px;max-height:82%;
+  margin:0 auto;padding:10px 12px;text-align:left;overflow:auto}
+.k-reader-settings a,.k-reader-settings button{display:inline-block;box-sizing:border-box;min-height:44px;
+  padding:10px 12px;margin:3px;border:1px solid #888;color:inherit;background:none;font:inherit;text-decoration:none}
+.k-settings-heading{overflow:hidden}
+.k-settings-heading h2{display:inline-block;margin:12px 3px 6px;font-size:1.05em}
+.k-settings-heading button{float:right;min-width:44px;font-size:1.25em;line-height:1}
+.k-settings-modes{padding:6px 0}
+.k-settings-modes button{font-weight:bold}
+.k-settings-modes button[aria-pressed="true"]{color:#fff;background:#111;border-color:#111}
+body.dark .k-settings-modes button[aria-pressed="true"]{color:#111;background:#eee;border-color:#eee}
+.k-reader-settings .k-settings-links{border-top:1px solid #888;padding-top:6px}
+.k-reader-header:after{content:"";display:block;clear:both}
+.k-content img{height:auto}
+#kViewport{min-height:100px}
+body[data-k-reader] .k-reader-header{position:absolute;top:0;left:0;right:0;height:45px;max-width:680px}
+body[data-k-reader] #kViewport{position:absolute;top:59px;bottom:61px;left:19px;right:19px;max-width:640px;
+  margin:auto;overflow:auto;min-height:0}
+body[data-k-reader="pages"] #kViewport{overflow:hidden}
+body[data-k-reader="pages"] #kText{margin:0;padding:0;overflow:visible;min-height:0;
+  -webkit-column-fill:auto;column-fill:auto}
+body[data-k-reader="pages"] #kText img{max-height:calc(100vh - 124px);object-fit:contain}
+body[data-k-reader] .k-reader-footer{position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;
+  height:48px;max-width:680px;margin:0 auto;border-top:1px solid #888}
+body[data-k-reader] .k-reader-footer .k-chapter-links{display:none}
+body[data-k-reader] .k-reader-footer button{display:block;box-sizing:border-box;width:18%;height:44px;
+  border:0;background:none;color:inherit;font:inherit;font-size:1.45em}
+body[data-k-reader] .k-reader-footer button:disabled{opacity:.4}
+#kTurnBack{float:left}
+#kTurnForward{float:right}
+#kReaderPosition{display:inline-block;margin-top:13px}
+body[data-k-reader] .k-content{padding:0 0 10px;min-height:85%;box-sizing:border-box}
+@media (max-width:360px){body[data-k-reader] #kViewport{left:14px;right:14px}}
+"""
+
+
+_KINDLE_CHAPTER_JS = """
+(function () {
+  var viewport = document.getElementById('kViewport');
+  var text = document.getElementById('kText');
+  var previous = document.getElementById('kPrev');
+  var next = document.getElementById('kNext');
+  var back = document.getElementById('kTurnBack');
+  var forward = document.getElementById('kTurnForward');
+  var position = document.getElementById('kReaderPosition');
+  var chapter = viewport.getAttribute('data-chapter');
+  var cookie = 'kindle_pos_' + viewport.getAttribute('data-book');
+  var chapterLabel = position.textContent;
+  var columnGap = 28;
+  var columnsSupported = 'webkitColumnWidth' in text.style || 'columnWidth' in text.style;
+  var paged = false;
+  var interacted = false;
+  var saveTimer;
+  var page = 0;
+  var pageCount = 1;
+  var stride = 1;
+  var end = 0;
+  function positionRatio() {
+    return end ? (paged ? viewport.scrollLeft : viewport.scrollTop) / end : 0;
+  }
+  function measure() {
+    if (paged) {
+      stride = viewport.clientWidth + columnGap;
+      end = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      pageCount = Math.round(end / stride) + 1;
+    } else {
+      var line = parseFloat(window.getComputedStyle(text).lineHeight) || 24;
+      stride = Math.max(1, viewport.clientHeight - line);
+      end = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+      pageCount = Math.ceil(end / stride) + 1;
+    }
+  }
+  function updatePosition() {
+    var offset = paged ? viewport.scrollLeft : viewport.scrollTop;
+    page = offset >= end - 1 ? pageCount - 1 : Math.round(offset / stride);
+    var label = chapterLabel + ' · ' + (page + 1) + '/' + pageCount;
+    if (position.textContent !== label) position.textContent = label;
+    back.disabled = !previous && page === 0;
+    forward.disabled = !next && page >= pageCount - 1;
+  }
+  function jump(index) {
+    var offset = Math.max(0, Math.min(end, index * stride));
+    if (paged) viewport.scrollLeft = offset;
+    else viewport.scrollTop = offset;
+    updatePosition();
+  }
+  function save() {
+    if (saveTimer) window.clearTimeout(saveTimer);
+    setCookie(cookie, chapter + ':' + positionRatio().toFixed(5), 365);
+  }
+  function turn(dir) {
+    if (kSettingsOpen()) return;
+    interacted = true;
+    if (paged ? page + dir >= 0 && page + dir < pageCount
+        : ((dir < 0 && viewport.scrollTop > 0) || (dir > 0 && viewport.scrollTop < end - 1))) {
+      if (paged) jump(page + dir);
+      else viewport.scrollTop += dir * stride;
+      updatePosition();
+      save();
+      return;
+    }
+    var link = dir < 0 ? previous : next;
+    if (link) {
+      save();
+      window.location.href = link.href + (dir < 0 ? '#kEnd' : '');
+    }
+  }
+  function layout(ratio) {
+    paged = columnsSupported && kPagedMode() && window.getComputedStyle(viewport).direction !== "rtl";
+    document.body.setAttribute('data-k-reader', paged ? 'pages' : 'scroll');
+    text.style.height = paged ? viewport.clientHeight + 'px' : '';
+    text.style.width = paged ? viewport.clientWidth + 'px' : '';
+    text.style.webkitColumnWidth = text.style.columnWidth = text.style.width;
+    text.style.webkitColumnGap = text.style.columnGap = paged ? columnGap + 'px' : '';
+    if (paged && viewport.scrollHeight > viewport.clientHeight + 3) {
+      // Tall, indivisible EPUB content remains reachable by regular scrolling.
+      paged = false;
+      document.body.setAttribute('data-k-reader', 'scroll');
+      text.style.height = text.style.width = '';
+      text.style.webkitColumnWidth = text.style.columnWidth = '';
+      text.style.webkitColumnGap = text.style.columnGap = '';
+    }
+    measure();
+    if (paged) jump(Math.round(ratio * (pageCount - 1)));
+    else {
+      viewport.scrollTop = ratio * end;
+      updatePosition();
+    }
+  }
+  function revealAnchor() {
+    var anchor = window.location.hash.slice(1);
+    if (!anchor || anchor === 'kEnd' || anchor === 'resume') return;
+    try { anchor = decodeURIComponent(anchor); } catch (error) {}
+    var target = document.getElementById(anchor);
+    if (!target || !viewport.contains(target)) return;
+    if (paged) {
+      var offset = viewport.scrollLeft + target.getBoundingClientRect().left
+        - viewport.getBoundingClientRect().left;
+      jump(Math.floor((offset + 1) / stride));
+    } else target.scrollIntoView();
+  }
+  window.kTurnPage = turn;
+  window.kReaderRelayout = function () {
+    interacted = true;
+    layout(positionRatio());
+    save();
+  };
+  var ratio = 0;
+  var fragment = window.location.hash;
+  if (fragment === '#kEnd') ratio = 1;
+  else if (fragment === '#resume') {
+    var parts = (getCookie(cookie) || '').split(':');
+    if (parts[0] === chapter) ratio = Math.max(0, Math.min(1, Number(parts[1]) || 0));
+  }
+  layout(ratio);
+  revealAnchor();
+  window.onhashchange = revealAnchor;
+  viewport.onscroll = function () {
+    if (!paged) updatePosition();
+    if (saveTimer) window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(save, 300);
+  };
+  window.onresize = function () { layout(positionRatio()); };
+  window.onpagehide = save;
+  window.onload = function () {
+    layout(interacted ? positionRatio() : ratio);
+    if (!interacted) revealAnchor();
+  };
+  document.onkeydown = function (event) {
+    var e = event || window.event;
+    if (!e) return;
+    if (kSettingsOpen()) {
+      if (e.keyCode === 27) kToggleSettings();
+      if (e.keyCode === 9) {
+        var controls = document.getElementById('kSettings').querySelectorAll('button, a[href]');
+        var first = controls[0];
+        var last = controls[controls.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          last.focus();
+          return false;
+        }
+        if (!e.shiftKey && document.activeElement === last) {
+          first.focus();
+          return false;
+        }
+      }
+      return;
+    }
+    if (kIsTurnNode(e.target || e.srcElement)) return;
+    if (e.keyCode === 37 || e.keyCode === 39) {
+      turn(e.keyCode === 37 ? -1 : 1);
+      if (e.preventDefault) e.preventDefault();
+    }
+  };
+})();
+"""
+
+
+def kindle_cover(url):
+    if not url:
+        return '<span class="k-cover k-cover-placeholder" aria-hidden="true"></span>'
+    return f'<span class="k-cover"><img src="{html.escape(url, quote=True)}" alt=""></span>'
 
 
 # Kindle minimal-page UI strings, resolved server-side against the book's
@@ -396,18 +704,6 @@ _KINDLE_READER_I18N = {
     },
 }
 
-_KINDLE_READER_I18N_SCRIPT = """\
-(function () {
-  var messages = %(messages)s;
-  var elements = document.querySelectorAll('[data-i18n]');
-  for (var i = 0; i < elements.length; i++) {
-    var key = elements[i].getAttribute('data-i18n');
-    if (messages[key]) elements[i].textContent = messages[key];
-  }
-})();
-"""
-
-
 # Server-only addition to the minimal reader: reading progress is read-write
 # on the minimal surface.  The page fetches a CSRF token, loads the saved
 # position (mirrored into the cookie so the index can resume it), then records
@@ -493,8 +789,6 @@ _KINDLE_READER_SERVER_REPORT_JS = """\
 _KINDLE_READER_SERVER_RESUME_JS = """\
 (function () {
   var bookHash = %(book_hash)s;
-  var resume = document.getElementById('kResume');
-  if (!resume) { return; }
   try {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', '/api/reading-progress/' + encodeURIComponent(bookHash), true);
@@ -502,11 +796,7 @@ _KINDLE_READER_SERVER_RESUME_JS = """\
       if (xhr.readyState === 4 && xhr.status === 200) {
         try {
           var progress = JSON.parse(xhr.responseText);
-          if (progress && progress.chapter_index !== undefined &&
-              progress.chapter_index !== null) {
-            resume.href = 'kindle_chapter_' + progress.chapter_index + '.html';
-            resume.style.display = 'block';
-          }
+          if (progress && !kindleRequestedChapter) kSetResume(progress.chapter_index);
         } catch (e) {}
       }
     };
@@ -516,22 +806,31 @@ _KINDLE_READER_SERVER_RESUME_JS = """\
 """
 
 
-def _kindle_i18n_messages(language):
-    """Resolve the Kindle minimal-page strings for a book language."""
+def _kindle_i18n_messages(language, tools=None):
+    """Resolve Kindle chrome strings independently of book metadata."""
+    language = normalize_locale(language, "en")
     dictionary = _KINDLE_READER_I18N.get(language or "")
     if dictionary is None:
         dictionary = _KINDLE_READER_I18N.get((language or "").split("-")[0])
     if dictionary is None:
         dictionary = _KINDLE_READER_I18N["en"]
-    return dictionary
-
-
-def _kindle_i18n_script(language):
-    """Inline ES5 script applying the localized Kindle page strings."""
-    messages = _kindle_i18n_messages(language)
-    return _KINDLE_READER_I18N_SCRIPT % {
-        "messages": json.dumps(messages, ensure_ascii=True)
+    bundle = get_bundle(normalize_locale(language, "en"))
+    english = get_bundle("en")
+    keys = {
+        "library": "library.title",
+        "contents": "reader.tableOfContents",
+        "settings": "reader.settings",
+        "done": "reader.closeSettings",
+        "pageMode": "settings.paginationMode",
+        "tapTurn": "reader.clickToTurn",
+        "startReading": "book.startReading",
+        "previousPage": "reader.previousPage",
+        "nextPage": "reader.nextPage",
     }
+    labels = dict(dictionary, **{name: bundle.get(key) or english[key] for name, key in keys.items()})
+    if tools is not None:
+        labels.update({key: kindle_message(language, key) for key in ("screensaver", "pomodoro")})
+    return labels
 
 
 def server_book_public_path_allowed(relative_path):
@@ -2325,7 +2624,7 @@ class EPUBProcessor:
         # Locale selection is shared navigation chrome in both SSG and Server.
         server_locale_control = SERVER_LOCALE_CONTROL
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
-        server_account_panel = SERVER_ACCOUNT_PANEL if self.deployment_mode == "server" else ""
+        server_account_panel = render_account_panel(self.kindle_support) if self.deployment_mode == "server" else ""
         server_locale_script = SERVER_LOCALE_SCRIPT
         index_html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -2930,9 +3229,10 @@ document.addEventListener('DOMContentLoaded', function() {{
             ) as f:
                 f.write(chapter_html)
 
-    def create_kindle_index_page(self, toc_data=None):
+    def create_kindle_index_page(self, toc_data=None, *, locale=None, tools=None):
         """Kindle 极简目录页模板。"""
         book_language = html.escape(self.lang or 'en', quote=True)
+        kindle_labels = _kindle_i18n_messages(locale)
         safe_book_title = metadata_text(self.book_title)
         book_title_text = html.escape(safe_book_title, quote=False)
         book_hash_js = json.dumps(str(self.book_hash))
@@ -2942,7 +3242,7 @@ document.addEventListener('DOMContentLoaded', function() {{
                 html.escape(metadata_text(author), quote=False)
                 for author in self.authors
             )
-            authors_html = f'<p class="k-meta">{authors_text}</p>'
+            authors_html = f'<p>{authors_text}</p>'
         if toc_data is None:
             toc_data = self._build_toc_data()
         toc_items = []
@@ -2955,7 +3255,10 @@ document.addEventListener('DOMContentLoaded', function() {{
                 title = html.escape(
                     metadata_text(item.get('title', '')), quote=False
                 )
-                toc_items.append(f'<li class="lvl-{level}"><a href="{chapter_file}">{title}</a></li>')
+                toc_items.append(
+                    f'<li class="lvl-{level}"><a href="{chapter_file}" '
+                    f'data-k-toc-chapter="{int(item["chapter_index"])}">{title}</a></li>'
+                )
             else:
                 title = html.escape(
                     metadata_text(item.get('title', '')), quote=False
@@ -2963,65 +3266,81 @@ document.addEventListener('DOMContentLoaded', function() {{
                 toc_items.append(f'<li class="sec">{title}</li>')
         toc_html = "\n".join(toc_items)
         resume_script = f"""
-(function () {{
-  var progress = getCookie({book_hash_js});
+function kSetResume(chapter) {{
+  if (typeof chapter !== 'number' || chapter < 0 || chapter >= {len(self.chapters)}
+      || chapter !== Math.floor(chapter)) return;
   var resume = document.getElementById('kResume');
-  if (resume && progress) {{
-    var match = progress.match(/^chapter_(\\d+)\\.html$/);
-    if (match) {{
-      resume.href = 'kindle_chapter_' + match[1] + '.html';
-      resume.style.display = 'block';
-    }}
+  if (!resume) return;
+  resume.href = 'kindle_chapter_' + chapter + '.html#resume';
+  document.getElementById('kStartLabel').style.display = 'none';
+  document.getElementById('kResumeLabel').style.display = 'inline';
+  var entries = document.querySelectorAll('[data-k-toc-chapter]');
+  var current;
+  for (var i = 0; i < entries.length; i++) {{
+    var index = Number(entries[i].getAttribute('data-k-toc-chapter'));
+    if (index === chapter && !current) {{
+      current = entries[i];
+      current.setAttribute('aria-current', 'location');
+    }} else entries[i].removeAttribute('aria-current');
   }}
-}})();
+}}
+var kindleRequestedChapter = location.hash.match(/^#chapter-([0-9]+)$/);
+if (kindleRequestedChapter) {{
+  kSetResume(Number(kindleRequestedChapter[1]));
+  var kindleCurrent = document.querySelector('.k-toc [aria-current]');
+  if (kindleCurrent && kindleCurrent.getBoundingClientRect().bottom > window.innerHeight - 58) {{
+    kindleCurrent.scrollIntoView();
+  }}
+}}
 """
-        # Server mode additionally resolves "Continue reading" from the
-        # authenticated reading-progress API (read-only); the cookie is the
-        # SSG/local fallback.  The index never mutates anything.
+        if self.deployment_mode != "server":
+            resume_script += f"""
+var kindleSavedChapter = (getCookie({book_hash_js}) || '').match(/^chapter_([0-9]+)[.]html$/);
+if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSavedChapter[1]));
+"""
         kindle_server_resume_script = ""
         if self.deployment_mode == "server":
             kindle_server_resume_script = _KINDLE_READER_SERVER_RESUME_JS % {
                 "book_hash": json.dumps(str(self.book_hash)),
             }
-        # The book title links back to the minimal library: a relative link in
-        # SSG (both files share the output root), the absolute route in Server
-        # (the minimal library lives at the site root, not under /book/<id>/).
-        # The footer's "Open full reader" link is kept as-is.
-        library_href = (
-            self.urls.public("/kindle-library.html")
-            if self.deployment_mode == "server"
-            else "kindle-library.html"
+        cover = self.get_metadata().cover
+        cover_html = kindle_cover(cover)
+        action = (
+            '<a id="kResume" class="k-control k-book-action" href="kindle_chapter_0.html" accesskey="c">'
+            f'<span id="kStartLabel" data-i18n="startReading">{html.escape(kindle_labels["startReading"])}</span>'
+            f'<span id="kResumeLabel" style="display:none" data-i18n="continueReading">'
+            f'{html.escape(kindle_labels["continueReading"])}</span></a>'
+            if self.chapters else ""
         )
         return f"""<!DOCTYPE html>
-<html lang="{book_language}">
+<html lang="{locale or 'en'}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>{book_title_text}</title>
 <style>
 {_KINDLE_READER_CSS}
+{_KINDLE_BOOK_CSS}
 </style>
 </head>
 <body class="light">
-<header class="k-header">
-    <a href="{library_href}">{book_title_text}</a>
-    <div class="k-controls">
-        <button type="button" onclick="kTheme()" accesskey="t" data-i18n="theme">Theme</button>
-        <button type="button" onclick="kFont(-1)" data-i18n="decreaseFont">A-</button>
-        <button type="button" onclick="kFont(1)" data-i18n="increaseFont">A+</button>
-    </div>
-</header>
-{authors_html}
-<a id="kResume" class="k-resume" href="kindle_chapter_0.html" style="display:none" accesskey="c" data-i18n="continueReading">Continue reading</a>
-<div class="k-toc">
-    <ul>
-{toc_html}
-    </ul>
+<main class="k-book">
+<div class="k-book-hero k-surface" lang="{book_language}">
+    {cover_html}
+    <h1>{book_title_text}</h1>
+    {authors_html}
+    <div lang="{locale or 'en'}" data-k-ui-language>{action}</div>
 </div>
+<section class="k-surface">
+    <h2 data-i18n="contents">{html.escape(kindle_labels["contents"])}</h2>
+    <div class="k-toc" lang="{book_language}"><ul>{toc_html}</ul></div>
+</section>
 <p class="k-footer"><a href="index.html?full=1" data-i18n="openFullReader">Open full reader</a></p>
+</main>
+{render_kindle_dock(self.urls, locale or "en", tools=tools)}
 <script>
-{_kindle_i18n_script(self.lang)}
 {_KINDLE_READER_JS}
+{kindle_locale_script(lambda code: _kindle_i18n_messages(code, tools), use_initial_locale=locale is not None)}
 {resume_script}
 {kindle_server_resume_script}</script>
 </body>
@@ -3029,10 +3348,11 @@ document.addEventListener('DOMContentLoaded', function() {{
 """
 
     def create_kindle_chapter_page(
-        self, body_content, style_links, chapter_index, chapter_title
+        self, body_content, style_links, chapter_index, chapter_title, *, locale=None
     ):
         """Kindle 极简章节阅读页模板。"""
         book_language = html.escape(self.lang or 'en', quote=True)
+        kindle_labels = _kindle_i18n_messages(locale)
         safe_book_title = metadata_text(self.book_title)
         safe_chapter_title = metadata_text(chapter_title)
         book_title_text = html.escape(safe_book_title, quote=False)
@@ -3042,17 +3362,19 @@ document.addEventListener('DOMContentLoaded', function() {{
         next_link = ""
         if chapter_index > 0:
             prev_link = (
-                f'<a class="prev" href="kindle_chapter_{chapter_index - 1}.html" '
+                f'<a id="kPrev" class="prev" href="kindle_chapter_{chapter_index - 1}.html" '
                 'accesskey="p" data-i18n="previous">\u2039 Prev</a>'
             )
         if chapter_index < len(self.chapters) - 1:
             next_link = (
-                f'<a class="next" href="kindle_chapter_{chapter_index + 1}.html" '
+                f'<a id="kNext" class="next" href="kindle_chapter_{chapter_index + 1}.html" '
                 'accesskey="n" data-i18n="next">Next \u203a</a>'
             )
         progress_script = (
             f"setCookie({book_hash_js}, 'chapter_{chapter_index}.html', 365);\n"
         )
+        if self.deployment_mode != "server":
+            progress_script += f"kRememberBook({book_hash_js});\n"
         # Server mode keeps the Kindle surface read-write for progress
         # (load the saved position, then record the current chapter) while
         # heartbeats stay report-only; the page never displays insights or
@@ -3064,7 +3386,7 @@ document.addEventListener('DOMContentLoaded', function() {{
                 "chapter_index": json.dumps(chapter_index),
             }
         return f"""<!DOCTYPE html>
-<html lang="{book_language}">
+<html lang="{locale or 'en'}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -3072,35 +3394,55 @@ document.addEventListener('DOMContentLoaded', function() {{
 <title>{chapter_title_text} - {book_title_text}</title>
 <style>
 {_KINDLE_READER_CSS}
+{_KINDLE_CHAPTER_CSS}
 </style>
 {style_links}
 </head>
 <body class="light">
-<header class="k-header">
-    <a href="kindle.html">{book_title_text}</a>
-    <span class="k-chapter">{chapter_title_text}</span>
-    <div class="k-controls">
-        <button type="button" onclick="kTheme()" accesskey="t" data-i18n="theme">Theme</button>
-        <button type="button" onclick="kFont(-1)" data-i18n="decreaseFont">A-</button>
-        <button type="button" onclick="kFont(1)" data-i18n="increaseFont">A+</button>
-        <button type="button" id="kClickScroll" onclick="kToggleClickScroll()" aria-pressed="true" data-i18n="tapTurn">Tap to turn</button>
-    </div>
+<header class="k-header k-reader-header">
+    <a href="kindle.html#chapter-{chapter_index}" data-i18n="contents">{html.escape(kindle_labels["contents"])}</a>
+    <button type="button" id="kSettingsToggle" onclick="kToggleSettings()" aria-controls="kSettings"
+            aria-expanded="false" data-i18n-aria-label="settings" aria-label="{html.escape(kindle_labels["settings"])}">Aa</button>
+    <span class="k-running-title" lang="{book_language}">{chapter_title_text or book_title_text}</span>
 </header>
-<div class="k-content">
-{body_content}
-</div>
-<nav class="k-nav">
-    {prev_link}
-    {next_link}
-</nav>
-<div class="k-bar">
-    <button type="button" onclick="kTheme()" accesskey="t" data-i18n="theme">Theme</button>
-    <button type="button" onclick="kFont(-1)" data-i18n="decreaseFont">A-</button>
-    <button type="button" onclick="kFont(1)" data-i18n="increaseFont">A+</button>
+<main id="kViewport" data-book="{html.escape(str(self.book_hash), quote=True)}" data-chapter="{chapter_index}">
+    <div class="k-content" id="kText" lang="{book_language}">
+        {body_content}
+    </div>
+</main>
+<footer class="k-reader-footer" id="kEnd">
+    <nav class="k-nav k-chapter-links">{prev_link}{next_link}</nav>
+    <button type="button" id="kTurnBack" onclick="kTurnPage(-1)" data-i18n-aria-label="previousPage" aria-label="{html.escape(kindle_labels["previousPage"])}">‹</button>
+    <button type="button" id="kTurnForward" onclick="kTurnPage(1)" data-i18n-aria-label="nextPage" aria-label="{html.escape(kindle_labels["nextPage"])}">›</button>
+    <span id="kReaderPosition">{chapter_index + 1}/{len(self.chapters)}</span>
+</footer>
+<div id="kSettingsBackdrop" onclick="kToggleSettings()" aria-hidden="true"></div>
+<div class="k-reader-settings k-surface" id="kSettings" role="dialog" aria-modal="true" aria-labelledby="kSettingsTitle">
+    <div class="k-settings-heading">
+        <h2 id="kSettingsTitle" data-i18n="settings">{html.escape(kindle_labels["settings"])}</h2>
+        <button class="k-control" type="button" onclick="kToggleSettings()" data-i18n-aria-label="done" aria-label="{html.escape(kindle_labels["done"])}">×</button>
+    </div>
+    <div class="k-settings-appearance">
+        <button class="k-control" type="button" onclick="kTheme()" accesskey="t" data-i18n="theme">Theme</button>
+        <button class="k-control" type="button" onclick="kFont(-1)" data-i18n="decreaseFont">A-</button>
+        <output id="kFontSizeValue"></output>
+        <button class="k-control" type="button" onclick="kFont(1)" data-i18n="increaseFont">A+</button>
+    </div>
+    <div class="k-settings-modes">
+        <button class="k-control" type="button" id="kReadingMode" onclick="kToggleReadingMode()" aria-pressed="true"
+                data-i18n="pageMode">{html.escape(kindle_labels["pageMode"])}</button>
+        <button class="k-control" type="button" id="kClickScroll" onclick="kToggleClickScroll()" aria-pressed="true"
+                data-i18n="tapTurn">{html.escape(kindle_labels["tapTurn"])}</button>
+    </div>
+    <div class="k-settings-links">
+        {prev_link.replace('id="kPrev" class="prev"', 'class="k-control"')}
+        {next_link.replace('id="kNext" class="next"', 'class="k-control"')}
+    </div>
 </div>
 <script>
-{_kindle_i18n_script(self.lang)}
 {_KINDLE_READER_JS}
+{kindle_locale_script(_kindle_i18n_messages, use_initial_locale=locale is not None)}
+{_KINDLE_CHAPTER_JS}
 {kindle_server_report_script}{progress_script}</script>
 </body>
 </html>
@@ -3708,7 +4050,7 @@ document.addEventListener('DOMContentLoaded', function() {{
         # Locale selection is shared navigation chrome in both SSG and Server.
         server_locale_control = SERVER_LOCALE_CONTROL
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
-        server_account_panel = SERVER_ACCOUNT_PANEL if self.deployment_mode == "server" else ""
+        server_account_panel = render_account_panel(self.kindle_support) if self.deployment_mode == "server" else ""
         server_locale_script = SERVER_LOCALE_SCRIPT
         prev_href = f'href="/book/{book_id_url}/chapter_{chapter_index-1}.html"' if chapter_index > 0 else ''
         next_href = f'href="/book/{book_id_url}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''

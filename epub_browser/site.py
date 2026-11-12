@@ -4,19 +4,23 @@ import os
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime
+from itertools import groupby
 from pathlib import Path
 from typing import Optional, Sequence, Tuple
 from types import SimpleNamespace
+from urllib.parse import urlencode
 
 from .asset_publisher import PublishedAssets, rewrite_asset_urls
 from .i18n_bundles import render_i18n_runtime_and_inline
+from .kindle import _KINDLE_DASHBOARD_CSS, kindle_locale_script, kindle_message, render_kindle_dashboard_widgets, render_kindle_dock
+from .locales import LOCALE_NATIVE_NAMES
 from .server_chrome import (
     SERVER_ACCOUNT_CONTROL,
-    SERVER_ACCOUNT_PANEL,
     SERVER_ACCOUNT_STYLESHEET,
     SERVER_AUTH_SCRIPT,
     SERVER_LOCALE_CONTROL,
     SERVER_LOCALE_SCRIPT,
+    render_account_panel,
 )
 from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
@@ -27,6 +31,7 @@ from .source_format import EPUB_FORMAT
 from .processor import (
     _KINDLE_READER_CSS,
     _KINDLE_READER_JS,
+    kindle_cover,
     metadata_text,
 )
 
@@ -39,60 +44,53 @@ class LibraryBook:
     tags: Tuple[str, ...]
     cover: Optional[str]
     source_format: str = EPUB_FORMAT
+    chapter_count: Optional[int] = None
 
 
-def _kindle_book_row(book: LibraryBook, urls: SiteURLs) -> str:
-    """One read-only Kindle book row linking into the minimal reader."""
-    href = urls.public(f"/book/{book.book_id}/kindle.html")
+def _kindle_book_row(book: LibraryBook, urls: SiteURLs, chapter=None) -> str:
+    filename = "kindle.html" if chapter is None else f"kindle_chapter_{chapter}.html"
+    fragment = "#resume" if chapter is not None else ""
+    href = html.escape(urls.public(f"/book/{book.book_id}/{filename}{fragment}"), quote=True)
     title = html.escape(metadata_text(book.title), quote=False)
-    authors = " & ".join(
-        html.escape(metadata_text(author), quote=False)
-        for author in book.authors
+    authors = " &amp; ".join(
+        html.escape(metadata_text(author), quote=False) for author in book.authors
     )
-    if authors:
-        return (
-            f'<li><a href="{href}"><span class="k-lib-title">{title}</span>'
-            f'<span class="k-lib-authors">{authors}</span></a></li>'
-        )
-    return f'<li><a href="{href}">{title}</a></li>'
-
-
-def _kindle_group_html(group, books_by_id, urls: SiteURLs) -> str:
-    """Render one bookshelf group as a read-only nested Kindle list.
-
-    The bookshelf document stores each group as ``{"name", "items",
-    "groups", "order"}``; nested groups are rendered recursively with plain
-    ``ul/li`` markup so legacy Kindle WebKit stays happy.  The surface is
-    read-only: group names are static text and only book rows are links.
-    """
-    if not isinstance(group, dict):
-        return ""
-    name = html.escape(metadata_text(group.get("name") or ""), quote=False)
-    if not name:
-        return ""
-    items = group.get("items")
-    sub_groups = group.get("groups")
-    items = items if isinstance(items, list) else []
-    sub_groups = sub_groups if isinstance(sub_groups, dict) else {}
-    order = group.get("order")
-    if not isinstance(order, list):
-        order = list(items) + list(sub_groups)
-    rows = []
-    for entry in order:
-        if entry in sub_groups:
-            rows.append(_kindle_group_html(sub_groups[entry], books_by_id, urls))
-        elif entry in books_by_id:
-            rows.append(_kindle_book_row(books_by_id[entry], urls))
+    cover_url = (
+        urls.public(book.cover)
+        if book.cover and book.cover.startswith(f"/book/{book.book_id}/") else None
+    )
+    count = f' data-chapters="{book.chapter_count}"' if book.chapter_count is not None else ""
+    search = html.escape(" ".join((book.title, *book.authors, *book.tags)), quote=True)
     return (
-        f'<li class="k-shelf-group"><span class="k-lib-title k-shelf-group-name">'
-        f'{name}</span><ul>{"".join(rows)}</ul></li>'
+        f'<li data-book="{html.escape(book.book_id, quote=True)}" data-search="{search}"{count}>'
+        f'<a href="{href}">{kindle_cover(cover_url)}'
+        f'<span class="k-lib-info"><strong class="k-lib-title">{title}</strong>'
+        f'<span class="k-lib-authors">{authors}</span></span></a></li>'
     )
 
 
-def _kindle_shelf_html(books_by_id, shelf, urls: SiteURLs) -> str:
-    """Render the user bookshelf (groups plus loose books) read-only."""
+KINDLE_PAGE_SIZE = 12
+
+
+def _kindle_page_count(total):
+    return max(1, (total + KINDLE_PAGE_SIZE - 1) // KINDLE_PAGE_SIZE)
+
+
+def _kindle_page(entries, requested):
+    total = _kindle_page_count(len(entries))
+    page = min(max(1, requested), total)
+    offset = (page - 1) * KINDLE_PAGE_SIZE
+    return entries[offset:offset + KINDLE_PAGE_SIZE], page, total
+
+
+def _kindle_static_page_name(page):
+    return "kindle-library.html" if page == 1 else f"kindle-library-{page}.html"
+
+
+def _kindle_shelf_entries(shelf, books_by_id, path=()):
+    """Yield visible book placements in shelf order with their group paths."""
     if not isinstance(shelf, dict):
-        return ""
+        return
     items = shelf.get("items")
     groups = shelf.get("groups")
     items = items if isinstance(items, list) else []
@@ -100,82 +98,565 @@ def _kindle_shelf_html(books_by_id, shelf, urls: SiteURLs) -> str:
     order = shelf.get("order")
     if not isinstance(order, list):
         order = list(items) + list(groups)
-    rows = []
     for entry in order:
+        if not isinstance(entry, str):
+            continue
         if entry in groups:
-            rows.append(_kindle_group_html(groups[entry], books_by_id, urls))
+            group = groups[entry]
+            if isinstance(group, dict) and group.get("name"):
+                yield from _kindle_shelf_entries(
+                    group, books_by_id, (*path, (entry, metadata_text(group["name"]))),
+                )
         elif entry in books_by_id:
-            rows.append(_kindle_book_row(books_by_id[entry], urls))
-    return "".join(rows)
+            yield path, books_by_id[entry]
+
+
+def _kindle_shelf_html(entries, urls: SiteURLs, depth=0) -> str:
+    """Rebuild group headings around just the books on this page."""
+    chunks = []
+    for group, rows in groupby(entries, lambda item: item[0][depth] if len(item[0]) > depth else None):
+        if group is None:
+            chunks.extend(_kindle_book_row(book, urls) for _, book in rows)
+        else:
+            children = _kindle_shelf_html(rows, urls, depth + 1)
+            chunks.append(
+                f'<li class="k-shelf-group"><span class="k-lib-title k-shelf-group-name">'
+                f'{html.escape(group[1])}</span><ul>{children}</ul></li>'
+            )
+    return "".join(chunks)
+
+
+_KINDLE_LOCAL_CATALOG_JS = r"""
+(function () {
+  var size = %s;
+  var metadata;
+  var callbacks = [];
+  var recent = document.getElementById('kRecent');
+  var catalog = document.getElementById('kCatalog');
+  var pager = document.getElementById('kCatalogPager');
+  var form = document.getElementById('kBookSearch');
+  var input = document.getElementById('kFindBooks');
+  var originalCatalog = catalog.innerHTML;
+  var originalPager = pager.innerHTML;
+  var results = [];
+  var query = '';
+  var resultPage = 1;
+
+  function loadBooks(callback) {
+    if (metadata) return callback(metadata);
+    callbacks.push(callback);
+    if (callbacks.length > 1) return;
+    function finish(books) {
+      metadata = books;
+      var pending = callbacks;
+      callbacks = [];
+      for (var i = 0; i < pending.length; i++) pending[i](books);
+    }
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'book-metadata.json', true);
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) return;
+        var books = null;
+        if (xhr.status === 200 || xhr.status === 0) {
+          try { books = JSON.parse(xhr.responseText); } catch (error) {}
+        }
+        finish(books instanceof Array ? books : null);
+      };
+      xhr.send(null);
+    } catch (error) { finish(null); }
+  }
+
+  function element(tag, style, text) {
+    var node = document.createElement(tag);
+    if (style) node.className = style;
+    if (text) node.textContent = text;
+    return node;
+  }
+
+  function row(book, chapter) {
+    var entry = element('li');
+    entry.setAttribute('data-book', book.hash);
+    var link = element('a');
+    var page = chapter === undefined ? 'kindle.html' : 'kindle_chapter_' + chapter + '.html#resume';
+    link.href = 'book/' + encodeURIComponent(book.hash) + '/' + page;
+    var cover = element('span', 'k-cover' + (book.cover ? '' : ' k-cover-placeholder'));
+    if (book.cover) {
+      var image = element('img');
+      image.src = book.cover;
+      image.alt = '';
+      cover.appendChild(image);
+    }
+    cover.setAttribute('aria-hidden', 'true');
+    link.appendChild(cover);
+    var info = element('span', 'k-lib-info');
+    info.appendChild(element('strong', 'k-lib-title', book.title));
+    info.appendChild(element('span', 'k-lib-authors', book.authors.join(' & ')));
+    link.appendChild(info);
+    entry.appendChild(link);
+    return entry;
+  }
+
+  function renderRecent() {
+    var order = (getCookie(kHistoryKey()) || '').split(',');
+    var saved = {};
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+      var parts = cookies[i].match(/^\s*([^=]+)=chapter_([0-9]+)[.]html$/);
+      if (parts) saved[':' + parts[1]] = Number(parts[2]);
+    }
+    var visible = {};
+    var pageRows = catalog.querySelectorAll('[data-book]');
+    for (var j = 0; j < pageRows.length; j++) {
+      var id = pageRows[j].getAttribute('data-book');
+      visible[':' + id] = pageRows[j];
+    }
+    // The full static reader also writes chapter cookies, without the Kindle MRU.
+    for (var key in saved) if (saved.hasOwnProperty(key)) order.push(key.slice(1));
+    function draw(books) {
+      var byId = {};
+      for (var i = 0; books && i < books.length; i++) byId[':' + books[i].hash] = books[i];
+      recent.innerHTML = '';
+      for (var j = 0; j < order.length && recent.children.length < 5; j++) {
+        var key = ':' + order[j];
+        if (!saved.hasOwnProperty(key)) continue;
+        var chapter = saved[key];
+        delete saved[key];
+        var current = visible[key];
+        var book = byId[key];
+        if (current) {
+          var count = current.getAttribute('data-chapters');
+          if (count !== null && chapter >= Number(count)) continue;
+          var copy = current.cloneNode(true);
+          var link = copy.getElementsByTagName('a')[0];
+          link.href = link.href.replace(/kindle[.]html$/, 'kindle_chapter_' + chapter + '.html#resume');
+          recent.appendChild(copy);
+        } else if (book && book.format === 'epub' &&
+                   (typeof book.chapterCount !== 'number' || chapter < book.chapterCount)) {
+          recent.appendChild(row(book, chapter));
+        }
+      }
+      document.getElementById('kRecentEmpty').style.display = recent.children.length ? 'none' : '';
+      if (window.kShowLibraryPanel) window.kShowLibraryPanel();
+    }
+    for (var key in saved) {
+      if (saved.hasOwnProperty(key) && !visible[key]) {
+        loadBooks(draw);
+        return;
+      }
+    }
+    draw(null);
+  }
+
+  function drawResults() {
+    catalog.innerHTML = '';
+    pager.innerHTML = '';
+    if (!results.length) {
+      var empty = element('li');
+      empty.setAttribute('data-i18n', 'noResults');
+      catalog.appendChild(empty);
+      kLocalize(catalog);
+      return;
+    }
+    var total = Math.ceil(results.length / size);
+    var offset = (resultPage - 1) * size;
+    for (var i = offset; i < Math.min(results.length, offset + size); i++) catalog.appendChild(row(results[i]));
+    if (total < 2) return;
+    var controls = element('div', 'k-pager');
+    function button(step, key, arrow) {
+      var control = element('button', 'k-control', arrow);
+      control.type = 'button';
+      control.setAttribute('data-i18n-aria-label', key);
+      control.disabled = resultPage + step < 1 || resultPage + step > total;
+      control.onclick = function () {
+        resultPage += step;
+        drawResults();
+        window.scrollTo(0, 0);
+      };
+      return control;
+    }
+    var position = element('span', '', resultPage + ' / ' + total);
+    position.setAttribute('data-i18n-aria-label', 'pageOf');
+    position.setAttribute('data-page', resultPage);
+    position.setAttribute('data-total', total);
+    controls.appendChild(button(-1, 'previousPage', '‹'));
+    controls.appendChild(position);
+    controls.appendChild(button(1, 'nextPage', '›'));
+    pager.appendChild(controls);
+    kLocalize(pager);
+  }
+
+  form.style.display = 'block';
+  form.onsubmit = function () {
+    query = input.value.replace(/^\s+|\s+$/g, '').toLowerCase();
+    if (!query) {
+      catalog.innerHTML = originalCatalog;
+      pager.innerHTML = originalPager;
+      kLocalize(catalog);
+      kLocalize(pager);
+      return false;
+    }
+    var submitted = query;
+    loadBooks(function (books) {
+      if (submitted !== query) return;
+      if (!books) {
+        // Some file:// browsers block XMLHttpRequest; keep the static pages usable.
+        var rows = catalog.children;
+        for (var i = 0; i < rows.length; i++) {
+          var text = rows[i].getAttribute('data-search') || '';
+          rows[i].style.display = text.toLowerCase().indexOf(query) >= 0 ? '' : 'none';
+        }
+        return;
+      }
+      results = [];
+      resultPage = 1;
+      for (var j = 0; j < books.length; j++) {
+        var book = books[j];
+        if (book.format !== 'epub') continue;
+        var haystack = [book.title].concat(book.authors, book.tags).join(' ').toLowerCase();
+        if (haystack.indexOf(query) >= 0) results.push(book);
+      }
+      drawResults();
+    });
+    return false;
+  };
+  renderRecent();
+  var previousPageShow = window.onpageshow;
+  window.onpageshow = function (event) {
+    if (previousPageShow) previousPageShow(event);
+    if (event && event.persisted) renderRecent();
+  };
+})();
+"""
+
+
+_KINDLE_LIBRARY_NAV_JS = r"""
+(function () {
+  var navigation = document.getElementById('kLibraryNav');
+  var tabs = navigation.getElementsByTagName('a');
+  var recent = document.getElementById('kRecent');
+  var current = '';
+  function showPanel() {
+    var requested = location.hash.slice(1);
+    if (requested === 'kContinue' || requested === 'kAllBooks' || requested === 'kBookshelf') current = requested;
+    var selected = document.getElementById(current) ? current : (recent.children.length ? 'kContinue' : 'kAllBooks');
+    for (var i = 0; i < tabs.length; i++) {
+      var panel = document.getElementById(tabs[i].hash.slice(1));
+      var active = panel && panel.id === selected;
+      if (panel) panel.style.display = active ? 'block' : 'none';
+      if (active) tabs[i].setAttribute('aria-current', 'page');
+      else tabs[i].removeAttribute('aria-current');
+    }
+  }
+  showPanel();
+  window.kShowLibraryPanel = showPanel;
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].onclick = function (event) {
+      if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
+      if (window.history && history.pushState) {
+        if (location.hash !== this.hash) history.pushState(null, '', this.hash);
+        showPanel();
+        window.scrollTo(0, 0);
+        return false;
+      }
+    };
+  }
+})();
+"""
+
+
+_KINDLE_DOCK_JS = """
+(function () {
+  var dock = document.getElementById('kDock');
+  var links = dock.getElementsByTagName('a');
+  var views = document.querySelectorAll('[data-k-view]');
+  var library = document.getElementById('kLibraryView');
+  var libraryHash = '';
+  function sync() {
+    var requested = location.hash.slice(1);
+    var inLibrary = requested === 'kContinue' || requested === 'kBookshelf' || requested === 'kAllBooks';
+    if (inLibrary) libraryHash = location.hash;
+    var target = inLibrary ? library : document.getElementById(requested);
+    if (!target || target.getAttribute('data-k-view') === null) {
+      target = document.getElementById(dock.getAttribute('data-default'));
+    }
+    for (var i = 0; i < views.length; i++) views[i].style.display = views[i] === target ? 'block' : 'none';
+    for (var j = 0; j < links.length; j++) {
+      if (links[j].hash === '#' + target.id) links[j].setAttribute('aria-current', 'page');
+      else links[j].removeAttribute('aria-current');
+    }
+    if (target === library && window.kShowLibraryPanel) window.kShowLibraryPanel();
+    if (target.id === 'kDashboardWidgets' && window.kActivateDashboard) window.kActivateDashboard();
+    window.scrollTo(0, 0);
+  }
+  for (var i = 0; i < links.length; i++) {
+    links[i].onclick = function (event) {
+      if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
+      var current = location.hash;
+      if (current === '#kContinue' || current === '#kBookshelf' || current === '#kAllBooks') libraryHash = current;
+      var hash = this.hash === '#kLibraryView' && libraryHash ? libraryHash : this.hash;
+      if (window.history && history.pushState) {
+        if (location.hash !== hash) history.pushState(null, '', hash);
+        sync();
+        return false;
+      }
+      if (location.hash !== hash) location.hash = hash;
+      else sync();
+      return false;
+    };
+  }
+  window.onhashchange = sync;
+  window.onpopstate = sync;
+  sync();
+})();
+"""
+
+
+def _kindle_library_locale_script(server_mode):
+    keys = (
+        "library", "continue", "allBooks", "emptyRecent", "emptyLibrary", "fullLibrary", "theme",
+        "search", "searchAction", "noResults", "settings", "fontFamily", "language", "light",
+        "sepia", "dark", "bookDefault", "serif", "sans", "pageMode", "tapTurn", "previousPage",
+        "nextPage", "pageOf",
+    )
+    if server_mode:
+        keys += (
+            "bookshelf", "emptyShelf", "screensaver", "calendar", "memo", "pomodoro", "reset",
+            "agenda", "noEvents", "calendarUnavailable", "pomoStart", "pomoPause", "pomoResume",
+            "pomoFocus", "pomoBreak", "pomoComplete", "pomoFocusMinutes", "pomoBreakMinutes", "pomoRounds",
+        )
+    return kindle_locale_script(
+        lambda locale: {key: kindle_message(locale, key) for key in keys},
+        use_initial_locale=server_mode,
+    )
+
+
+def _kindle_pager(page, total, href, copy):
+    if total == 1:
+        return ""
+
+    def control(target, key, arrow):
+        attrs = f'class="k-control" data-i18n-aria-label="{key}" aria-label="{copy(key)}"'
+        if target < 1 or target > total:
+            return f'<span {attrs} aria-disabled="true">{arrow}</span>'
+        return f'<a {attrs} href="{html.escape(href(target), quote=True)}">{arrow}</a>'
+
+    label = copy("pageOf").replace("{number}", str(page)).replace("{total}", str(total))
+    return (
+        '<div class="k-pager">'
+        + control(page - 1, "previousPage", "‹")
+        + f'<span data-i18n-aria-label="pageOf" aria-label="{label}" data-page="{page}" '
+          f'data-total="{total}">{page} / {total}</span>'
+        + control(page + 1, "nextPage", "›")
+        + '</div>'
+    )
 
 
 def render_kindle_library_page(
     books: Sequence[LibraryBook],
     urls: SiteURLs,
     shelf=None,
+    recent=None,
+    locale="en",
+    dashboard=None,
+    show_dashboard=False,
+    catalog_page=1,
+    shelf_page=1,
+    query="",
+    static_catalog_total=None,
 ) -> str:
-    """Render the dependency-free Kindle minimal library page.
+    """Render the shared Kindle bookshelf with local or account progress."""
+    books_by_id = {book.book_id: book for book in books if book.source_format == EPUB_FORMAT}
 
-    One plain row per book linking straight into that book's ``kindle.html``
-    minimal reader, reusing the exact inline CSS/JS of the EPUBProcessor
-    Kindle pages so legacy Kindle WebKit browsers get one consistent, ES5,
-    no-/assets/ surface.  SSG writes this page next to ``index.html``; Server
-    mode renders it at request time from the authenticated catalogue.
+    def copy(key):
+        return html.escape(kindle_message(locale, key))
 
-    ``shelf`` is the optional read-only bookshelf document (``items`` /
-    ``groups`` / ``order``).  When present, the user's groups render first as
-    plain nested lists, followed by the full book catalogue; group names are
-    static text and nothing here mutates the shelf.  SSG passes no shelf
-    because bookshelves are per-user Server data.
-    """
-    books_by_id = {book.book_id: book for book in books}
-    shelf_html = (
-        _kindle_shelf_html(books_by_id, shelf, urls) if shelf is not None else ""
+    server_mode = recent is not None
+    shelf_entries, shelf_page, shelf_total = _kindle_page(
+        list(_kindle_shelf_entries(shelf, books_by_id)), shelf_page,
     )
-    all_rows = [
-        _kindle_book_row(book, urls)
-        for book in sorted(books, key=lambda book: book.book_id)
+    shelf_html = _kindle_shelf_html(shelf_entries, urls)
+    query = query.strip()[:200]
+    needle = query.casefold()
+    catalog = [
+        book for book in sorted(books_by_id.values(), key=lambda book: book.book_id)
+        if not needle or needle in " ".join((book.title, *book.authors, *book.tags)).casefold()
     ]
-    all_list_html = (
-        "\n".join(all_rows) if all_rows else '<li class="k-lib-empty">No books</li>'
-    )
-    if shelf_html:
-        shelf_section = f'<p class="sec">Bookshelf</p>\n<ul>\n{shelf_html}\n</ul>'
-        all_section = f'<p class="sec">All books</p>\n<ul>\n{all_list_html}\n</ul>'
+    if static_catalog_total is None:
+        catalog, catalog_page, catalog_total = _kindle_page(catalog, catalog_page)
     else:
-        shelf_section = ""
-        all_section = f'<ul>\n{all_list_html}\n</ul>'
+        # The static publisher already sliced the sorted EPUB catalogue.
+        catalog_total = static_catalog_total
+    all_rows = "".join(_kindle_book_row(book, urls) for book in catalog)
+    recent_rows = "".join(
+        _kindle_book_row(books_by_id[book_id], urls, chapter)
+        for book_id, chapter in (recent or ())
+        if book_id in books_by_id
+    )
+    library_url = urls.public("/kindle-library.html")
+
+    def paged_url(section, page):
+        if not server_mode:
+            return urls.public("/" + _kindle_static_page_name(page)) + "#kAllBooks"
+        params = {
+            "catalog_page": page if section == "kAllBooks" else catalog_page,
+            "shelf_page": page if section == "kBookshelf" else shelf_page,
+        }
+        if query:
+            params["q"] = query
+        return library_url + "?" + urlencode(params) + "#" + section
+
+    catalog_pager = _kindle_pager(
+        catalog_page, catalog_total, lambda page: paged_url("kAllBooks", page), copy,
+    )
+    shelf_link = (
+        f'<a class="k-control" href="#kBookshelf" data-i18n="bookshelf">{copy("bookshelf")}</a>'
+        if server_mode else ""
+    )
+    empty_shelf = f'<li data-i18n="emptyShelf">{copy("emptyShelf")}</li>'
+    shelf_section = (
+        f'<section id="kBookshelf" class="k-library-panel" data-i18n-aria-label="bookshelf">'
+        f'<ul class="k-shelf-list">{shelf_html or empty_shelf}</ul>'
+        + _kindle_pager(shelf_page, shelf_total, lambda page: paged_url("kBookshelf", page), copy)
+        + '</section>'
+        if server_mode else ""
+    )
+    language_options = "".join(
+        f'<option value="{code}"{" selected" if code == locale else ""}>{html.escape(name)}</option>'
+        for code, name in LOCALE_NATIVE_NAMES.items()
+    )
+    dashboard_html, dashboard_js = (
+        render_kindle_dashboard_widgets(dashboard, locale, show_dashboard)
+        if dashboard is not None else ("", "")
+    )
+    default_view = "kDashboardWidgets" if show_dashboard else "kLibraryView"
+    if show_dashboard and dashboard["pomodoro"] and not any(dashboard[key] for key in ("clock", "calendar", "memo")):
+        default_view = "kPomodoro"
+    library_style = ' style="display:none"' if show_dashboard else ""
+    no_recent = "" if recent_rows else f'<p id="kRecentEmpty" data-i18n="emptyRecent">{copy("emptyRecent")}</p>'
+    empty_key = "noResults" if query else "emptyLibrary"
+    empty_library = f'<li data-i18n="{empty_key}">{copy(empty_key)}</li>'
+    local_scripts = "" if server_mode else _KINDLE_LOCAL_CATALOG_JS % KINDLE_PAGE_SIZE
+    dashboard_css = _KINDLE_DASHBOARD_CSS if dashboard is not None else ""
     return f"""<!DOCTYPE html>
-<html lang="en">
+<html lang="{locale}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Library</title>
+<title data-i18n="library">{copy("library")}</title>
 <style>
 {_KINDLE_READER_CSS}
-.k-lib-title{{display:block;font-weight:bold}}
-.k-lib-authors{{display:block;color:#666;font-size:14px;font-weight:normal}}
-body.dark .k-lib-authors{{color:#9a9a9a}}
-.k-lib-empty{{padding:8px 0;color:#666}}
-.k-shelf-group-name{{display:block;font-weight:bold;margin:8px 0 2px}}
+.k-library{{box-sizing:border-box;max-width:720px;margin:0 auto;padding:14px 14px 76px;font:16px/1.4 Arial,sans-serif}}
+.k-library-head{{overflow:hidden;margin-bottom:10px}}
+.k-library-head h1{{margin:4px 0;font:700 1.85em/1.25 Arial,sans-serif;letter-spacing:-.02em}}
+
+.k-library-tabs{{padding:4px;white-space:normal}}
+.k-library-tabs a{{display:inline-block;box-sizing:border-box;min-height:44px;padding:11px 12px;
+  border-color:transparent;color:inherit;text-decoration:none;font-size:.91em}}
+.k-library-tabs a[aria-current]{{background:#111;color:#fff;font-weight:bold}}
+body.dark .k-library-tabs a[aria-current]{{background:#eee;color:#111}}
+.k-library-panel{{padding:12px 0;min-height:110px}}
+.k-library-panel ul{{list-style:none;padding:0;margin:0}}
+.k-library-panel a{{display:block;color:inherit;text-decoration:none}}
+.k-lib-info,.k-lib-title,.k-lib-authors{{display:block;word-wrap:break-word}}
+.k-lib-authors{{font-size:.83em;margin-top:3px;opacity:.85}}
+.k-shelf-group-name{{display:block;margin:15px 0 2px;font-weight:bold}}
+.k-shelf-list ul{{padding-left:12px;border-left:1px solid #888}}
+.k-shelf-list a,#kRecent a{{overflow:hidden;padding:10px 0;min-height:44px;border-bottom:1px solid #888}}
+.k-shelf-list .k-cover,#kRecent .k-cover{{float:left;width:42px;height:58px;margin-right:12px}}
+#kRecent li:first-child a{{border:1px solid #aaa;border-bottom-width:2px;padding:14px;margin-bottom:6px}}
+#kRecent li:first-child .k-cover{{width:75px;height:104px;margin-right:16px}}
+#kRecent li:first-child .k-lib-title{{font:700 1.3em/1.3 Georgia,serif}}
+#kBookSearch{{margin-bottom:14px}}
+#kBookSearch button{{margin-top:6px}}
+.k-pager{{display:table;width:100%;table-layout:fixed;margin:8px 0;text-align:center}}
+.k-pager .k-control{{display:inline-block;width:60px;padding:6px 12px;font-size:1.3em}}
+.k-pager>span[data-page]{{display:inline-block;min-width:94px;padding:0 10px}}
+.k-pager [aria-disabled="true"],.k-pager button:disabled{{opacity:.4}}
+#kFindBooks{{box-sizing:border-box;width:100%;min-height:44px;padding:8px 12px;border:1px solid #888;background:transparent;color:inherit;font:inherit}}
+#kFindBooks::placeholder{{color:inherit;opacity:.8}}
+#kCatalog li[data-book]{{display:inline-block;vertical-align:top;box-sizing:border-box;width:32%;margin:0 1.3% 8px 0}}
+#kCatalog a{{box-sizing:border-box;min-height:174px;padding:9px 8px;border:1px solid #aaa;
+  border-bottom-width:2px}}
+#kCatalog .k-cover{{width:81px;max-width:100%;height:114px;margin:0 auto 8px}}
+#kCatalog .k-lib-title{{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+  min-height:2.5em;max-height:2.5em;overflow:hidden;line-height:1.25;font-size:.9em}}
+#kCatalog .k-lib-authors{{min-height:1.2em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}
+{dashboard_css}
+.k-home-settings{{padding:12px 14px}}
+.k-home-settings fieldset{{margin:0 0 12px;padding:0;border:0}}
+.k-home-settings legend{{font-weight:bold;padding-bottom:5px}}
+.k-home-settings button{{margin:2px}}
+.k-home-settings button[aria-pressed="true"]{{border-color:currentColor;font-weight:bold;box-shadow:inset 0 0 0 1px currentColor}}
+#kLanguage{{max-width:100%;min-width:154px;background:inherit}}
+body.dark #kLanguage option{{background:#161616;color:#eee}}
+body.sepia #kLanguage option{{background:#f3e9d2;color:#3c2f1a}}
+
+@media (max-width:360px){{
+    #kCatalog li[data-book]{{width:48%}}
+    .k-library-tabs a{{padding-left:7px;padding-right:7px}}
+}}
 </style>
 </head>
 <body class="light">
-<header class="k-header">
-<a href="index.html?full=1">Library</a>
-<div class="k-controls">
-    <button type="button" onclick="kTheme()" accesskey="t">Theme</button>
-    <button type="button" onclick="kFont(-1)">A-</button>
-    <button type="button" onclick="kFont(1)">A+</button>
-</div>
+<div class="k-library">
+<main>
+<section id="kLibraryView" data-k-view{library_style}>
+<header class="k-library-head">
+<h1 data-i18n="library">{copy("library")}</h1>
 </header>
-<div class="k-toc">
+<nav class="k-library-tabs k-surface" id="kLibraryNav">
+<a class="k-control" href="#kContinue" data-i18n="continue">{copy("continue")}</a>
+{shelf_link}
+<a class="k-control" href="#kAllBooks" data-i18n="allBooks">{copy("allBooks")}</a>
+</nav>
+<section id="kContinue" class="k-library-panel" data-i18n-aria-label="continue" aria-label="{copy("continue")}">
+{no_recent}<ul id="kRecent">{recent_rows}</ul></section>
 {shelf_section}
-{all_section}
+<section id="kAllBooks" class="k-library-panel" data-i18n-aria-label="allBooks" aria-label="{copy("allBooks")}">
+<form id="kBookSearch" action="{library_url}#kAllBooks" method="get"{"" if server_mode else ' style="display:none"'}>
+  <input type="search" class="k-control" id="kFindBooks" name="q" maxlength="200"
+         value="{html.escape(query, quote=True)}" data-i18n-aria-label="search" data-i18n-placeholder="search"
+         aria-label="{copy("search")}" placeholder="{copy("search")}">
+  <input type="hidden" name="shelf_page" value="{shelf_page}">
+  <button class="k-control" type="submit" data-i18n="searchAction">{copy("searchAction")}</button>
+</form>
+<ul id="kCatalog">{all_rows or empty_library}</ul>
+<div id="kCatalogPager">{catalog_pager}</div>
+</section>
+</section>
+{dashboard_html}
+<section id="kHomeSettings" class="k-surface k-home-settings" data-k-view style="display:none">
+<h1 data-i18n="settings">{copy("settings")}</h1>
+<fieldset><legend data-i18n="theme">{copy("theme")}</legend>
+<button type="button" class="k-control" data-k-theme="light" onclick="kSelectTheme('light')" data-i18n="light">{copy("light")}</button>
+<button type="button" class="k-control" data-k-theme="sepia" onclick="kSelectTheme('sepia')" data-i18n="sepia">{copy("sepia")}</button>
+<button type="button" class="k-control" data-k-theme="dark" onclick="kSelectTheme('dark')" data-i18n="dark">{copy("dark")}</button>
+</fieldset>
+<fieldset><legend data-i18n="fontFamily">{copy("fontFamily")}</legend>
+<button type="button" class="k-control" data-k-font-choice="book" onclick="kSelectFont('book')" data-i18n="bookDefault">{copy("bookDefault")}</button>
+<button type="button" class="k-control" data-k-font-choice="serif" onclick="kSelectFont('serif')" data-i18n="serif">{copy("serif")}</button>
+<button type="button" class="k-control" data-k-font-choice="sans" onclick="kSelectFont('sans')" data-i18n="sans">{copy("sans")}</button>
+</fieldset>
+<fieldset><legend id="kLanguageLabel" data-i18n="language">{copy("language")}</legend>
+<select id="kLanguage" class="k-control" aria-labelledby="kLanguageLabel" onchange="kSetLocale(this.value)">
+{language_options}
+</select>
+</fieldset>
+<p><button type="button" class="k-control" id="kReadingMode" onclick="kToggleReadingMode()" data-i18n="pageMode">{copy("pageMode")}</button>
+<button type="button" class="k-control" id="kClickScroll" onclick="kToggleClickScroll()" data-i18n="tapTurn">{copy("tapTurn")}</button></p>
+<a class="k-control" href="{urls.public('/index.html?full=1')}" data-i18n="fullLibrary">{copy("fullLibrary")}</a>
+</section>
+</main>
+{render_kindle_dock(urls, locale, default_view=default_view, tools=dashboard)}
 </div>
-<p class="k-footer"><a href="index.html?full=1">Open full library</a></p>
 <script>
 {_KINDLE_READER_JS}
+{_kindle_library_locale_script(server_mode)}
+{_KINDLE_LIBRARY_NAV_JS}
+{local_scripts}
+{dashboard_js}
+{_KINDLE_DOCK_JS}
 </script>
 </body>
 </html>
@@ -253,6 +734,8 @@ def render_library_shell(
   location.replace('kindle-library.html');
 })();
 </script>""" if kindle else ""
+    if kindle and deployment_mode == "server":
+        kindle_entry_script = kindle_entry_script.replace("'kindle-library.html'", "'kindle'")
     server_account_control = ""
     server_account_panel = ""
     server_account_stylesheet = ""
@@ -322,7 +805,7 @@ def render_library_shell(
         recent_reading_start = 'if (window.EpubRecentReading) window.EpubRecentReading.start(window);'
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET
         server_account_control = SERVER_ACCOUNT_CONTROL
-        server_account_panel = SERVER_ACCOUNT_PANEL
+        server_account_panel = render_account_panel(kindle)
         server_auth_script = SERVER_AUTH_SCRIPT
         server_client_start = f"""
             if (!window.EpubBrowserAuth) return;
@@ -652,10 +1135,20 @@ def publish_library_shell(
     html = render_library_shell(ordered_books, assets, urls, deployment_mode, kindle, ai_reading_enabled=False)
     _atomic_write_text(root / "index.html", html)
     if deployment_mode == "ssg" and kindle:
-        _atomic_write_text(
-            root / "kindle-library.html",
-            render_kindle_library_page(ordered_books, urls),
-        )
+        catalog = tuple(book for book in ordered_books if book.source_format == EPUB_FORMAT)
+        total = _kindle_page_count(len(catalog))
+        for page in range(1, total + 1):
+            offset = (page - 1) * KINDLE_PAGE_SIZE
+            _atomic_write_text(
+                root / _kindle_static_page_name(page),
+                render_kindle_library_page(
+                    catalog[offset:offset + KINDLE_PAGE_SIZE], urls,
+                    catalog_page=page, static_catalog_total=total,
+                ),
+            )
+        for item, book in zip(metadata, ordered_books):
+            if book.source_format == EPUB_FORMAT and book.chapter_count is not None:
+                item["chapterCount"] = book.chapter_count
     _atomic_write_text(
         root / "book-metadata.json",
         json.dumps(metadata, ensure_ascii=False, separators=(",", ":")),
