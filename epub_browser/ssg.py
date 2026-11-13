@@ -100,12 +100,15 @@ class SSGPublisher:
         )
         try:
             assets_dir = Path(__file__).with_name("assets")
+            excluded_prefixes = SERVER_ONLY_ASSET_PREFIXES
+            if not any(book.source_format == PDF_FORMAT for book in prepared):
+                excluded_prefixes = excluded_prefixes | {"vendor/pdfjs/"}
             assets = AssetPublisher(
                 assets_dir,
                 staging,
                 urls=self.urls,
                 excluded_paths=SERVER_ONLY_ASSET_PATHS,
-                excluded_prefixes=SERVER_ONLY_ASSET_PREFIXES,
+                excluded_prefixes=excluded_prefixes,
             ).publish()
             books = self._convert_all(prepared, staging, assets)
             publish_library_shell(

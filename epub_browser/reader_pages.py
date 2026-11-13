@@ -2046,6 +2046,17 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
                     </button>
                     <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if self.deployment_mode == "ssg" else ""
 
+        highlight_assets = ""
+        if pdf_page is None:
+            highlight_assets = " " + " ".join(
+                f'data-highlight-{key}="{html.escape(self.asset_manifest.url_for(path), quote=True)}"'
+                for key, path in (
+                    ("script", "vendor/highlight/highlight.min.js"),
+                    ("light", "vendor/highlight/github.min.css"),
+                    ("dark", "vendor/highlight/github-dark.min.css"),
+                )
+            )
+
         chapter_html =  f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2064,8 +2075,6 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     {ai_feature_assets}
     <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
     {style_links}
-    <link id="code-light" rel="stylesheet" href="/assets/vendor/highlight/github.min.css">
-    <link id="code-dark" rel="stylesheet" disabled href="/assets/vendor/highlight/github-dark.min.css">
     <link rel="stylesheet" href="/assets/vendor/fontawesome/css/all.min.css">
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/notification.css">
@@ -2180,7 +2189,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
             <div class="content-loading is-visible" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
                 <div class="loading-spinner"></div>
             </div>
-            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" dir="auto" data-eb-styles data-chapter-index="{chapter_index}" data-chapter-title="{chapter_title_attribute}" data-book-hash="{book_id_attribute}" data-total-chapters="{len(self.chapters)}">
+            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" dir="auto" data-eb-styles data-chapter-index="{chapter_index}" data-chapter-title="{chapter_title_attribute}" data-book-hash="{book_id_attribute}" data-total-chapters="{len(self.chapters)}"{highlight_assets}>
             {content}
             </article>
         </div>
@@ -2530,7 +2539,6 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     <script src="/assets/vendor/sortablejs/sortable.min.js" defer></script>
     {dictionary_assets}
     {render_vocabulary_assets(self.asset_manifest, include_dictionary=False) if self.deployment_mode == "server" else ""}
-    <script src="/assets/vendor/highlight/highlight.min.js" defer></script>
     <script src="/assets/bookshelf.js" defer></script>
     {reading_insights_assets}
     {reading_session_script}

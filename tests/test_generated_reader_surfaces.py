@@ -4412,7 +4412,6 @@ assert.deepEqual(
             'lightbox-adapter.js',
             'vendor/web-highlighter/web-highlighter.min.js',
             'vendor/sortablejs/sortable.min.js',
-            'vendor/highlight/highlight.min.js',
         ):
             directory, _, filename = logical_path.rpartition('/')
             stem = filename.rsplit('.', 1)[0]
@@ -4423,6 +4422,11 @@ assert.deepEqual(
                 + re.escape(immutable_stem)
                 + r'\.[0-9a-f]{12}\.js" defer></script>',
             )
+
+    def test_chapter_exposes_highlight_assets_without_loading_them(self):
+        for chapter in (self._chapter_html(), self._server_chapter_html()):
+            self.assertRegex(chapter, r'data-highlight-script="[^"]+/highlight\.min\.[0-9a-f]{12}\.js"')
+            self.assertNotRegex(chapter, r'(?:src|href)="[^"]*/vendor/highlight/')
 
     def test_reader_scroll_visual_updates_are_coalesced_per_animation_frame(self):
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')

@@ -249,7 +249,12 @@ class AssetPublisher:
             self.urls.public(f'/assets/{name}') for name in WEB_MANIFEST_SOURCES
         ]
         index_url = self.urls.public('/index.html')
-        precache_urls = [index_url, *published.assets.values(), *mutable_manifests]
+        precache_urls = [
+            index_url,
+            *(url for name, url in published.assets.items()
+              if not name.startswith("vendor/highlight/")),
+            *mutable_manifests,
+        ]
         worker = source.read_text(encoding='utf-8')
         worker = worker.replace('__EPUB_BROWSER_RELEASE_ID__', release_id)
         worker = worker.replace('__EPUB_BROWSER_PRECACHE_URLS__', json.dumps(precache_urls, separators=(',', ':')))
