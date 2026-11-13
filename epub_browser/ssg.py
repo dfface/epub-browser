@@ -7,6 +7,7 @@ import tempfile
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional, Sequence
 
@@ -287,7 +288,14 @@ class SSGPublisher:
                 for future in as_completed(futures):
                     book = futures[future]
                     try:
-                        converted_books.append(future.result())
+                        converted = future.result()
+                        source_stat = book.source.stat()
+                        created = getattr(source_stat, "st_birthtime", source_stat.st_mtime)
+                        converted_books.append(replace(
+                            converted,
+                            created_at=datetime.fromtimestamp(created, timezone.utc).isoformat(),
+                            updated_at=datetime.fromtimestamp(source_stat.st_mtime, timezone.utc).isoformat(),
+                        ))
                     except Exception as error:
                         failures.append((book.source, str(error)))
                     finally:

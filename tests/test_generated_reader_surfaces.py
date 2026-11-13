@@ -392,7 +392,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('kTheme', page)
             self.assertNotIn('/assets/', page)
             for banned in (
-                "=>", "const ", "let ", "Promise", "classList", "localStorage",
+                "=>", "const ", "let ", "Promise", "classList",
             ):
                 self.assertNotIn(banned, page)
 

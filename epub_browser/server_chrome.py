@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from .asset_publisher import PublishedAssets
+from .book_sort import BOOK_SORT_LABEL, BOOK_SORT_OPTIONS, book_sort_options
 from .locales import LOCALE_NATIVE_NAMES
 from .urls import SiteURLs
 from .i18n_bundles import render_i18n_bootstrap
@@ -372,7 +373,7 @@ SERVER_ACCOUNT_PANEL = '''
                 <label class="admin-book-search-control" for="adminBookSearch"><span data-i18n="admin.books.searchLabel">Search books</span><input id="adminBookSearch" type="search" autocomplete="off" data-i18n-placeholder="admin.books.searchPlaceholder" placeholder="Search by title, author, or tag"></label>
                 <label class="admin-book-filter-control" for="adminBookVisibilityFilter"><span data-i18n="admin.books.visibilityFilter">Visibility</span><select id="adminBookVisibilityFilter"><option value="" data-i18n="admin.books.visibility.all">All visibility</option><option value="authenticated" data-i18n="admin.books.visibility.authenticated">All signed-in users</option><option value="restricted" data-i18n="admin.books.visibility.restricted">Restricted</option></select></label>
                 <label class="admin-book-filter-control" for="adminBookTagFilter"><span data-i18n="admin.books.tagFilter">Tag</span><select id="adminBookTagFilter"><option value="" data-i18n="admin.books.tag.all">All tags</option></select></label>
-                <label class="admin-book-sort-control" for="adminBookSort"><span data-i18n="admin.books.sortLabel">Sort by</span><select id="adminBookSort"><option value="title_asc" data-i18n="admin.books.sort.titleAsc">Title (A–Z)</option><option value="title_desc" data-i18n="admin.books.sort.titleDesc">Title (Z–A)</option><option value="created_desc" data-i18n="admin.books.sort.createdDesc">Recently added</option><option value="updated_desc" data-i18n="admin.books.sort.updatedDesc">Recently updated</option></select></label>
+                <label class="admin-book-sort-control" for="adminBookSort"><span data-i18n="{book_sort_label}">Sort by</span><select id="adminBookSort">{book_sort_options}</select></label>
                 <label class="admin-book-page-size-control" for="adminBookPageSize"><span data-i18n="admin.books.pageSize">Books per page</span><select id="adminBookPageSize"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label>
                 <button type="button" class="bookshelf-action-btn account-inline-action admin-book-clear-filters" id="adminBookClearFilters" data-i18n="admin.books.clearFilters">Clear filters</button>
                 <button type="button" class="bookshelf-action-btn account-inline-action admin-book-refresh" id="adminBookRefresh" data-i18n="admin.books.refresh">Refresh</button>
@@ -490,8 +491,11 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
 
 
 def render_account_panel(kindle=False):
+    panel = SERVER_ACCOUNT_PANEL.replace("{book_sort_label}", BOOK_SORT_LABEL).replace(
+        "{book_sort_options}", book_sort_options(BOOK_SORT_OPTIONS, "title_asc"),
+    )
     if not kindle:
-        return SERVER_ACCOUNT_PANEL.replace("{kindle_settings_tab}", "").replace("{kindle_settings_panel}", "")
+        return panel.replace("{kindle_settings_tab}", "").replace("{kindle_settings_panel}", "")
     tab = """<button type="button" class="admin-section-tab" id="accountKindleTab" role="tab" aria-selected="false" aria-controls="accountKindlePanel" data-account-section="kindle"><i class="fas fa-tablet-screen-button" aria-hidden="true"></i><span data-i18n="account.kindle.screensaver">Kindle screensaver</span></button>"""
     settings = """
 <section class="account-card account-card-wide" id="accountKindlePanel" role="tabpanel" aria-labelledby="accountKindleTab" data-account-panel="kindle" hidden>
@@ -529,4 +533,4 @@ def render_account_panel(kindle=False):
     </form>
 </section>
 """
-    return SERVER_ACCOUNT_PANEL.replace("{kindle_settings_tab}", tab).replace("{kindle_settings_panel}", settings)
+    return panel.replace("{kindle_settings_tab}", tab).replace("{kindle_settings_panel}", settings)

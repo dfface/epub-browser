@@ -38,7 +38,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 28
+DB_SCHEMA_VERSION = 29
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -449,6 +449,14 @@ class StateStore:
                     "INTEGER NOT NULL DEFAULT 10 CHECK(reading_insights_rank_limit >= 1)",
                 )
                 connection.execute("PRAGMA user_version = 28")
+            if version < 29:
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS library_orders (
+                        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                        book_ids_json TEXT NOT NULL
+                    )
+                """)
+                connection.execute("PRAGMA user_version = 29")
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -3142,6 +3150,7 @@ class StateStore:
                 (
                     ("book_access", "user_id"),
                     ("bookshelves", "user_id"),
+                    ("library_orders", "user_id"),
                     ("reading_progress", "user_id"),
                     ("annotations", "user_id"),
                     ("book_reviews", "user_id"),
@@ -4233,6 +4242,22 @@ class StateStore:
                     (principal.user_id,),
                 ).fetchall()
         return tuple(self._book_record(row) for row in rows)
+
+    def library_order(self, user_id: str) -> tuple[str, ...]:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT book_ids_json FROM library_orders WHERE user_id = ?", (user_id,),
+            ).fetchone()
+        return tuple(json.loads(row[0])) if row else ()
+
+    def save_library_order(self, user_id: str, book_ids: Sequence[str], *, import_legacy=False) -> None:
+        conflict = "DO NOTHING" if import_legacy else "DO UPDATE SET book_ids_json = excluded.book_ids_json"
+        with self._connection() as connection:
+            connection.execute(
+                "INSERT INTO library_orders (user_id, book_ids_json) VALUES (?, ?) "
+                "ON CONFLICT(user_id) " + conflict,
+                (user_id, json.dumps(book_ids, ensure_ascii=False)),
+            )
 
     def can_read_book(self, user_id: str, role: str, book_id: str) -> bool:
         with self._connection() as connection:
@@ -5502,6 +5527,24 @@ class StateStore:
         if any(not author or len(author) > 500 for author in normalized_authors):
             raise ValueError("Book authors are invalid")
         return normalized_title, normalized_authors
+
+    def library_tag_names(self, book_ids: Sequence[str]) -> dict[str, list[str]]:
+        if not book_ids:
+            return {}
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT book_ai_tags.book_id, ai_tags.name
+                FROM book_ai_tags JOIN ai_tags ON ai_tags.id = book_ai_tags.tag_id
+                WHERE book_ai_tags.book_id IN (SELECT value FROM json_each(?))
+                ORDER BY ai_tags.normalized_name, ai_tags.id
+                """,
+                (json.dumps(book_ids),),
+            ).fetchall()
+        tags = {}
+        for row in rows:
+            tags.setdefault(row["book_id"], []).append(row["name"])
+        return tags
 
     def managed_book_metadata(self, book_id: str) -> dict:
         """Overlay Server-managed display fields onto the EPUB-derived snapshot."""
@@ -7905,13 +7948,12 @@ class StateStore:
         """Return one owner's ratings in one query; review text never leaves this projection."""
         if not book_ids:
             return {}
-        unique_ids = tuple(dict.fromkeys(book_ids))
         with self._connection() as connection:
             self._require_user(connection, user_id)
             rows = connection.execute(
-                "SELECT book_id, rating FROM book_reviews WHERE user_id = ? AND book_id IN ("
-                + ", ".join("?" for _ in unique_ids) + ")",
-                (user_id, *unique_ids),
+                "SELECT book_id, rating FROM book_reviews "
+                "WHERE user_id = ? AND book_id IN (SELECT value FROM json_each(?))",
+                (user_id, json.dumps(book_ids)),
             ).fetchall()
         return {row["book_id"]: row["rating"] for row in rows}
 

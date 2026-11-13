@@ -268,35 +268,92 @@ body {
 }
 
 .controls {
-    display: block;
-    justify-content: space-between;
-    align-items: center;
     margin-bottom: 30px;
-    flex-wrap: wrap;
-    gap: 15px;
+}
+
+.library-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(12rem, max-content);
+    gap: 12px;
+    margin-bottom: 16px;
 }
 
 .search-container {
-    flex: 1;
-    min-width: 300px;
+    min-width: 0;
     position: relative;
 }
 
-.search-box {
+.search-box,
+.library-sort-control select {
     width: 100%;
-    padding: 15px 50px 15px 20px;
+    min-height: 52px;
     border: 2px solid var(--border);
-    border-radius: 50px;
-    font-size: 1rem;
-    transition: var(--transition);
+    border-radius: 28px;
     background: var(--search-bg);
     color: var(--search-text);
+    font: inherit;
+    transition: var(--transition);
 }
 
-.search-box:focus {
-    outline: none;
-    border-color: var(--button-bg);
-    box-shadow: 0 0 0 3px rgba(67, 97, 238, 0.2);
+.search-box {
+    padding: 12px 48px 12px 20px;
+}
+
+.library-sort-control {
+    position: relative;
+    min-width: 0;
+}
+
+.library-sort-control select {
+    appearance: none;
+    cursor: pointer;
+    padding-block: 12px;
+    padding-inline: 44px 40px;
+}
+
+.library-sort-control select:disabled {
+    cursor: default;
+}
+
+.search-box:focus-visible,
+.library-sort-control select:focus-visible {
+    outline: 2px solid var(--button-bg);
+    outline-offset: 2px;
+}
+
+.library-sort-icon,
+.library-sort-chevron {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-secondary);
+    pointer-events: none;
+}
+
+.library-sort-icon {
+    inset-inline-start: 18px;
+}
+
+.library-sort-chevron {
+    inset-inline-end: 16px;
+    font-size: .72rem;
+}
+
+@media (max-width: 520px) {
+    .library-toolbar {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 8px;
+    }
+
+    .library-sort-control {
+        justify-self: end;
+        max-width: 100%;
+    }
+
+    .library-sort-control select {
+        min-height: 44px;
+        padding-block: 8px;
+    }
 }
 
 .search-icon {
@@ -815,15 +872,6 @@ body {
     .stats {
         flex-direction: row;
         align-items: center;
-    }
-    
-    .controls {
-        flex-direction: column;
-        align-items: stretch;
-    }
-    
-    .search-container {
-        min-width: 100%;
     }
     
     .select-group-header {

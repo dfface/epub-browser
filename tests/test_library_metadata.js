@@ -191,6 +191,7 @@ function createLibraryHarness(responses, mode = 'server') {
     },
     scrollTo() {},
   };
+  vm.runInNewContext(fs.readFileSync('epub_browser/assets/book-sort.js', 'utf8'), { window });
   vm.runInNewContext(fs.readFileSync('epub_browser/assets/library.js', 'utf8'), {
     window, document, navigator: window.navigator, localStorage,
     XMLHttpRequest: FakeXMLHttpRequest, JSON, Date, console: { error() {}, log() {} },
@@ -474,7 +475,7 @@ test('incremental metadata refresh preserves quoted saved card order and the act
     { hash: quotedHash, title: 'Quoted', authors: [], tags: [quotedTag], url: '/book/quoted/', cover: null },
     { hash: 'other', title: 'Other', authors: [], tags: ['Other'], url: '/book/other/', cover: null },
   ];
-  const harness = createLibraryHarness([books, books]);
+  const harness = createLibraryHarness([books, books], 'ssg');
   harness.window.initScriptLibrary();
   harness.setSavedOrder('book-grid-sortable-order', JSON.stringify(['other', quotedHash]));
   harness.tag('All').classList.remove('active');
@@ -502,7 +503,7 @@ test('incremental metadata refresh rejects a valid JSON non-array without replac
 
 test('incremental metadata refresh ignores malformed saved book-card order JSON', async () => {
   const books = [{ hash: 'one', title: 'One', authors: [], tags: ['A'], url: '/book/one/', cover: null }];
-  const harness = createLibraryHarness([books, books]);
+  const harness = createLibraryHarness([books, books], 'ssg');
   harness.window.initScriptLibrary();
   harness.setSavedOrder('book-grid-sortable-order', '{not JSON');
 

@@ -3853,6 +3853,25 @@ class BookAuthorizationTests(unittest.TestCase):
         ]
         return client
 
+    def test_library_sorts_visible_books_and_keeps_manual_order_per_account(self):
+        def ids(client, sort):
+            response = client.get("/book-metadata.json", params={"sort": sort})
+            self.assertEqual(response.status_code, 200)
+            return [book["hash"] for book in response.json()]
+
+        self.assertEqual(ids(self.admin_client, "title_desc"), ["restricted-id", "open-id"])
+        self.assertEqual(ids(self.admin_client, "unknown"), ["open-id", "restricted-id"])
+        order = self.admin_client.put("/api/library-order", json={"ids": ["restricted-id", "open-id"]})
+        self.assertEqual(order.status_code, 204)
+        self.assertEqual(ids(self.admin_client, "manual"), ["restricted-id", "open-id"])
+        self.assertEqual(ids(self.member_client, "manual"), ["open-id"])
+        self.assertEqual(ids(self.admin_client, "title_asc"), ["open-id", "restricted-id"])
+        legacy = self.admin_client.put("/api/library-order", json={"ids": ["open-id"], "legacy": True})
+        self.assertEqual(legacy.status_code, 204)
+        self.assertEqual(ids(self.admin_client, "manual"), ["restricted-id", "open-id"])
+        with TestClient(self.app) as anonymous:
+            self.assertEqual(anonymous.put("/api/library-order", json={"ids": []}).status_code, 401)
+
     def test_member_cannot_discover_or_open_restricted_book_by_direct_resource_url(self):
         metadata = self.member_client.get("/api/library-metadata")
         legacy_metadata = self.member_client.get("/book-metadata.json")
@@ -5934,6 +5953,13 @@ class ServerKindleTests(unittest.TestCase):
         self.assertEqual(panel(second, "kBookshelf").count('<li data-book='), 1)
         last = self.client.get("/kindle-library.html?catalog_page=999")
         self.assertEqual(panel(last, "kAllBooks").count('<li data-book='), 2)
+        descending = self.client.get("/kindle-library.html?sort=title_desc")
+        catalog = panel(descending, "kAllBooks")
+        self.assertLess(catalog.index('data-book="extra-12"'), catalog.index('data-book="extra-11"'))
+        self.assertIn("sort=title_desc#kAllBooks", catalog)
+        descending_next = self.client.get("/kindle-library.html?sort=title_desc&catalog_page=2")
+        self.assertIn('data-book="extra-00"', panel(descending_next, "kAllBooks"))
+        self.assertNotIn('data-book="extra-12"', panel(descending_next, "kAllBooks"))
         results = self.client.get("/kindle-library.html?q=extra-12")
         self.assertEqual(panel(results, "kAllBooks").count('<li data-book='), 1)
         self.assertIn('data-book="extra-12"', panel(results, "kAllBooks"))
