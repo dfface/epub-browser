@@ -1494,6 +1494,8 @@
         'progress:write': 'account.pats.scope.progressWrite',
         'annotations:read': 'account.pats.scope.annotationsRead',
         'annotations:write': 'account.pats.scope.annotationsWrite',
+        'vocabulary:read': 'vocabulary.scopeRead',
+        'vocabulary:write': 'vocabulary.scopeWrite',
         'reviews:read': 'account.pats.scope.reviewsRead',
         'reviews:write': 'account.pats.scope.reviewsWrite',
         'kindle-memo:read': 'account.kindle.memoRead',
@@ -3944,6 +3946,7 @@
             'progress:write': 'progress:read',
             'annotations:write': 'annotations:read',
             'reviews:write': 'reviews:read',
+            'vocabulary:write': 'vocabulary:read',
             'kindle-memo:write': 'kindle-memo:read'
           };
           var readScope = event.target && required[event.target.value];

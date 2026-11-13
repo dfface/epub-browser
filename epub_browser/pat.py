@@ -17,6 +17,8 @@ PAT_SCOPES = frozenset({
     "progress:write",
     "annotations:read",
     "annotations:write",
+    "vocabulary:read",
+    "vocabulary:write",
     "reviews:read",
     "reviews:write",
     "kindle-memo:read",
@@ -28,6 +30,7 @@ PAT_WRITE_REQUIRES = {
     "bookshelf:write": "bookshelf:read",
     "progress:write": "progress:read",
     "annotations:write": "annotations:read",
+    "vocabulary:write": "vocabulary:read",
     "reviews:write": "reviews:read",
     "kindle-memo:write": "kindle-memo:read",
 }

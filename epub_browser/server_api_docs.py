@@ -11,6 +11,7 @@ _GROUPS = (
     ("bookshelf", "apiDocs.group.bookshelf", "Bookshelf"),
     ("progress", "apiDocs.group.progress", "Reading progress"),
     ("annotations", "apiDocs.group.annotations", "Annotations"),
+    ("vocabulary", "vocabulary.navigation", "Vocabulary"),
     ("reviews", "apiDocs.group.reviews", "Reviews"),
     ("kindle-memo", "account.kindle.memo", "Memo"),
     ("admin", "apiDocs.group.admin", "Administrator data"),

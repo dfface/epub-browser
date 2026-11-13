@@ -63,6 +63,87 @@ class DictionaryApiTests(unittest.TestCase):
             json={"text": "run", "dictionary_id": self.dictionary.id},
         ).status_code, 401)
 
+    def test_vocabulary_aggregates_lookup_events_and_scopes_changes(self):
+        self.store.resolve_book(
+            self.root / "second.epub", None, "second", {"language": "en"},
+            preferred_book_id="second",
+        )
+        for book_id in ("book", "second"):
+            cache = self.root / "book" / book_id / "content"
+            cache.mkdir(parents=True)
+            (cache / "metadata.json").write_text(
+                '{"chapters":[{"title":"Chapter one","path":"one.xhtml"}]}',
+                encoding="utf-8",
+            )
+
+        def lookup(book_id, text, lookup_id):
+            return self.client.post(f"/api/books/{book_id}/dictionary/lookup", json={
+                "text": text, "dictionary_id": self.dictionary.id,
+                "chapter_index": 0, "lookup_id": lookup_id,
+            })
+
+        for book_id, text, lookup_id in (
+            ("book", "Run", "1"), ("book", "Run", "1"),
+            ("book", "run", "2"), ("second", "run", "3"),
+        ):
+            self.assertEqual(lookup(book_id, text, lookup_id).status_code, 200)
+        miss = lookup("book", "unknown", "4").json()
+        self.assertFalse(miss["found"])
+        self.assertTrue(miss["vocabulary_recorded"])
+        invalid_location = self.client.post("/api/books/book/dictionary/lookup", json={
+            "text": "run", "dictionary_id": self.dictionary.id,
+            "chapter_index": 20, "lookup_id": "invalid-location",
+        }).json()
+        self.assertTrue(invalid_location["found"])
+        self.assertFalse(invalid_location["vocabulary_recorded"])
+        review = self.client.post("/api/books/book/dictionary/lookup", json={
+            "text": "run", "dictionary_id": self.dictionary.id,
+        }).json()
+        self.assertTrue(review["found"])
+        self.assertNotIn("vocabulary_recorded", review)
+
+        def words(client=self.client, suffix=""):
+            result = client.get("/api/vocabulary" + suffix)
+            self.assertEqual(result.status_code, 200)
+            self.assertEqual(result.headers["cache-control"], "private, no-store")
+            return {item["word"]: item for item in result.json()["words"]}
+
+        all_words = words()
+        self.assertEqual(all_words["Run"]["lookup_count"], 3)
+        self.assertEqual(all_words["unknown"]["lookup_count"], 1)
+        self.assertEqual(words(suffix="?book_id=book")["Run"]["lookup_count"], 2)
+        word_url = "/api/vocabulary/" + all_words["Run"]["id"]
+        self.assertEqual(self.client.patch(word_url, json={"mastery": "learning"}).status_code, 200)
+        self.assertEqual(words(suffix="?book_id=second")["Run"]["mastery"], "learning")
+
+        member = self.store.create_user("reader", None)
+        token, csrf = self.auth.create_session(member)
+        with TestClient(self.app, cookies={"epub_browser_session": token},
+                        headers={"X-CSRF-Token": csrf}) as other:
+            self.assertEqual(words(other), {})
+            self.assertEqual(other.patch(word_url, json={"mastery": "mastered"}).status_code, 404)
+            self.assertEqual(other.delete(word_url).status_code, 404)
+            for book_id in ("book", "second"):
+                result = other.post(f"/api/books/{book_id}/dictionary/lookup", json={
+                    "text": "run", "dictionary_id": self.dictionary.id,
+                    "chapter_index": 0, "lookup_id": "same-id",
+                })
+                self.assertEqual(result.status_code, 200)
+            self.assertEqual(words(other)["run"]["lookup_count"], 2)
+            self.store.set_book_visibility("second", "restricted")
+            self.assertEqual(words(other)["run"]["lookup_count"], 1)
+            self.assertEqual([source["book_id"] for source in words(other)["run"]["sources"]], ["book"])
+            self.assertEqual(other.get("/api/vocabulary?book_id=second").status_code, 403)
+            self.store.grant_book_access("second", member.user_id)
+            self.assertEqual(words(other)["run"]["lookup_count"], 2)
+
+        self.assertEqual(self.client.delete(word_url + "?book_id=book").status_code, 204)
+        self.assertNotIn("Run", words(suffix="?book_id=book"))
+        self.assertEqual(words()["Run"]["lookup_count"], 1)
+        self.assertEqual(words()["Run"]["mastery"], "learning")
+        self.assertEqual(self.client.delete(word_url).status_code, 204)
+        self.assertNotIn("Run", words())
+
     def test_dictionary_choices_are_book_acl_protected(self):
         response = self.client.get("/api/books/book/dictionaries")
         self.assertEqual(response.status_code, 200)

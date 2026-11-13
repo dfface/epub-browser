@@ -14,3 +14,37 @@
 .dictionary-source, .dictionary-attribution { display: block; color: var(--text-secondary); }
 .dictionary-source-link { display: inline-block; min-height: 44px; padding: 10px 0; color: var(--button-bg); }
 @media (prefers-reduced-motion: reduce) { .dictionary-dialog { scroll-behavior: auto; } }
+
+/* Keep the native select behavior and give each trigger a theme-colored indicator. */
+.dictionary-select-control {
+    position: relative;
+    display: inline-grid;
+    min-width: 0;
+    max-width: 100%;
+    color: var(--text-secondary, var(--text));
+}
+
+.dictionary-select-control::after {
+    content: "";
+    position: absolute;
+    inset-inline-end: 15px;
+    top: 50%;
+    width: 7px;
+    height: 7px;
+    border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor;
+    transform: translateY(-70%) rotate(45deg);
+    pointer-events: none;
+}
+
+.dictionary-select-control > select:is(select) {
+    appearance: none;
+    min-width: 0;
+    max-width: 100%;
+    padding-inline-end: 36px;
+}
+
+@media (forced-colors: active) {
+    .dictionary-select-control::after { display: none; }
+    .dictionary-select-control > select:is(select) { appearance: auto; padding-inline-end: 12px; }
+}

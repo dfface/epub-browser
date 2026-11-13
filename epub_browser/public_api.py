@@ -14,12 +14,14 @@ from typing import Callable, Optional, Tuple
 from starlette.responses import JSONResponse, PlainTextResponse, Response
 from starlette.routing import Match, Route
 
+from .dictionary_formats import normalize_lookup
 from .i18n_bundles import get_bundle, resolve_request_locale
 from .kindle import KINDLE_MEMO_MAX_LENGTH, valid_kindle_memo
 from .pat import AuthenticatedPAT, PAT_SCOPES
 from .server_concurrency import run_db, run_render
 from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import PDF_FORMAT
+from .vocabulary import MASTERY_STATES, MAX_PAGE_SIZE, MAX_QUERY_LENGTH, PAGE_SIZE, vocabulary_page_options
 
 
 PUBLIC_API_CONTEXT_KEY = "epub_browser.public_api_context"
@@ -309,6 +311,32 @@ async def _chapter_detail(request, authenticated: AuthenticatedPAT):
         headers={"Cache-Control": "private, no-store"},
     )
 
+
+async def bounded_public_json_object(request, maximum_size=64 * 1024):
+    content_type = request.headers.get('content-type', '').split(';', 1)[0]
+    if content_type.strip().casefold() != 'application/json':
+        return None, 'unsupported_media_type'
+    content_length = request.headers.get('content-length')
+    if content_length:
+        try:
+            if int(content_length) < 0:
+                return None, 'invalid_json'
+            if int(content_length) > maximum_size:
+                return None, 'body_too_large'
+        except ValueError:
+            return None, 'invalid_json'
+    body = bytearray()
+    async for chunk in request.stream():
+        body.extend(chunk)
+        if len(body) > maximum_size:
+            return None, 'body_too_large'
+    try:
+        data = json.loads(bytes(body).decode('utf-8'))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None, 'invalid_json'
+    if not isinstance(data, dict):
+        return None, 'invalid_json'
+    return data, None
 
 async def _json_object(request):
     try:
@@ -762,6 +790,75 @@ async def _kindle_memo(request, authenticated):
     return JSONResponse({"memo": memo}, headers={"Cache-Control": "private, no-store"})
 
 
+async def _vocabulary(request, authenticated):
+    context = _context(request)
+    store = context.store
+    principal = authenticated.principal
+    book_id = request.query_params.get("book_id")
+    headers = {"Cache-Control": "private, no-store"}
+    if book_id is not None and await _authorized_book(request, authenticated, book_id) is None:
+        return public_api_error("book_not_found", "Book not found", 404)
+    if request.method in ("GET", "HEAD"):
+        try:
+            options = vocabulary_page_options(request.query_params)
+        except ValueError:
+            return public_api_error("invalid_vocabulary_query", "Invalid vocabulary query", 400)
+        result = await run_db(store.list_vocabulary, principal, book_id, **options)
+        return JSONResponse(result, headers=headers)
+
+    if request.method == "POST":
+        data, error = await bounded_public_json_object(request, maximum_size=16 * 1024)
+        if error:
+            return public_api_error("invalid_vocabulary_lookup", "Invalid vocabulary lookup", 400)
+        book_id = data.get("book_id")
+        chapter = data.get("chapter_index")
+        lookup_id = data.get("lookup_id")
+        word = data.get("word")
+        if (
+            not isinstance(book_id, str) or not book_id or type(chapter) is not int or chapter < 0
+            or not isinstance(lookup_id, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", lookup_id)
+            or not isinstance(word, str) or not word.strip() or len(word) > MAX_QUERY_LENGTH
+        ):
+            return public_api_error("invalid_vocabulary_lookup", "Invalid vocabulary lookup", 400)
+        book = await _authorized_book(request, authenticated, book_id)
+        if book is None:
+            return public_api_error("book_not_found", "Book not found", 404)
+
+        def chapter_exists():
+            renderer = ServerPageRenderer(context.public_dir, book_id, source_format=book.source_format)
+            return chapter < len(_chapter_list(renderer))
+
+        try:
+            exists = await run_render(chapter_exists)
+        except ServerPageError:
+            return public_api_error("book_content_unavailable", "Book content is unavailable", 503)
+        if not exists:
+            return public_api_error("invalid_vocabulary_lookup", "Invalid vocabulary lookup", 400)
+        recorded = await run_db(
+            store.record_vocabulary_lookup, principal, book_id, chapter,
+            lookup_id, " ".join(word.split()), normalize_lookup(word),
+        )
+        if not recorded:
+            return public_api_error("book_not_found", "Book not found", 404)
+        return Response(status_code=204, headers=headers)
+
+    mastery = None
+    if request.method == "PATCH":
+        data, error = await bounded_public_json_object(request, maximum_size=1024)
+        if error or data.get("mastery") not in MASTERY_STATES:
+            return public_api_error("invalid_vocabulary_mastery", "Invalid mastery state", 400)
+        mastery = data["mastery"]
+    changed = await run_db(
+        store.change_vocabulary, principal, request.path_params["word_id"],
+        book_id=book_id, mastery=mastery,
+    )
+    if not changed:
+        return public_api_error("not_found", "Word not found", 404)
+    if mastery is None:
+        return Response(status_code=204, headers=headers)
+    return JSONResponse({"mastery": mastery}, headers=headers)
+
+
 def public_api_operations():
     return (
         PublicAPIOperation(
@@ -811,6 +908,10 @@ def public_api_operations():
         PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("GET",), "reviews:read", "Get a review", "getMyReview", _review_item),
         PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("PUT",), "reviews:write", "Create or replace a review", "putMyReview", _review_item),
         PublicAPIOperation("/api/v1/me/reviews/{book_id}", ("DELETE",), "reviews:write", "Delete a review", "deleteMyReview", _review_item),
+        PublicAPIOperation("/api/v1/me/vocabulary", ("GET",), "vocabulary:read", "List your vocabulary", "listMyVocabulary", _vocabulary),
+        PublicAPIOperation("/api/v1/me/vocabulary", ("POST",), "vocabulary:write", "Record a vocabulary lookup", "recordMyVocabularyLookup", _vocabulary),
+        PublicAPIOperation("/api/v1/me/vocabulary/{word_id}", ("PATCH",), "vocabulary:write", "Update a word's mastery", "patchMyVocabulary", _vocabulary),
+        PublicAPIOperation("/api/v1/me/vocabulary/{word_id}", ("DELETE",), "vocabulary:write", "Delete a word or its lookups in one book", "deleteMyVocabulary", _vocabulary),
         PublicAPIOperation("/api/v1/me/kindle-memo", ("GET",), "kindle-memo:read", "Read the token owner's Kindle memo", "getMyKindleMemo", _kindle_memo),
         PublicAPIOperation("/api/v1/me/kindle-memo", ("PUT",), "kindle-memo:write", "Replace the token owner's Kindle memo", "putMyKindleMemo", _kindle_memo),
         PublicAPIOperation("/api/v1/admin/users", ("GET",), "admin:data:read", "List public account metadata", "listAdminUsers", _admin_users),
@@ -971,6 +1072,74 @@ def openapi_document():
                     "403": {"description": "Insufficient scope"},
                 },
             }
+    vocabulary = paths["/api/v1/me/vocabulary"]
+    vocabulary_item = paths["/api/v1/me/vocabulary/{word_id}"]
+    mastery_schema = {"type": "string", "enum": list(MASTERY_STATES)}
+    string_schema = {"type": "string"}
+    book_parameter = {
+        "name": "book_id", "in": "query", "schema": string_schema,
+        "description": "Limit the operation to this visible book.",
+    }
+    vocabulary["get"]["parameters"] = [book_parameter] + [
+        {"name": name, "in": "query", "schema": schema}
+        for name, schema in (
+            ("q", {"type": "string", "maxLength": MAX_QUERY_LENGTH}),
+            ("mastery", mastery_schema),
+            ("page", {"type": "integer", "minimum": 1, "maximum": 2**31 - 1, "default": 1}),
+            ("page_size", {"type": "integer", "minimum": 1, "maximum": MAX_PAGE_SIZE, "default": PAGE_SIZE}),
+        )
+    ]
+    for operation in vocabulary_item.values():
+        operation["parameters"] = [
+            {"name": "word_id", "in": "path", "required": True, "schema": string_schema},
+            book_parameter,
+        ]
+    for operation in (*vocabulary.values(), *vocabulary_item.values()):
+        operation["responses"].update({
+            "400": {"description": "Invalid request"},
+            "404": {"description": "Book or word is unavailable to the token owner"},
+        })
+
+    def object_content(properties):
+        return {"application/json": {"schema": {
+            "type": "object", "required": list(properties), "properties": properties,
+        }}}
+
+    source_properties = {
+        "book_id": string_schema, "title": string_schema,
+        "source_format": {"enum": ["epub", "pdf"]},
+        "chapter_index": {"type": "integer", "minimum": 0},
+    }
+    schemas["VocabularySource"] = object_content(source_properties)["application/json"]["schema"]
+    word_properties = {
+        "id": string_schema, "word": string_schema, "mastery": mastery_schema,
+        "lookup_count": {"type": "integer", "minimum": 1},
+        "first_seen": {"type": "string", "format": "date-time"},
+        "last_seen": {"type": "string", "format": "date-time"},
+        "sources": {"type": "array", "items": {"$ref": "#/components/schemas/VocabularySource"}},
+    }
+    schemas["VocabularyWord"] = object_content(word_properties)["application/json"]["schema"]
+    vocabulary["get"]["responses"]["200"]["content"] = object_content({
+        "words": {"type": "array", "items": {"$ref": "#/components/schemas/VocabularyWord"}},
+        "page": {"type": "integer", "minimum": 1, "description": "Clamped to the last page when necessary."},
+        "page_size": {"type": "integer", "minimum": 1},
+        "total": {"type": "integer", "minimum": 0},
+        "total_pages": {"type": "integer", "minimum": 0},
+    })
+    mastery_content = object_content({"mastery": mastery_schema})
+    vocabulary_item["patch"]["requestBody"] = {"required": True, "content": mastery_content}
+    vocabulary_item["patch"]["responses"]["200"]["content"] = mastery_content
+    vocabulary["post"]["requestBody"] = {"required": True, "content": object_content({
+        "book_id": string_schema,
+        "chapter_index": {"type": "integer", "minimum": 0},
+        "word": {"type": "string", "minLength": 1, "maxLength": MAX_QUERY_LENGTH},
+        "lookup_id": {"type": "string", "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+                      "description": "Reuse for retries of the same lookup."},
+    })}
+    vocabulary["post"]["responses"]["503"] = {"description": "Book content is unavailable"}
+    for operation in (vocabulary["post"], vocabulary_item["delete"]):
+        operation["responses"].pop("200")
+        operation["responses"]["204"] = {"description": "Successful response"}
     memo_content = {"application/json": {"schema": {
         "type": "object",
         "required": ["memo"],

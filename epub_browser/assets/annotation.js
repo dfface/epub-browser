@@ -1466,8 +1466,9 @@
                 actionButton('dictionary', function() {
                     if (self.rejectUnsupportedSource(source)) return;
                     var anchor = self.getSourceAnchorRect(source);
+                    var chapterIndex = self.getChapterIndexFromSource(source);
                     self.cancelPendingDraft();
-                    global.EpubBrowserDictionary.open('dictionary', source.text, anchor);
+                    global.EpubBrowserDictionary.open('dictionary', source.text, anchor, chapterIndex);
                 });
                 actionButton('encyclopedia', function() {
                     if (self.rejectUnsupportedSource(source)) return;

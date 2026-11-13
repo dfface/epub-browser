@@ -38,7 +38,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 29
+DB_SCHEMA_VERSION = 30
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -457,6 +457,31 @@ class StateStore:
                     )
                 """)
                 connection.execute("PRAGMA user_version = 29")
+            if version < 30:
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS vocabulary_words (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        normalized_word TEXT NOT NULL,
+                        word TEXT NOT NULL,
+                        mastery TEXT NOT NULL DEFAULT 'new'
+                            CHECK(mastery IN ('new', 'learning', 'mastered')),
+                        UNIQUE(user_id, normalized_word)
+                    )
+                """)
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS vocabulary_lookups (
+                        id INTEGER PRIMARY KEY,
+                        word_id TEXT NOT NULL REFERENCES vocabulary_words(id) ON DELETE CASCADE,
+                        book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                        lookup_id TEXT NOT NULL,
+                        chapter_index INTEGER NOT NULL CHECK(chapter_index >= 0),
+                        looked_up_at REAL NOT NULL,
+                        UNIQUE(word_id, book_id, lookup_id)
+                    )
+                """)
+                connection.execute("CREATE INDEX IF NOT EXISTS vocabulary_lookups_book ON vocabulary_lookups(book_id)")
+                connection.execute("PRAGMA user_version = 30")
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -3155,6 +3180,7 @@ class StateStore:
                     ("annotations", "user_id"),
                     ("book_reviews", "user_id"),
                     ("reading_sessions", "user_id"),
+                    ("vocabulary_words", "user_id"),
                     ("kindle_screensavers", "user_id"),
                 ),
             ),
@@ -4217,30 +4243,21 @@ class StateStore:
                 (book_id, user_id),
             )
 
+    _READABLE_BOOK = """
+        books.active = 1 AND (
+            ? = 'admin' OR books.visibility = 'authenticated' OR EXISTS (
+                SELECT 1 FROM book_access
+                WHERE book_access.book_id = books.book_id AND book_access.user_id = ?
+            )
+        )
+    """
+
     def visible_books(self, principal: Principal) -> tuple[BookRecord, ...]:
         with self._connection() as connection:
-            if principal.role == "admin":
-                rows = connection.execute(
-                    "SELECT * FROM books WHERE active = 1 ORDER BY book_id"
-                ).fetchall()
-            else:
-                rows = connection.execute(
-                    """
-                    SELECT books.*
-                    FROM books
-                    WHERE books.active = 1
-                      AND (
-                        books.visibility = 'authenticated'
-                        OR EXISTS (
-                            SELECT 1 FROM book_access
-                            WHERE book_access.book_id = books.book_id
-                              AND book_access.user_id = ?
-                        )
-                      )
-                    ORDER BY books.book_id
-                    """,
-                    (principal.user_id,),
-                ).fetchall()
+            rows = connection.execute(
+                f"SELECT books.* FROM books WHERE {self._READABLE_BOOK} ORDER BY book_id",
+                (principal.role, principal.user_id),
+            ).fetchall()
         return tuple(self._book_record(row) for row in rows)
 
     def library_order(self, user_id: str) -> tuple[str, ...]:
@@ -4258,6 +4275,134 @@ class StateStore:
                 "ON CONFLICT(user_id) " + conflict,
                 (user_id, json.dumps(book_ids, ensure_ascii=False)),
             )
+
+    def record_vocabulary_lookup(
+        self, principal: Principal, book_id: str, chapter_index: int,
+        lookup_id: str, word: str, normalized_word: str,
+    ) -> bool:
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if not connection.execute(
+                f"SELECT 1 FROM books WHERE book_id = ? AND {self._READABLE_BOOK}",
+                (book_id, principal.role, principal.user_id),
+            ).fetchone():
+                return False
+            connection.execute("""
+                INSERT INTO vocabulary_words (id, user_id, normalized_word, word)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id, normalized_word) DO NOTHING
+            """, (uuid.uuid4().hex, principal.user_id, normalized_word, word))
+            connection.execute("""
+                INSERT INTO vocabulary_lookups (word_id, book_id, lookup_id, chapter_index, looked_up_at)
+                SELECT id, ?, ?, ?, ? FROM vocabulary_words
+                WHERE user_id = ? AND normalized_word = ?
+                ON CONFLICT(word_id, book_id, lookup_id) DO NOTHING
+            """, (book_id, lookup_id, chapter_index, time.time(), principal.user_id, normalized_word))
+
+            return True
+
+    def list_vocabulary(
+        self, principal: Principal, book_id: str | None = None, *,
+        page: int, page_size: int, query: str, mastery: str | None,
+    ) -> dict:
+        eligible = f"""
+            FROM vocabulary_words w
+            JOIN vocabulary_lookups l ON l.word_id = w.id
+            JOIN books ON books.book_id = l.book_id
+            WHERE w.user_id = ? AND {self._READABLE_BOOK}
+                AND (? IS NULL OR books.book_id = ?)
+                AND instr(w.normalized_word, ?) > 0
+                AND (? IS NULL OR w.mastery = ?)
+        """
+        parameters = (principal.user_id, principal.role, principal.user_id,
+                      book_id, book_id, query, mastery, mastery)
+        with self._connection() as connection:
+            connection.execute("BEGIN")
+            total = connection.execute(
+                f"SELECT COUNT(DISTINCT w.id) {eligible}", parameters
+            ).fetchone()[0]
+            total_pages = (total + page_size - 1) // page_size
+            page = min(page, max(1, total_pages))
+            rows = connection.execute(f"""
+                WITH page_words AS (
+                    SELECT w.id, MAX(l.looked_up_at) AS last_seen
+                    {eligible}
+                    GROUP BY w.id
+                    ORDER BY last_seen DESC, w.id
+                    LIMIT ? OFFSET ?
+                ), ranked AS (
+                    SELECT w.id AS word_id, w.word, w.mastery, books.book_id,
+                           books.title, books.source_format, l.chapter_index, l.looked_up_at,
+                           COUNT(*) OVER source AS lookup_count,
+                           MIN(l.looked_up_at) OVER source AS first_seen,
+                           ROW_NUMBER() OVER (
+                               PARTITION BY w.id, books.book_id
+                               ORDER BY l.looked_up_at DESC, l.id DESC
+                           ) AS rank
+                    {eligible}
+                    AND w.id IN (SELECT id FROM page_words)
+                    WINDOW source AS (PARTITION BY w.id, books.book_id)
+                )
+                SELECT * FROM ranked WHERE rank = 1
+                ORDER BY looked_up_at DESC, word_id, book_id
+            """, (*parameters, page_size, (page - 1) * page_size, *parameters))
+            words = {}
+            for row in rows:
+                word = words.setdefault(row["word_id"], {
+                    "id": row["word_id"],
+                    "word": row["word"],
+                    "mastery": row["mastery"],
+                    "lookup_count": 0,
+                    "first_seen": row["first_seen"],
+                    "last_seen": row["looked_up_at"],
+                    "sources": [],
+                })
+                word["lookup_count"] += row["lookup_count"]
+                word["first_seen"] = min(word["first_seen"], row["first_seen"])
+                word["sources"].append({
+                    "book_id": row["book_id"],
+                    "title": row["title"],
+                    "source_format": row["source_format"],
+                    "chapter_index": row["chapter_index"],
+                })
+        for word in words.values():
+            word["first_seen"] = self._utc_timestamp(word["first_seen"])
+            word["last_seen"] = self._utc_timestamp(word["last_seen"])
+        return {
+            "words": list(words.values()), "page": page, "page_size": page_size,
+            "total": total, "total_pages": total_pages,
+        }
+
+    def change_vocabulary(
+        self, principal: Principal, word_id: str, *,
+        book_id: str | None = None, mastery: str | None = None,
+    ) -> bool:
+        with self._connection() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            visible = connection.execute(f"""
+                SELECT 1 FROM vocabulary_words w
+                JOIN vocabulary_lookups l ON l.word_id = w.id
+                JOIN books ON books.book_id = l.book_id
+                WHERE w.id = ? AND w.user_id = ? AND {self._READABLE_BOOK}
+                    AND (? IS NULL OR books.book_id = ?)
+                LIMIT 1
+            """, (word_id, principal.user_id, principal.role, principal.user_id, book_id, book_id))
+            if not visible.fetchone():
+                return False
+            if mastery is not None:
+                connection.execute("UPDATE vocabulary_words SET mastery = ? WHERE id = ?", (mastery, word_id))
+            elif book_id is None:
+                connection.execute("DELETE FROM vocabulary_words WHERE id = ?", (word_id,))
+            else:
+                connection.execute(
+                    "DELETE FROM vocabulary_lookups WHERE word_id = ? AND book_id = ?", (word_id, book_id),
+                )
+                connection.execute("""
+                    DELETE FROM vocabulary_words WHERE id = ? AND NOT EXISTS (
+                        SELECT 1 FROM vocabulary_lookups WHERE word_id = ?
+                    )
+                """, (word_id, word_id))
+            return True
 
     def can_read_book(self, user_id: str, role: str, book_id: str) -> bool:
         with self._connection() as connection:

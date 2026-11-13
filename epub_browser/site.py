@@ -22,6 +22,8 @@ from .server_chrome import (
     SERVER_LOCALE_CONTROL,
     SERVER_LOCALE_SCRIPT,
     render_account_panel,
+    render_vocabulary_assets,
+    render_vocabulary_navigation,
 )
 from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
@@ -947,6 +949,7 @@ htmlElement.classList.add(theme + "-mode");
         <div class="app-nav-links">
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
+            {render_vocabulary_navigation() if deployment_mode == "server" else ""}
             {reading_insights_navigation}
             {ai_reading_navigation}
             {install_control}
@@ -1091,6 +1094,7 @@ htmlElement.classList.add(theme + "-mode");
     <script src="/assets/cache-boundary.js" defer></script>
     <script src="/assets/notification.js" defer></script>
 {server_auth_script}
+{vocabulary_assets}
     <script src="/assets/theme.js" defer></script>
     <script src="/assets/dialog.js" defer></script>
     <script src="/assets/version-check.js" defer></script>
@@ -1135,6 +1139,10 @@ htmlElement.classList.add(theme + "-mode");
     library_html = library_html.replace("{server_client_start}", server_client_start)
     library_html = library_html.replace("{ai_reading_stylesheet}", ai_reading_stylesheet)
     library_html = library_html.replace("{ai_reading_navigation}", ai_reading_navigation)
+    library_html = library_html.replace(
+        "{vocabulary_assets}",
+        render_vocabulary_assets(assets) if deployment_mode == "server" else "",
+    )
     library_html = library_html.replace("{reading_insights_navigation}", reading_insights_navigation)
     library_html = library_html.replace("{ai_reading_script}", ai_reading_script)
     library_html = library_html.replace("{SERVER_LOCALE_SCRIPT}", SERVER_LOCALE_SCRIPT)
