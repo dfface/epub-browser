@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "내 단어장 목록 보기",
   "apiDocs.operation.recordMyVocabularyLookup": "단어 검색 기록",
   "apiDocs.operation.patchMyVocabulary": "단어 학습 상태 변경",
-  "apiDocs.operation.deleteMyVocabulary": "단어 또는 특정 책의 검색 기록 삭제"
+  "apiDocs.operation.deleteMyVocabulary": "단어 또는 특정 책의 검색 기록 삭제",
+  "book.search": "이 책 검색",
+  "book.searchPlaceholder": "이 책 검색",
+  "book.searchHint": "이 책에서 검색할 단어나 구문을 입력하세요.",
+  "book.searching": "검색 중…",
+  "book.searchNoResults": "일치하는 내용이 없습니다.",
+  "book.searchResultCount": "검색 결과: {count}개",
+  "book.searchPrevPage": "이전 페이지",
+  "book.searchNextPage": "다음 페이지",
+  "book.searchPageStatus": "{pages}페이지 중 {page}페이지",
+  "book.searchPageOutOfRange": "이 페이지에는 결과가 없습니다",
+  "book.searchFailed": "검색에 실패했습니다. 다시 시도하세요.",
+  "book.searchUnavailable": "검색을 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요.",
+  "book.closeSearch": "검색 닫기",
+  "admin.general.searchIndexCacheLimit": "디스크에 캐시되는 책 검색 인덱스",
+  "admin.general.searchIndexCacheLimitHelp": "최근 사용한 검색 인덱스를 이 개수만큼 유지합니다. 삭제되면 다음에 해당 책을 검색할 때 다시 만들어집니다."
 }

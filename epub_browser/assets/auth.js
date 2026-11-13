@@ -2167,6 +2167,7 @@
       fields.recent_reading_limit.value = String(generalSettings.recent_reading_limit || 10);
       fields.reading_insights_rank_limit.value = String(generalSettings.reading_insights_rank_limit || 10);
       fields.book_cache_limit.value = String(generalSettings.book_cache_limit || 100);
+      fields.search_index_cache_limit.value = String(generalSettings.search_index_cache_limit || 20);
       var errorEl = element('adminGeneralError');
       if (errorEl) errorEl.hidden = true;
     }
@@ -2180,7 +2181,8 @@
       var limit = fields.recent_reading_limit.valueAsNumber;
       var rankLimit = fields.reading_insights_rank_limit.valueAsNumber;
       var cacheLimit = fields.book_cache_limit.value.trim();
-      if (!/^0*[1-9][0-9]*$/.test(cacheLimit) || [limit, rankLimit].some(function (value) {
+      var searchIndexCacheLimit = fields.search_index_cache_limit.value.trim();
+      if (!/^0*[1-9][0-9]*$/.test(cacheLimit) || !/^0*[1-9][0-9]*$/.test(searchIndexCacheLimit) || [limit, rankLimit].some(function (value) {
         return !Number.isSafeInteger(value) || value < 1;
       })) {
         if (errorEl) {
@@ -2192,7 +2194,7 @@
       return authenticatedFetch('/api/admin/general-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recent_reading_limit: limit, reading_insights_rank_limit: rankLimit, book_cache_limit: cacheLimit })
+        body: JSON.stringify({ recent_reading_limit: limit, reading_insights_rank_limit: rankLimit, book_cache_limit: cacheLimit, search_index_cache_limit: searchIndexCacheLimit })
       }).then(function(response) {
         if (!response.ok) {
           if (errorEl) {

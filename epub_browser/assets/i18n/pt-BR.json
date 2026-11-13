@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "Listar seu vocabulário",
   "apiDocs.operation.recordMyVocabularyLookup": "Registrar uma consulta",
   "apiDocs.operation.patchMyVocabulary": "Atualizar o domínio de uma palavra",
-  "apiDocs.operation.deleteMyVocabulary": "Excluir uma palavra ou suas consultas em um livro"
+  "apiDocs.operation.deleteMyVocabulary": "Excluir uma palavra ou suas consultas em um livro",
+  "book.search": "Pesquisar neste livro",
+  "book.searchPlaceholder": "Pesquisar neste livro",
+  "book.searchHint": "Digite uma palavra ou frase para pesquisar neste livro.",
+  "book.searching": "Pesquisando…",
+  "book.searchNoResults": "Nenhuma correspondência encontrada.",
+  "book.searchResultCount": "Resultados: {count}",
+  "book.searchPrevPage": "Página anterior",
+  "book.searchNextPage": "Próxima página",
+  "book.searchPageStatus": "Página {page} de {pages}",
+  "book.searchPageOutOfRange": "Nenhum resultado nesta página",
+  "book.searchFailed": "A pesquisa falhou. Tente novamente.",
+  "book.searchUnavailable": "A pesquisa está temporariamente indisponível. Tente novamente mais tarde.",
+  "book.closeSearch": "Fechar pesquisa",
+  "admin.general.searchIndexCacheLimit": "Índices de pesquisa em cache no disco",
+  "admin.general.searchIndexCacheLimitHelp": "O servidor mantém esta quantidade de índices de pesquisa usados recentemente. Um índice removido é recriado na próxima busca nesse livro."
 }

@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "Показать свой словарь",
   "apiDocs.operation.recordMyVocabularyLookup": "Записать поиск слова",
   "apiDocs.operation.patchMyVocabulary": "Изменить статус изучения слова",
-  "apiDocs.operation.deleteMyVocabulary": "Удалить слово или историю его поиска в книге"
+  "apiDocs.operation.deleteMyVocabulary": "Удалить слово или историю его поиска в книге",
+  "book.search": "Поиск по книге",
+  "book.searchPlaceholder": "Поиск по книге",
+  "book.searchHint": "Введите слово или фразу для поиска по этой книге.",
+  "book.searching": "Идёт поиск…",
+  "book.searchNoResults": "Совпадений не найдено.",
+  "book.searchResultCount": "Результаты: {count}",
+  "book.searchPrevPage": "Предыдущая страница",
+  "book.searchNextPage": "Следующая страница",
+  "book.searchPageStatus": "Страница {page} из {pages}",
+  "book.searchPageOutOfRange": "На этой странице нет результатов",
+  "book.searchFailed": "Не удалось выполнить поиск. Повторите попытку.",
+  "book.searchUnavailable": "Поиск временно недоступен. Повторите попытку позже.",
+  "book.closeSearch": "Закрыть поиск",
+  "admin.general.searchIndexCacheLimit": "Кэшированные на диске индексы поиска по книгам",
+  "admin.general.searchIndexCacheLimitHelp": "Сервер хранит столько недавно использованных индексов поиска. Удалённый индекс будет пересоздан при следующем поиске по этой книге."
 }

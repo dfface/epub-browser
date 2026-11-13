@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "Senaraikan kosa kata anda",
   "apiDocs.operation.recordMyVocabularyLookup": "Rekod carian perkataan",
   "apiDocs.operation.patchMyVocabulary": "Kemas kini penguasaan perkataan",
-  "apiDocs.operation.deleteMyVocabulary": "Padam perkataan atau cariannya dalam sebuah buku"
+  "apiDocs.operation.deleteMyVocabulary": "Padam perkataan atau cariannya dalam sebuah buku",
+  "book.search": "Cari dalam buku ini",
+  "book.searchPlaceholder": "Cari dalam buku ini",
+  "book.searchHint": "Taip perkataan atau frasa untuk mencari dalam buku ini.",
+  "book.searching": "Mencari…",
+  "book.searchNoResults": "Tiada padanan ditemui.",
+  "book.searchResultCount": "Hasil: {count}",
+  "book.searchPrevPage": "Halaman sebelumnya",
+  "book.searchNextPage": "Halaman seterusnya",
+  "book.searchPageStatus": "Halaman {page} daripada {pages}",
+  "book.searchPageOutOfRange": "Tiada hasil pada halaman ini",
+  "book.searchFailed": "Carian gagal. Cuba lagi.",
+  "book.searchUnavailable": "Carian tidak tersedia buat sementara. Cuba lagi kemudian.",
+  "book.closeSearch": "Tutup carian",
+  "admin.general.searchIndexCacheLimit": "Indeks carian buku yang dicache pada cakera",
+  "admin.general.searchIndexCacheLimitHelp": "Pelayan menyimpan sebanyak ini indeks carian yang baru digunakan. Indeks yang dibuang akan dibina semula pada carian seterusnya untuk buku itu."
 }

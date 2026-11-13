@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "List your vocabulary",
   "apiDocs.operation.recordMyVocabularyLookup": "Record a vocabulary lookup",
   "apiDocs.operation.patchMyVocabulary": "Update a word’s mastery",
-  "apiDocs.operation.deleteMyVocabulary": "Delete a word or its lookups in one book"
+  "apiDocs.operation.deleteMyVocabulary": "Delete a word or its lookups in one book",
+  "book.search": "Search this book",
+  "book.searchPlaceholder": "Search this book",
+  "book.searchHint": "Type a word or phrase to search this book.",
+  "book.searching": "Searching…",
+  "book.searchNoResults": "No matches found.",
+  "book.searchResultCount": "Results: {count}",
+  "book.searchPrevPage": "Previous page",
+  "book.searchNextPage": "Next page",
+  "book.searchPageStatus": "Page {page} of {pages}",
+  "book.searchPageOutOfRange": "That page has no results",
+  "book.searchFailed": "Search failed. Try again.",
+  "book.searchUnavailable": "Search is temporarily unavailable. Try again later.",
+  "book.closeSearch": "Close search",
+  "admin.general.searchIndexCacheLimit": "Book search indexes cached on disk",
+  "admin.general.searchIndexCacheLimitHelp": "The server keeps this many recently used search indexes. Removing one only means it is rebuilt the next time that book is searched."
 }

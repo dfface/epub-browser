@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "列出自己的生詞",
   "apiDocs.operation.recordMyVocabularyLookup": "記錄一次查詞",
   "apiDocs.operation.patchMyVocabulary": "更新詞的掌握狀態",
-  "apiDocs.operation.deleteMyVocabulary": "刪除生詞或移除它在指定書籍中的紀錄"
+  "apiDocs.operation.deleteMyVocabulary": "刪除生詞或移除它在指定書籍中的紀錄",
+  "book.search": "搜尋本書",
+  "book.searchPlaceholder": "搜尋本書",
+  "book.searchHint": "輸入關鍵詞或短語，搜尋本書內容。",
+  "book.searching": "正在搜尋…",
+  "book.searchNoResults": "找不到相符內容。",
+  "book.searchResultCount": "結果：{count} 筆",
+  "book.searchPrevPage": "上一頁",
+  "book.searchNextPage": "下一頁",
+  "book.searchPageStatus": "第 {page} / {pages} 頁",
+  "book.searchPageOutOfRange": "該頁沒有結果",
+  "book.searchFailed": "搜尋失敗，請重試。",
+  "book.searchUnavailable": "搜尋暫時無法使用，請稍後再試。",
+  "book.closeSearch": "關閉搜尋",
+  "admin.general.searchIndexCacheLimit": "快取的書籍搜尋索引",
+  "admin.general.searchIndexCacheLimitHelp": "伺服器保留最近使用過的搜尋索引數量。刪除後僅需在下次搜尋該書時重新建立。"
 }

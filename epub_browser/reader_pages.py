@@ -1085,6 +1085,39 @@ class ReaderPageRenderer:
             if is_pdf_book else ""
         )
         server_account_stylesheet = SERVER_ACCOUNT_STYLESHEET if self.deployment_mode == "server" else ""
+        book_search_stylesheet = ""
+        book_search_trigger = ""
+        book_search_modal = ""
+        book_search_script = ""
+        if self.deployment_mode == "server" and not is_pdf_book:
+            book_search_stylesheet = '<link rel="stylesheet" href="/assets/book-search.css">'
+            book_search_trigger = (
+                '<button type="button" class="css-btn secondary" id="bookSearchToggle" '
+                'aria-haspopup="dialog" aria-controls="book-search-dialog" aria-expanded="false">'
+                '<i class="fas fa-magnifying-glass" aria-hidden="true"></i>'
+                '<span data-i18n="book.search">Search this book</span></button>'
+            )
+            book_search_modal = f'''<div class="book-search-modal" id="bookSearchModal" hidden>
+    <section class="book-search-dialog" id="book-search-dialog" role="dialog" aria-modal="true" aria-label="Search this book" data-i18n-aria-label="book.search" tabindex="-1" data-book-search data-book-hash="{book_id_attribute}">
+        <div class="book-search-dialog-header">
+            <h2 data-i18n="book.search">Search this book</h2>
+            <button class="book-search-close" id="bookSearchClose" type="button" aria-label="Close search" data-i18n-aria-label="book.closeSearch"><i class="fas fa-times" aria-hidden="true"></i></button>
+        </div>
+        <form class="book-search-form" id="bookSearchForm" role="search">
+            <label class="visually-hidden" for="bookSearchInput" data-i18n="book.search">Search this book</label>
+            <input id="bookSearchInput" type="search" autocomplete="off" enterkeyhint="search" maxlength="128" placeholder="Search this book" data-i18n-placeholder="book.searchPlaceholder">
+            <button class="book-search-submit" type="submit" aria-label="Search this book" data-i18n-aria-label="book.search"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></button>
+        </form>
+        <p class="book-search-status" id="bookSearchStatus" role="status"></p>
+        <ul class="toc-list book-search-results" id="bookSearchResults"></ul>
+        <div class="book-search-pagination" id="bookSearchPagination" hidden>
+            <button class="book-search-page-btn" id="bookSearchPrev" type="button" aria-label="Previous page" data-i18n-aria-label="book.searchPrevPage"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+            <span class="book-search-page-status" id="bookSearchPageStatus"></span>
+            <button class="book-search-page-btn" id="bookSearchNext" type="button" aria-label="Next page" data-i18n-aria-label="book.searchNextPage"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+        </div>
+    </section>
+</div>'''
+            book_search_script = '<script src="/assets/book-search.js" defer></script>'
         # Locale selection is shared navigation chrome in both SSG and Server.
         server_locale_control = SERVER_LOCALE_CONTROL
         server_account_control = SERVER_ACCOUNT_CONTROL if self.deployment_mode == "server" else ""
@@ -1110,6 +1143,7 @@ class ReaderPageRenderer:
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
+    {book_search_stylesheet}
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
     <link rel="icon" type="image/png" href="/assets/favicon.png">
@@ -1178,6 +1212,7 @@ class ReaderPageRenderer:
                     </div>
                     {ai_book_chat_button}
                     <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
+                    {book_search_trigger}
                     {book_review_trigger}
                 </div>
             </div>
@@ -1185,6 +1220,7 @@ class ReaderPageRenderer:
     {book_review_display}
     {book_review_initial_data}
     {book_review_panel}
+    {book_search_modal}
     <div class="toc-container" data-id="toc-container"{ai_reading_indicators}>
         <div class="toc-header">
             <h2 data-i18n="book.tableOfContents">Table of contents</h2>
@@ -1364,6 +1400,7 @@ if (window.EpubBrowserCacheBoundary) {
 <script>window.EpubBrowserBookFeatureAssets={book_feature_assets};</script>
 <script src="/assets/book-feature-loader.js" defer></script>
 <script src="/assets/book.js?v=13" defer></script>
+{book_search_script}
 {ai_reading_script}
 {render_vocabulary_assets(self.asset_manifest) if self.deployment_mode == "server" else ""}
 {ai_book_chat_script}
@@ -2016,6 +2053,37 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
             '<script src="/assets/dictionary.js" defer></script>'
             if self.deployment_mode == "server" else ""
         )
+        book_search_controls = ""
+        book_search_mobile_controls = ""
+        book_search_drawer = ""
+        book_search_script = ""
+        book_search_stylesheet = ""
+        if self.deployment_mode == "server" and pdf_page is None:
+            book_search_stylesheet = '<link rel="stylesheet" href="/assets/book-search.css">'
+            book_search_controls = '''
+            <button class="control-btn" id="bookSearchToggle" type="button" aria-label="Search this book" data-i18n-aria-label="book.search" aria-controls="bookSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span class="control-name" data-i18n="book.search">Search this book</span></button>'''
+            book_search_mobile_controls = '''
+        <button class="control-btn" id="mobileBookSearchToggle" type="button" aria-label="Search this book" title="Search this book" data-i18n-aria-label="book.search" data-i18n-title="book.search" aria-controls="bookSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span data-i18n="book.search">Search this book</span></button>'''
+            book_search_drawer = '''
+    <nav class="toc-floating reader-drawer book-search-drawer" id="bookSearchDrawer" aria-label="Search this book" data-i18n-aria-label="book.search" aria-hidden="true">
+        <div class="toc-header">
+            <h3 data-i18n="book.search">Search this book</h3>
+            <button class="toc-close" id="bookSearchClose" type="button" aria-label="Close search" data-i18n-aria-label="book.closeSearch"><i class="fas fa-times" aria-hidden="true"></i></button>
+        </div>
+        <form class="book-search-form" id="bookSearchForm" role="search">
+            <label class="visually-hidden" for="bookSearchInput" data-i18n="book.search">Search this book</label>
+            <input id="bookSearchInput" type="search" autocomplete="off" enterkeyhint="search" maxlength="128" placeholder="Search this book" data-i18n-placeholder="book.searchPlaceholder">
+            <button class="book-search-submit" type="submit" aria-label="Search this book" data-i18n-aria-label="book.search"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></button>
+        </form>
+        <p class="book-search-status" id="bookSearchStatus" role="status"></p>
+        <ul class="toc-list book-search-results" id="bookSearchResults"></ul>
+        <div class="book-search-pagination" id="bookSearchPagination" hidden>
+            <button class="book-search-page-btn" id="bookSearchPrev" type="button" aria-label="Previous page" data-i18n-aria-label="book.searchPrevPage"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+            <span class="book-search-page-status" id="bookSearchPageStatus"></span>
+            <button class="book-search-page-btn" id="bookSearchNext" type="button" aria-label="Next page" data-i18n-aria-label="book.searchNextPage"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+        </div>
+    </nav>'''
+            book_search_script = '<script src="/assets/book-search.js" defer></script>'
         reading_session_context = (
             f'<meta data-reading-session data-book-id="{book_id_attribute}" '
             f'data-chapter-index="{chapter_index}" data-chapter-label="{chapter_title_attribute}">'
@@ -2079,7 +2147,8 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
-    <link rel="stylesheet" href="/assets/chapter.css?v=17">
+    <link rel="stylesheet" href="/assets/chapter.css?v=18">
+    {book_search_stylesheet}
     {pdf_stylesheet}
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
@@ -2137,6 +2206,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
         </ul>
     </nav>
     {pdf_search_drawer}
+    {book_search_drawer}
 
     <div class="reader-drawer-backdrop" id="readerDrawerBackdrop" aria-hidden="true"></div>
 
@@ -2182,6 +2252,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
                 </section>
             </div>
             {pdf_reader_controls}
+            {book_search_controls}
             {ai_chapter_button}
             {ai_followup_button}
         </div>
@@ -2388,6 +2459,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
             <span data-i18n="reader.bookChapters">Chapters</span>
         </button>
         {pdf_mobile_controls}
+        {book_search_mobile_controls}
         {mobile_ai_reading_button}
         {mobile_ai_followup_button}
         {prev_link_mobile}
@@ -2532,7 +2604,8 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     <script src="/assets/reading-progress.js" defer></script>
     <script src="/assets/reader-layout.js" defer></script>
     {pdf_chapter_script}
-    <script src="/assets/chapter.js?v=17" defer></script>
+    {book_search_script}
+    <script src="/assets/chapter.js?v=18" defer></script>
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>
     <script src="/assets/annotation-hub.js" defer></script>

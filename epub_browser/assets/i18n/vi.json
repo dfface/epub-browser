@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "Liệt kê từ vựng của bạn",
   "apiDocs.operation.recordMyVocabularyLookup": "Ghi lại một lần tra từ",
   "apiDocs.operation.patchMyVocabulary": "Cập nhật mức độ thành thạo của từ",
-  "apiDocs.operation.deleteMyVocabulary": "Xóa từ hoặc các lượt tra trong một sách"
+  "apiDocs.operation.deleteMyVocabulary": "Xóa từ hoặc các lượt tra trong một sách",
+  "book.search": "Tìm trong sách này",
+  "book.searchPlaceholder": "Tìm trong sách này",
+  "book.searchHint": "Nhập một từ hoặc cụm từ để tìm trong sách này.",
+  "book.searching": "Đang tìm kiếm…",
+  "book.searchNoResults": "Không tìm thấy kết quả phù hợp.",
+  "book.searchResultCount": "Kết quả: {count}",
+  "book.searchPrevPage": "Trang trước",
+  "book.searchNextPage": "Trang sau",
+  "book.searchPageStatus": "Trang {page} / {pages}",
+  "book.searchPageOutOfRange": "Không có kết quả ở trang này",
+  "book.searchFailed": "Tìm kiếm thất bại. Hãy thử lại.",
+  "book.searchUnavailable": "Tìm kiếm tạm thời không khả dụng. Hãy thử lại sau.",
+  "book.closeSearch": "Đóng tìm kiếm",
+  "admin.general.searchIndexCacheLimit": "Chỉ mục tìm kiếm sách được lưu trên đĩa",
+  "admin.general.searchIndexCacheLimitHelp": "Máy chủ giữ số chỉ mục tìm kiếm được dùng gần đây. Chỉ mục bị xóa sẽ được tạo lại khi tìm kiếm sách đó lần sau."
 }

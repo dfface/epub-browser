@@ -3432,11 +3432,11 @@ class StateStoreTests(unittest.TestCase):
     def test_general_settings_default_and_validation(self):
         self.assertEqual(
             self.store.get_general_settings(),
-            {"recent_reading_limit": 10, "reading_insights_rank_limit": 10, "book_cache_limit": 100},
+            {"recent_reading_limit": 10, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20},
         )
         self.assertEqual(
             self.store.set_general_settings(recent_reading_limit=18),
-            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100},
+            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20},
         )
         self.assertEqual(
             self.store.get_general_settings()["recent_reading_limit"], 18
@@ -3448,7 +3448,7 @@ class StateStoreTests(unittest.TestCase):
         # No upper cap: values above 24 are accepted.
         self.assertEqual(
             self.store.set_general_settings(recent_reading_limit=100),
-            {"recent_reading_limit": 100, "reading_insights_rank_limit": 10, "book_cache_limit": 100},
+            {"recent_reading_limit": 100, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20},
         )
 
     def test_book_cache_limit_accepts_large_positive_integers(self):
@@ -3469,7 +3469,7 @@ class StateStoreTests(unittest.TestCase):
         self.store.initialize()
         self.assertEqual(
             self.store.get_general_settings(),
-            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100},
+            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20},
         )
 
     def test_imported_and_administrator_tags_share_one_managed_collection(self):

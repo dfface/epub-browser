@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "แสดงรายการคำศัพท์ของคุณ",
   "apiDocs.operation.recordMyVocabularyLookup": "บันทึกการค้นหาคำ",
   "apiDocs.operation.patchMyVocabulary": "อัปเดตสถานะการเรียนรู้ของคำ",
-  "apiDocs.operation.deleteMyVocabulary": "ลบคำหรือประวัติการค้นหาในหนังสือหนึ่งเล่ม"
+  "apiDocs.operation.deleteMyVocabulary": "ลบคำหรือประวัติการค้นหาในหนังสือหนึ่งเล่ม",
+  "book.search": "ค้นหาในหนังสือเล่มนี้",
+  "book.searchPlaceholder": "ค้นหาในหนังสือเล่มนี้",
+  "book.searchHint": "พิมพ์คำหรือวลีเพื่อค้นหาในหนังสือเล่มนี้",
+  "book.searching": "กำลังค้นหา…",
+  "book.searchNoResults": "ไม่พบรายการที่ตรงกัน",
+  "book.searchResultCount": "ผลลัพธ์: {count}",
+  "book.searchPrevPage": "ก่อนหน้า",
+  "book.searchNextPage": "ถัดไป",
+  "book.searchPageStatus": "หน้า {page} จาก {pages}",
+  "book.searchPageOutOfRange": "ไม่มีผลลัพธ์ในหน้านี้",
+  "book.searchFailed": "การค้นหาล้มเหลว โปรดลองอีกครั้ง",
+  "book.searchUnavailable": "การค้นหาไม่พร้อมใช้งานชั่วคราว โปรดลองใหม่ภายหลัง",
+  "book.closeSearch": "ปิดการค้นหา",
+  "admin.general.searchIndexCacheLimit": "ดัชนีค้นหาหนังสือที่แคชบนดิสก์",
+  "admin.general.searchIndexCacheLimitHelp": "เซิร์ฟเวอร์เก็บดัชนีค้นหาที่ใช้ล่าสุดตามจำนวนนี้ หากถูกลบจะสร้างใหม่เมื่อค้นหาหนังสือเล่มนั้นครั้งถัดไป"
 }

@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "自分の単語帳を一覧表示",
   "apiDocs.operation.recordMyVocabularyLookup": "単語の検索を記録",
   "apiDocs.operation.patchMyVocabulary": "単語の習得状況を更新",
-  "apiDocs.operation.deleteMyVocabulary": "単語または指定した本の検索履歴を削除"
+  "apiDocs.operation.deleteMyVocabulary": "単語または指定した本の検索履歴を削除",
+  "book.search": "この本を検索",
+  "book.searchPlaceholder": "この本を検索",
+  "book.searchHint": "キーワードやフレーズを入力して本書を検索します。",
+  "book.searching": "検索中…",
+  "book.searchNoResults": "一致する箇所はありません。",
+  "book.searchResultCount": "検索結果: {count} 件",
+  "book.searchPrevPage": "前のページ",
+  "book.searchNextPage": "次のページ",
+  "book.searchPageStatus": "{pages} ページ中 {page} ページ",
+  "book.searchPageOutOfRange": "このページに結果はありません",
+  "book.searchFailed": "検索に失敗しました。もう一度お試しください。",
+  "book.searchUnavailable": "検索は一時的に利用できません。後でもう一度お試しください。",
+  "book.closeSearch": "検索を閉じる",
+  "admin.general.searchIndexCacheLimit": "ディスクにキャッシュする書籍検索インデックス",
+  "admin.general.searchIndexCacheLimitHelp": "最近使用した検索インデックスをこの数だけ保持します。削除されても、次回その本を検索するときに再構築されます。"
 }

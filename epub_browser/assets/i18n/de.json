@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "Eigene Wortliste anzeigen",
   "apiDocs.operation.recordMyVocabularyLookup": "Nachschlagen erfassen",
   "apiDocs.operation.patchMyVocabulary": "Lernstand eines Worts ändern",
-  "apiDocs.operation.deleteMyVocabulary": "Wort oder dessen Suchverlauf in einem Buch löschen"
+  "apiDocs.operation.deleteMyVocabulary": "Wort oder dessen Suchverlauf in einem Buch löschen",
+  "book.search": "Dieses Buch durchsuchen",
+  "book.searchPlaceholder": "Dieses Buch durchsuchen",
+  "book.searchHint": "Geben Sie ein Wort oder eine Phrase ein, um dieses Buch zu durchsuchen.",
+  "book.searching": "Suche läuft…",
+  "book.searchNoResults": "Keine Treffer gefunden.",
+  "book.searchResultCount": "Treffer: {count}",
+  "book.searchPrevPage": "Vorherige Seite",
+  "book.searchNextPage": "Nächste Seite",
+  "book.searchPageStatus": "Seite {page} von {pages}",
+  "book.searchPageOutOfRange": "Auf dieser Seite gibt es keine Treffer",
+  "book.searchFailed": "Suche fehlgeschlagen. Versuchen Sie es erneut.",
+  "book.searchUnavailable": "Suche ist vorübergehend nicht verfügbar. Versuchen Sie es später erneut.",
+  "book.closeSearch": "Suche schließen",
+  "admin.general.searchIndexCacheLimit": "Auf dem Datenträger zwischengespeicherte Suchindizes",
+  "admin.general.searchIndexCacheLimitHelp": "Der Server behält so viele zuletzt verwendete Suchindizes. Ein entfernter Index wird bei der nächsten Suche in diesem Buch neu erstellt."
 }

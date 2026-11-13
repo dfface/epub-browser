@@ -1569,5 +1569,20 @@
   "apiDocs.operation.listMyVocabulary": "列出自己的生词",
   "apiDocs.operation.recordMyVocabularyLookup": "记录一次查词",
   "apiDocs.operation.patchMyVocabulary": "更新词的掌握状态",
-  "apiDocs.operation.deleteMyVocabulary": "删除生词或移除它在指定书籍中的记录"
+  "apiDocs.operation.deleteMyVocabulary": "删除生词或移除它在指定书籍中的记录",
+  "book.search": "搜索本书",
+  "book.searchPlaceholder": "搜索本书",
+  "book.searchHint": "输入关键词或短语，搜索本书内容。",
+  "book.searching": "正在搜索…",
+  "book.searchNoResults": "没有找到匹配内容。",
+  "book.searchResultCount": "结果：{count} 条",
+  "book.searchPrevPage": "上一页",
+  "book.searchNextPage": "下一页",
+  "book.searchPageStatus": "第 {page} / {pages} 页",
+  "book.searchPageOutOfRange": "该页没有结果",
+  "book.searchFailed": "搜索失败，请重试。",
+  "book.searchUnavailable": "搜索暂时不可用，请稍后再试。",
+  "book.closeSearch": "关闭搜索",
+  "admin.general.searchIndexCacheLimit": "缓存的书籍搜索索引",
+  "admin.general.searchIndexCacheLimitHelp": "服务器保留最近使用过的搜索索引数量。删除后仅需在下次搜索该书时重新构建。"
 }
