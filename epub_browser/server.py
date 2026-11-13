@@ -64,7 +64,13 @@ from .dictionary_service import (
 )
 from .encyclopedia import EncyclopediaError, WikimediaEncyclopedia
 from .prompt_templates import template_for
-from .state import SetupAlreadyCompleteError, StateStore, UserDeletionError
+from .state import (
+    APPEARANCE_DEFAULTS,
+    APPEARANCE_THEMES,
+    SetupAlreadyCompleteError,
+    StateStore,
+    UserDeletionError,
+)
 from .library_progress import LibraryProgressBroker
 from .locales import LOCALE_NATIVE_NAMES, SUPPORTED_LOCALE_SET, normalize_locale
 from .oidc import OIDCConfiguration, OIDCError, OIDCService
@@ -2155,6 +2161,41 @@ window.location.assign(payload.redirect||'/');
             },
             cache_control='no-store',
         )
+
+    async def account_appearance(request):
+        principal = require_principal(request)
+        if request.method == 'GET':
+            settings = await run_db(store.get_account_appearance, principal.user_id)
+        else:
+            try:
+                changes = await request.json()
+            except (UnicodeDecodeError, json.JSONDecodeError):
+                changes = None
+            if (
+                not isinstance(changes, dict)
+                or not changes
+                or not changes.keys() <= APPEARANCE_DEFAULTS.keys()
+                or ('automatic' in changes and type(changes['automatic']) is not bool)
+                or any(
+                    not isinstance(value, str) or value not in APPEARANCE_THEMES
+                    for key, value in changes.items() if key != 'automatic'
+                )
+            ):
+                locale = resolve_request_locale(request)
+                return response(
+                    error_payload('invalid_appearance', get_bundle(locale)['theme.invalid']),
+                    400, cache_control='private, no-store',
+                )
+            settings = await run_db(store.update_account_appearance, principal.user_id, changes)
+        return response(settings, cache_control='private, no-store')
+
+    async def account_reader_page(markup, principal):
+        preferences = await run_db(store.get_account_appearance, principal.user_id)
+        # Values are restricted to the theme identifiers and a boolean.
+        bootstrap = '<script>window.EpubBrowserAppearance=' + json.dumps(preferences) + ';</script>'
+        markup = markup.replace('<head>', '<head>\n' + bootstrap, 1)
+        target = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
+        return await apply_security_headers(target, markup=markup)
 
     async def csrf(request):
         principal = require_principal(request)
@@ -4341,8 +4382,7 @@ window.location.assign(payload.redirect||'/');
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
             markup = None
         if markup is not None:
-            target = HTMLResponse(markup, headers={'Cache-Control': 'no-cache'})
-            return await apply_security_headers(target, markup=markup)
+            return await account_reader_page(markup, require_principal(request))
 
         index_path = os.path.join(base_directory, 'index.html')
         if not os.path.isfile(index_path):
@@ -4950,14 +4990,7 @@ window.location.assign(payload.redirect||'/');
                             renderer.render_index,
                             initial_book_review=review,
                         )
-                        dynamic_response = HTMLResponse(
-                            markup,
-                            headers={'Cache-Control': 'no-cache'},
-                        )
-                        return await apply_security_headers(
-                            dynamic_response,
-                            markup=markup,
-                        )
+                        return await account_reader_page(markup, principal)
                     chapter_match = re.fullmatch(
                         r'chapter_([0-9]+)\.html',
                         book_relative_path,
@@ -4968,14 +5001,7 @@ window.location.assign(payload.redirect||'/');
                             renderer.render_chapter,
                             int(chapter_match.group(1)),
                         )
-                        dynamic_response = HTMLResponse(
-                            markup,
-                            headers={'Cache-Control': 'no-cache'},
-                        )
-                        return await apply_security_headers(
-                            dynamic_response,
-                            markup=markup,
-                        )
+                        return await account_reader_page(markup, principal)
                     if kindle_page_allowed:
                         if book_relative_path == 'kindle.html':
                             dashboard = await run_db(store.get_kindle_screensaver, principal.user_id)
@@ -5939,6 +5965,7 @@ window.location.assign(payload.redirect||'/');
         Route('/sw.js', service_worker_tombstone, methods=['GET']),
         Route('/api/session', session, methods=['GET']),
         Route('/api/csrf', csrf, methods=['GET']),
+        Route('/api/account/appearance', account_appearance, methods=['GET', 'PUT']),
         Route('/api/account/password', change_password, methods=['PUT']),
         Route('/api/account/sessions', list_own_sessions, methods=['GET']),
         Route('/api/account/sessions/{session_id}', revoke_own_session, methods=['DELETE']),

@@ -491,6 +491,11 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         for control_id in (
             "accountMenu",
             "accountPanel",
+            "accountAppearanceTab",
+            "accountAppearancePanel",
+            "accountDayTheme",
+            "accountNightTheme",
+            "accountAutoTheme",
             "accountPasswordForm",
             "sessionList",
             "patCreateForm",

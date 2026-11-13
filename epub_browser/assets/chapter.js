@@ -1860,15 +1860,6 @@ function initScript() {
     prepareChapterCodeBlocks(content);
     highlightCodeBlocks(content);
     
-    function switchCodeTheme(dark) {
-        var light = document.querySelector('link[href*="github"][id*="light"]');
-        var darkLink = document.querySelector('link[href*="github"][id*="dark"]');
-        if (light && darkLink) {
-            light.disabled = dark;
-            darkLink.disabled = !dark;
-        }
-    }
-
     function wrapAllElements(name, wrapper, root) {
         var list = (root || document).querySelectorAll(name);
         var wrapName = name + '-wrapper';
