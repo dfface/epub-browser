@@ -32,6 +32,30 @@ class LibraryProgressBrokerTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(snapshot["failures"][0]["filename"], "broken.epub")
         self.assertNotIn("/private/", str(snapshot))
 
+    async def test_metadata_and_cache_stages_have_independent_progress(self):
+        broker = LibraryProgressBroker()
+        broker.start_generation("startup")
+        broker.mark_discovered(2, 0)
+        broker.extraction_started(Path("one.epub"))
+        broker.record_examined()
+        broker.record_conversion_planned()
+
+        self.assertEqual(broker.snapshot().phase, "extracting")
+        self.assertEqual(broker.snapshot().examined, 1)
+        self.assertEqual(broker.snapshot().cache_total, 1)
+        self.assertEqual(broker.snapshot().completed, 0)
+
+        broker.conversion_started()
+        self.assertEqual(broker.snapshot().phase, "converting")
+        broker.record_converted(Path("one.epub"))
+        broker.extraction_started(Path("two.epub"))
+        broker.record_indexed(Path("two.epub"))
+
+        self.assertEqual(broker.snapshot().cache_completed, 1)
+        self.assertEqual(broker.snapshot().completed, 2)
+        self.assertEqual(broker.snapshot().examined, 2)
+        self.assertEqual(broker.snapshot().indexed, 1)
+
     async def test_new_generation_retains_catalog_revision_but_resets_batch(self):
         broker = LibraryProgressBroker()
         broker.start_generation("startup")
@@ -58,7 +82,7 @@ class LibraryProgressBrokerTests(unittest.IsolatedAsyncioTestCase):
         latest = await asyncio.wait_for(subscription.next(), 0.2)
 
         self.assertEqual(initial.phase, "idle")
-        self.assertEqual(latest.phase, "processing")
+        self.assertEqual(latest.phase, "converting")
         self.assertEqual(latest.total, 4)
         self.assertEqual(latest.in_flight, 1)
         subscription.close()

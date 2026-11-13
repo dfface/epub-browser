@@ -7568,6 +7568,18 @@ class StateStore:
             ).fetchall()
         return tuple(self._book_record(row) for row in rows)
 
+    def book_reading_recency(self) -> dict[str, int]:
+        """返回每本书最近一次阅读时间的 UTC 秒数。"""
+        with self._connection() as connection:
+            rows = connection.execute(
+                """
+                SELECT book_hash, CAST(strftime('%s', MAX(updated_at)) AS INTEGER) AS read_at
+                FROM reading_progress
+                GROUP BY book_hash
+                """
+            ).fetchall()
+        return {row["book_hash"]: int(row["read_at"] or 0) for row in rows}
+
     def book_by_id(self, book_id: str) -> Optional[BookRecord]:
         with self._connection() as connection:
             row = connection.execute(

@@ -175,10 +175,14 @@
   "library.loadError": "ライブラリをロードできません。更新してもう一度お試しください。",
   "library.progress.scanning": "スキャンライブラリ",
   "library.progress.processing": "ライブラリを更新しています",
+  "library.progress.extracting": "書籍情報を抽出しています",
+  "library.progress.converting": "読書キャッシュを構築しています",
   "library.progress.complete": "ライブラリが更新されました",
   "library.progress.degraded": "ライブラリの更新に失敗しました",
   "library.progress.reconnecting": "ライブラリ更新に再接続しています…",
   "library.progress.summary": "{total} 書籍の {completed} を処理しました",
+  "library.progress.extractingSummary": "{total} 冊中 {completed} 冊の情報を抽出しました",
+  "library.progress.convertingSummary": "{total} 冊中 {completed} 冊をキャッシュしました",
   "library.progress.removed": {
     "one": "{count} 冊の本を削除しました",
     "other": "{count} 冊の本を削除しました"

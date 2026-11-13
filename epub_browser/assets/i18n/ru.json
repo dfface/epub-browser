@@ -175,10 +175,14 @@
   "library.loadError": "Не удалось загрузить библиотеку. Обновите страницу и повторите попытку.",
   "library.progress.scanning": "Сканирование библиотеки",
   "library.progress.processing": "Обновление библиотеки",
+  "library.progress.extracting": "Извлечение информации о книгах",
+  "library.progress.converting": "Создание кэша для чтения",
   "library.progress.complete": "Библиотека обновлена",
   "library.progress.degraded": "Библиотека обновлена с ошибками",
   "library.progress.reconnecting": "Повторное подключение к обновлениям библиотеки…",
   "library.progress.summary": "Обработано книг: {completed} из {total}",
+  "library.progress.extractingSummary": "Проверено книг: {completed} из {total}",
+  "library.progress.convertingSummary": "Кэшировано книг: {completed} из {total}",
   "library.progress.removed": {
     "one": "Удалена {count} книга",
     "other": "Удалено книг: {count}"

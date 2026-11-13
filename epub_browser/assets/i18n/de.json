@@ -175,10 +175,14 @@
   "library.loadError": "Die Bibliothek konnte nicht geladen werden. Aktualisiere die Seite und versuche es erneut.",
   "library.progress.scanning": "Bibliothek wird durchsucht",
   "library.progress.processing": "Bibliothek wird aktualisiert",
+  "library.progress.extracting": "Buchinformationen werden extrahiert",
+  "library.progress.converting": "Lesecache wird erstellt",
   "library.progress.complete": "Bibliothek aktualisiert",
   "library.progress.degraded": "Bibliothek mit Fehlern aktualisiert",
   "library.progress.reconnecting": "Verbindung zu Bibliotheksaktualisierungen wird wiederhergestellt…",
   "library.progress.summary": "{completed} von {total} Büchern verarbeitet",
+  "library.progress.extractingSummary": "{completed} von {total} Büchern geprüft",
+  "library.progress.convertingSummary": "{completed} von {total} Büchern zwischengespeichert",
   "library.progress.removed": {
     "one": "{count} Buch entfernt",
     "other": "{count} Bücher entfernt"
