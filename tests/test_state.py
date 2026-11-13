@@ -3432,11 +3432,11 @@ class StateStoreTests(unittest.TestCase):
     def test_general_settings_default_and_validation(self):
         self.assertEqual(
             self.store.get_general_settings(),
-            {"recent_reading_limit": 10, "reading_insights_rank_limit": 10},
+            {"recent_reading_limit": 10, "reading_insights_rank_limit": 10, "book_cache_limit": 100},
         )
         self.assertEqual(
             self.store.set_general_settings(recent_reading_limit=18),
-            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10},
+            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100},
         )
         self.assertEqual(
             self.store.get_general_settings()["recent_reading_limit"], 18
@@ -3448,8 +3448,18 @@ class StateStoreTests(unittest.TestCase):
         # No upper cap: values above 24 are accepted.
         self.assertEqual(
             self.store.set_general_settings(recent_reading_limit=100),
-            {"recent_reading_limit": 100, "reading_insights_rank_limit": 10},
+            {"recent_reading_limit": 100, "reading_insights_rank_limit": 10, "book_cache_limit": 100},
         )
+
+    def test_book_cache_limit_accepts_large_positive_integers(self):
+        limit = 10**30 + 1
+        self.assertEqual(
+            self.store.set_general_settings(book_cache_limit=limit)["book_cache_limit"], limit
+        )
+        self.assertEqual(self.store.get_general_settings()["book_cache_limit"], limit)
+        for invalid in (0, -1, True, 1.5):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                self.store.set_general_settings(book_cache_limit=invalid)
 
     def test_general_settings_migration_preserves_recent_reading_limit(self):
         self.store.set_general_settings(recent_reading_limit=18)
@@ -3459,7 +3469,7 @@ class StateStoreTests(unittest.TestCase):
         self.store.initialize()
         self.assertEqual(
             self.store.get_general_settings(),
-            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10},
+            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100},
         )
 
     def test_imported_and_administrator_tags_share_one_managed_collection(self):

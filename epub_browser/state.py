@@ -38,7 +38,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 30
+DB_SCHEMA_VERSION = 31
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -482,6 +482,12 @@ class StateStore:
                 """)
                 connection.execute("CREATE INDEX IF NOT EXISTS vocabulary_lookups_book ON vocabulary_lookups(book_id)")
                 connection.execute("PRAGMA user_version = 30")
+            if version < 31:
+                self._add_column_if_missing(
+                    connection, "general_settings", "book_cache_limit",
+                    "TEXT NOT NULL DEFAULT '100'",
+                )
+                connection.execute("PRAGMA user_version = 31")
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -5232,14 +5238,17 @@ class StateStore:
         """Return the public general server configuration."""
         with self._connection() as connection:
             row = connection.execute(
-                "SELECT recent_reading_limit, reading_insights_rank_limit "
+                "SELECT recent_reading_limit, reading_insights_rank_limit, book_cache_limit "
                 "FROM general_settings WHERE singleton = 1"
             ).fetchone()
-        return dict(row)
+        settings = dict(row)
+        settings["book_cache_limit"] = int(settings["book_cache_limit"])
+        return settings
 
     def set_general_settings(
         self, *, recent_reading_limit: Optional[int] = None,
         reading_insights_rank_limit: Optional[int] = None,
+        book_cache_limit: Optional[int] = None,
     ) -> dict:
         if recent_reading_limit is not None:
             try:
@@ -5252,6 +5261,10 @@ class StateStore:
             type(reading_insights_rank_limit) is not int or reading_insights_rank_limit < 1
         ):
             raise ValueError("Reading insights rank limit must be a positive integer")
+        if book_cache_limit is not None and (
+            type(book_cache_limit) is not int or book_cache_limit < 1
+        ):
+            raise ValueError("Book cache limit must be a positive integer")
         try:
             with self._connection() as connection:
                 row = connection.execute(
@@ -5259,15 +5272,22 @@ class StateStore:
                     UPDATE general_settings
                     SET recent_reading_limit = COALESCE(?, recent_reading_limit),
                         reading_insights_rank_limit = COALESCE(?, reading_insights_rank_limit),
+                        book_cache_limit = COALESCE(?, book_cache_limit),
                         updated_at = CURRENT_TIMESTAMP
                     WHERE singleton = 1
-                    RETURNING recent_reading_limit, reading_insights_rank_limit
+                    RETURNING recent_reading_limit, reading_insights_rank_limit, book_cache_limit
                     """,
-                    (recent_reading_limit, reading_insights_rank_limit),
+                    (
+                        recent_reading_limit,
+                        reading_insights_rank_limit,
+                        str(book_cache_limit) if book_cache_limit is not None else None,
+                    ),
                 ).fetchone()
         except OverflowError as exc:
             raise ValueError("Setting is outside the SQLite integer range") from exc
-        return dict(row)
+        settings = dict(row)
+        settings["book_cache_limit"] = int(settings["book_cache_limit"])
+        return settings
 
     def set_ai_user_access(
         self,
@@ -7504,9 +7524,13 @@ class StateStore:
                 )
 
     def active_books(self) -> tuple[BookRecord, ...]:
+        return self.book_records(active_only=True)
+
+    def book_records(self, *, active_only=False) -> tuple[BookRecord, ...]:
+        where = " WHERE active = 1" if active_only else ""
         with self._connection() as connection:
             rows = connection.execute(
-                "SELECT * FROM books WHERE active = 1 ORDER BY book_id"
+                f"SELECT * FROM books{where} ORDER BY book_id"
             ).fetchall()
         return tuple(self._book_record(row) for row in rows)
 

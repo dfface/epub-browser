@@ -84,6 +84,67 @@ body.auth-page {
     content: "";
 }
 
+/* Shown while an authenticated reader waits for an evicted book. */
+.book-prepare-card h1 {
+    margin: 0 0 8px;
+    font-size: clamp(1.4rem, 5vw, 1.75rem);
+}
+
+.book-prepare-name {
+    margin: 0 0 24px;
+    overflow-wrap: anywhere;
+    font-weight: 600;
+}
+
+.book-prepare-status p {
+    margin: 0;
+    line-height: 1.5;
+}
+
+.book-prepare-card progress {
+    width: 100%;
+    margin-top: 8px;
+    accent-color: var(--account-primary);
+}
+
+.book-prepare-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 16px;
+    align-items: center;
+    margin-top: 24px;
+}
+
+.book-prepare-actions [hidden] {
+    display: none;
+}
+
+.book-prepare-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding-inline: 6px;
+    color: inherit;
+    text-underline-offset: 3px;
+}
+
+.book-prepare-actions :focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .book-prepare-card progress {
+        appearance: none;
+        height: 4px;
+        background: var(--account-primary);
+    }
+
+    .book-prepare-card progress::-webkit-progress-bar {
+        background: var(--account-primary);
+    }
+}
+
 .auth-card-header {
     display: flex;
     align-items: center;

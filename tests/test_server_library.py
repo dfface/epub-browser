@@ -19,7 +19,7 @@ from starlette.testclient import TestClient
 from pypdf import PdfReader, PdfWriter
 
 from epub_browser.asset_publisher import AssetPublisher
-from epub_browser.auth import AuthConfig, AuthService, BootstrapCredentials
+from epub_browser.auth import AuthConfig, AuthService, BootstrapCredentials, hash_password
 from epub_browser.epub_identity import (
     ensure_embedded_book_id,
     read_embedded_book_id,
@@ -127,6 +127,92 @@ class ServerLibraryManagerTests(unittest.TestCase):
                 return latest
             time.sleep(0.01)
         return latest
+
+    def test_disk_cache_evicts_the_least_recently_read_book_and_rebuilds_it(self):
+        self._write_epub(self.source, "Original", include_cover=True)
+        pdf_source = self.source_dir / "book.pdf"
+        self._write_pdf(pdf_source)
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        books = {record.source_format: record for record in manager.reconcile().active_books}
+        epub, pdf = books["epub"], books["pdf"]
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, AuthConfig.from_values([])),
+            library_manager=manager,
+        )
+        with TestClient(app) as client:
+            self.assertEqual(_json_login(client, "admin", "secret").status_code, 200)
+            epub_chapter = f"/book/{epub.book_id}/chapter_0.html"
+            self.assertEqual(client.get(epub_chapter).status_code, 200)
+            csrf = client.get("/api/session").json()["csrf_token"]
+            large_limit = "1000000000000000000000000000001"
+            large_settings = client.put(
+                "/api/admin/general-settings",
+                json={"book_cache_limit": large_limit},
+                headers={"X-CSRF-Token": csrf},
+            )
+            self.assertEqual(large_settings.json()["settings"]["book_cache_limit"], large_limit)
+            self.assertEqual(
+                client.get("/api/admin/general-settings").json()["settings"]["book_cache_limit"],
+                large_limit,
+            )
+            settings = client.put(
+                "/api/admin/general-settings",
+                json={"book_cache_limit": 1},
+                headers={"X-CSRF-Token": csrf},
+            )
+            self.assertEqual(settings.status_code, 200, settings.text)
+            self.assertEqual(settings.json()["settings"]["book_cache_limit"], 1)
+            pdf_root = manager.public_dir / "book" / pdf.book_id
+            epub_root = manager.public_dir / "book" / epub.book_id
+            self.assertFalse((pdf_root / "pdf" / "document.pdf").exists())
+            self.assertTrue((epub_root / "content" / "chapter_0.json").exists())
+
+            shelf = client.get("/book-metadata.json").json()
+            self.assertEqual({book["hash"] for book in shelf}, {epub.book_id, pdf.book_id})
+            for book in shelf:
+                if book["cover"]:
+                    self.assertEqual(client.get(book["cover"]).status_code, 200)
+            self.assertFalse((pdf_root / "pdf" / "document.pdf").exists())
+            self.assertEqual(manager.reconcile("watch").converted, 0)
+
+            pdf_chapter = f"/book/{pdf.book_id}/chapter_0.html"
+            self.store.set_book_visibility(pdf.book_id, "restricted")
+            self.store.create_user("member", hash_password("member-secret"))
+            with TestClient(app) as member:
+                self.assertNotEqual(member.get(pdf_chapter + "?prepare=start").status_code, 204)
+                self.assertEqual(_json_login(member, "member", "member-secret").status_code, 200)
+                self.assertEqual(member.get(pdf_chapter + "?prepare=start").status_code, 403)
+                self.assertEqual(member.get(pdf_chapter + "?prepare=status").status_code, 403)
+                member_csrf = member.get("/api/session").json()["csrf_token"]
+                self.assertEqual(member.put(
+                    "/api/admin/general-settings",
+                    json={"book_cache_limit": 2},
+                    headers={"X-CSRF-Token": member_csrf},
+                ).status_code, 403)
+            self.assertFalse((pdf_root / "pdf" / "document.pdf").exists())
+            waiting = client.get(pdf_chapter, headers={"Sec-Fetch-Mode": "navigate"})
+            self.assertIn('id="bookPrepareProgress"', waiting.text)
+            self.assertIn('role="status"', waiting.text)
+            self.assertEqual(waiting.headers["cache-control"], "private, no-store")
+            self.assertEqual(client.get(pdf_chapter + "?prepare=status").text, "queued")
+            moved_pdf = pdf_source.with_suffix(".unavailable")
+            pdf_source.rename(moved_pdf)
+            self.assertEqual(client.get(pdf_chapter + "?prepare=start").status_code, 503)
+            moved_pdf.rename(pdf_source)
+            self.assertEqual(client.get(pdf_chapter + "?prepare=start").status_code, 204)
+            self.assertEqual(client.get(pdf_chapter).status_code, 200)
+            document = client.get(
+                f"/api/books/{pdf.book_id}/document", headers={"Range": "bytes=0-4"}
+            )
+            self.assertEqual(document.status_code, 206)
+            self.assertEqual(document.content, b"%PDF-")
+            self.assertFalse((epub_root / "content" / "chapter_0.json").exists())
+            self.assertEqual(client.get(epub_chapter).status_code, 200)
+            self.assertTrue((epub_root / "content" / "chapter_0.json").exists())
+            self.assertFalse((pdf_root / "pdf" / "document.pdf").exists())
 
     def test_first_reconcile_creates_sidecar_without_modifying_epub(self):
         before = self.source.read_bytes()

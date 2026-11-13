@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import uuid
+from contextlib import nullcontext
 from dataclasses import dataclass
 from functools import cache
 from datetime import date
@@ -20,6 +21,7 @@ from .i18n_bundles import get_bundle, resolve_request_locale
 from .kindle import KINDLE_MEMO_MAX_LENGTH, valid_kindle_memo
 from .pat import AuthenticatedPAT, PAT_SCOPES
 from .server_concurrency import run_db, run_render
+from .server_library import BookCacheUnavailable
 from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import PDF_FORMAT
 from .vocabulary import MASTERY_STATES, MAX_PAGE_SIZE, MAX_QUERY_LENGTH, PAGE_SIZE, vocabulary_page_options
@@ -37,6 +39,7 @@ _BEARER_PATTERN = re.compile(r"^Bearer ([^\s,]+)$")
 class PublicAPIContext:
     store: object
     public_dir: Path
+    book_cache: Optional[Callable] = None
 
 
 @dataclass(frozen=True)
@@ -190,17 +193,20 @@ async def _book_chapters(request, authenticated: AuthenticatedPAT):
     store = _context(request).store
     public_dir = _context(request).public_dir
 
+    book_cache = _context(request).book_cache
+
     def _chapter_items():
-        return _chapter_list(ServerPageRenderer(
-            public_dir,
-            book_id,
-            source_format=book.source_format,
-            metadata_overrides=store.managed_book_metadata(book_id),
-        ))
+        with book_cache(book_id, restore=False) if book_cache else nullcontext():
+            return _chapter_list(ServerPageRenderer(
+                public_dir,
+                book_id,
+                source_format=book.source_format,
+                metadata_overrides=store.managed_book_metadata(book_id),
+            ))
 
     try:
         items = await run_render(_chapter_items)
-    except ServerPageError:
+    except (ServerPageError, BookCacheUnavailable):
         return public_api_error(
             "book_content_unavailable", "Book content is unavailable", 503
         )
@@ -257,23 +263,26 @@ async def _chapter_detail(request, authenticated: AuthenticatedPAT):
     store = _context(request).store
     public_dir = _context(request).public_dir
 
+    book_cache = _context(request).book_cache
+
     def _load_chapter():
-        renderer = ServerPageRenderer(
-            public_dir,
-            book_id,
-            source_format=book.source_format,
-            metadata_overrides=store.managed_book_metadata(book_id),
-        )
-        chapters = _chapter_list(renderer)
-        if chapter_index >= len(chapters):
-            return "chapter_not_found", None, None
-        if renderer.source_format == PDF_FORMAT:
-            return "pdf", chapters[chapter_index], None
-        return "html", None, renderer.chapter_content(chapter_index)
+        with book_cache(book_id, read=True, restore=book.source_format != PDF_FORMAT) if book_cache else nullcontext():
+            renderer = ServerPageRenderer(
+                public_dir,
+                book_id,
+                source_format=book.source_format,
+                metadata_overrides=store.managed_book_metadata(book_id),
+            )
+            chapters = _chapter_list(renderer)
+            if chapter_index >= len(chapters):
+                return "chapter_not_found", None, None
+            if renderer.source_format == PDF_FORMAT:
+                return "pdf", chapters[chapter_index], None
+            return "html", None, renderer.chapter_content(chapter_index)
 
     try:
         outcome, chapter_meta, chapter = await run_render(_load_chapter)
-    except ServerPageError:
+    except (ServerPageError, BookCacheUnavailable):
         return public_api_error(
             "book_content_unavailable", "Book content is unavailable", 503
         )
@@ -416,7 +425,8 @@ async def _list_progress(request, authenticated):
 async def _progress_item(request, authenticated):
     store = _context(request).store
     book_id = request.path_params["book_id"]
-    if await _authorized_book(request, authenticated, book_id) is None:
+    book = await _authorized_book(request, authenticated, book_id)
+    if book is None:
         return public_api_error("book_not_found", "Book not found", 404)
     user_id = authenticated.principal.user_id
     if request.method in ("GET", "HEAD"):
@@ -438,18 +448,20 @@ async def _progress_item(request, authenticated):
         return public_api_error("invalid_chapter_index", "Invalid chapter index", 400)
     public_dir = _context(request).public_dir
 
+    book_cache = _context(request).book_cache
+
     def _chapters():
-        return _chapter_list(ServerPageRenderer(
-            public_dir,
-            book_id,
-            source_format=book.source_format,
-            metadata_overrides=store.managed_book_metadata(book_id),
-        ))
+        with book_cache(book_id, restore=False) if book_cache else nullcontext():
+            return _chapter_list(ServerPageRenderer(
+                public_dir,
+                book_id,
+                source_format=book.source_format,
+                metadata_overrides=store.managed_book_metadata(book_id),
+            ))
 
     try:
-        book = await _authorized_book(request, authenticated, book_id)
         chapters = await run_render(_chapters)
-    except ServerPageError:
+    except (ServerPageError, BookCacheUnavailable):
         return public_api_error("book_content_unavailable", "Book content is unavailable", 503)
     if chapter_index >= len(chapters):
         return public_api_error("invalid_chapter_index", "Invalid chapter index", 400)
