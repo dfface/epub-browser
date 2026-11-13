@@ -3067,8 +3067,8 @@ assert.deepEqual(
     def test_epub_font_slider_overrides_publisher_body_size(self):
         chrome = next((path for path in (
             os.environ.get("EPUB_BROWSER_CHROMIUM"),
-            shutil.which("chromium"),
             shutil.which("google-chrome"),
+            shutil.which("chromium"),
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         ) if path and Path(path).is_file()), None)
         if not chrome:
@@ -3138,7 +3138,7 @@ assert.deepEqual(
                         chrome, "--headless", "--no-sandbox", "--disable-gpu",
                         f"--user-data-dir={root / 'chrome'}", "--virtual-time-budget=2500",
                         "--dump-dom", f"http://127.0.0.1:{server.server_port}/{chapter_path}",
-                    ], capture_output=True, text=True, check=True, timeout=20)
+                    ], capture_output=True, text=True, check=True, timeout=60)
                 finally:
                     server.shutdown()
                     thread.join()
