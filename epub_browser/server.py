@@ -4488,20 +4488,31 @@ window.location.assign(payload.redirect||'/');
         )
 
     async def openapi_schema(request):
-        return response(openapi_document(), cache_control='public, max-age=300')
+        result = response(openapi_document(), cache_control='public, max-age=300')
+        # A weak validator also applies to the gzip representation.
+        etag = 'W/"' + hashlib.sha256(result.body).hexdigest() + '"'
+        result.headers['ETag'] = etag
+        if if_none_match_matches(request.headers.get('if-none-match'), etag):
+            return Response(status_code=304, headers={
+                'ETag': etag, 'Cache-Control': result.headers['Cache-Control'],
+            })
+        return result
 
     async def api_docs(request):
         locale = resolve_request_locale(request)
 
         def _render_docs():
-            docs = render_api_docs(public_api_operations(), locale=locale)
+            docs = render_api_docs(public_api_operations(), openapi_document(), locale=locale)
             try:
                 return rewrite_asset_urls(docs, current_published_assets())
             except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
                 return docs
 
         markup = await run_render(_render_docs)
-        target = HTMLResponse(markup, headers={'Cache-Control': 'public, max-age=300'})
+        target = HTMLResponse(markup, headers={
+            'Cache-Control': 'public, max-age=300',
+            'Vary': 'Accept-Language, Cookie',
+        })
         return await apply_security_headers(target, markup=markup)
 
     async def reading_insights_page(request):

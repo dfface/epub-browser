@@ -3146,15 +3146,15 @@ class StateStore:
                 )
             return self._get_user(connection, user_id)
 
-    def list_users(self) -> tuple[UserRecord, ...]:
+    def list_users(self, *, limit: int = -1, offset: int = 0) -> tuple[UserRecord, ...]:
         with self._connection() as connection:
             rows = connection.execute(
                 """
                 SELECT id AS user_id, username, role, enabled, password_hash,
                        created_at, updated_at
                 FROM users
-                ORDER BY username, id
-                """
+                ORDER BY username, id LIMIT ? OFFSET ?
+                """, (limit, offset),
             ).fetchall()
         return tuple(self._user_record(row) for row in rows)
 
@@ -4252,11 +4252,16 @@ class StateStore:
         )
     """
 
-    def visible_books(self, principal: Principal) -> tuple[BookRecord, ...]:
+    def visible_books(
+        self, principal: Principal, *, source_format: str | None = None,
+        limit: int = -1, offset: int = 0,
+    ) -> tuple[BookRecord, ...]:
         with self._connection() as connection:
             rows = connection.execute(
-                f"SELECT books.* FROM books WHERE {self._READABLE_BOOK} ORDER BY book_id",
-                (principal.role, principal.user_id),
+                f"""SELECT books.* FROM books WHERE {self._READABLE_BOOK}
+                    AND (? IS NULL OR source_format = ?)
+                    ORDER BY book_id LIMIT ? OFFSET ?""",
+                (principal.role, principal.user_id, source_format, source_format, limit, offset),
             ).fetchall()
         return tuple(self._book_record(row) for row in rows)
 
@@ -4303,7 +4308,7 @@ class StateStore:
 
     def list_vocabulary(
         self, principal: Principal, book_id: str | None = None, *,
-        page: int, page_size: int, query: str, mastery: str | None,
+        page: int, page_size: int, query: str, mastery: str | None, offset: int | None = None,
     ) -> dict:
         eligible = f"""
             FROM vocabulary_words w
@@ -4322,7 +4327,9 @@ class StateStore:
                 f"SELECT COUNT(DISTINCT w.id) {eligible}", parameters
             ).fetchone()[0]
             total_pages = (total + page_size - 1) // page_size
-            page = min(page, max(1, total_pages))
+            if offset is None:
+                page = min(page, max(1, total_pages))
+                offset = (page - 1) * page_size
             rows = connection.execute(f"""
                 WITH page_words AS (
                     SELECT w.id, MAX(l.looked_up_at) AS last_seen
@@ -4345,7 +4352,7 @@ class StateStore:
                 )
                 SELECT * FROM ranked WHERE rank = 1
                 ORDER BY looked_up_at DESC, word_id, book_id
-            """, (*parameters, page_size, (page - 1) * page_size, *parameters))
+            """, (*parameters, page_size, offset, *parameters))
             words = {}
             for row in rows:
                 word = words.setdefault(row["word_id"], {
@@ -7101,7 +7108,10 @@ class StateStore:
             ).fetchall()
         return tuple(dict(row) for row in rows)
 
-    def list_ai_book_chat_turns_for_user(self, owner_user_id: str) -> tuple:
+    def list_ai_book_chat_turns_for_user(
+        self, owner_user_id: str, *, book_id: str | None = None,
+        chapter_index: int | None = None, limit: int = -1, offset: int = 0,
+    ) -> tuple:
         with self._connection() as connection:
             self._require_user(connection, owner_user_id)
             rows = connection.execute(
@@ -7110,24 +7120,32 @@ class StateStore:
                        owner_user_id, question, language, answer, status, error_code,
                        created_at, updated_at
                 FROM ai_book_chat_turns WHERE owner_user_id = ?
-                ORDER BY created_at DESC, id DESC
+                  AND (? IS NULL OR ai_book_chat_turns.book_id = ?)
+                  AND (? IS NULL OR ai_book_chat_turns.chapter_index = ?)
+                ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?
                 """,
-                (owner_user_id,),
+                (owner_user_id, book_id, book_id, chapter_index, chapter_index, limit, offset),
             ).fetchall()
         return tuple(dict(row) for row in rows)
 
-    def list_ai_reading_results_for_user(self, owner_user_id: str) -> tuple:
+    def list_ai_reading_results_for_user(
+        self, owner_user_id: str, *, book_id: str | None = None,
+        chapter_index: int | None = None, limit: int = -1, offset: int = 0,
+    ) -> tuple:
         with self._connection() as connection:
             self._require_user(connection, owner_user_id)
             rows = connection.execute(
                 """
-                SELECT DISTINCT results.*
+                SELECT results.*
                 FROM ai_reading_results AS results
-                JOIN ai_reading_jobs AS jobs ON jobs.result_id = results.id
-                WHERE jobs.owner_user_id = ?
-                ORDER BY results.created_at DESC, results.id DESC
+                WHERE results.id IN (
+                    SELECT result_id FROM ai_reading_jobs WHERE owner_user_id = ?
+                )
+                  AND (? IS NULL OR results.book_id = ?)
+                  AND (? IS NULL OR results.chapter_index = ?)
+                ORDER BY results.created_at DESC, results.id DESC LIMIT ? OFFSET ?
                 """,
-                (owner_user_id,),
+                (owner_user_id, book_id, book_id, chapter_index, chapter_index, limit, offset),
             ).fetchall()
         return tuple(self._ai_result_record(row) for row in rows)
 
@@ -7852,6 +7870,9 @@ class StateStore:
         chapter_index: Optional[int] = None,
         *,
         user_id: str,
+        visible_to: Principal | None = None,
+        limit: int = -1,
+        offset: int = 0,
     ):
         clauses = []
         values = []
@@ -7863,12 +7884,18 @@ class StateStore:
             values.append(chapter_index)
         clauses.append("user_id = ?")
         values.append(user_id)
-        where = " WHERE " + " AND ".join(clauses) if clauses else ""
+        if visible_to is not None:
+            clauses.append(
+                f"EXISTS (SELECT 1 FROM books WHERE books.book_id = annotations.book_hash "
+                f"AND {self._READABLE_BOOK})"
+            )
+            values.extend((visible_to.role, visible_to.user_id))
+        where = " WHERE " + " AND ".join(clauses)
         with self._connection() as connection:
             self._require_user(connection, user_id)
             rows = connection.execute(
-                "SELECT * FROM annotations" + where + " ORDER BY created_at DESC",
-                values,
+                "SELECT * FROM annotations" + where + " ORDER BY created_at DESC, id LIMIT ? OFFSET ?",
+                (*values, limit, offset),
             ).fetchall()
         return [self._annotation_data(row) for row in rows]
 
@@ -8076,16 +8103,29 @@ class StateStore:
                     self._timestamp(),
                 )
 
-    def list_book_reviews(self, user_id: str) -> tuple:
+    def list_book_reviews(
+        self, user_id: str, *, book_id: str | None = None,
+        visible_to: Principal | None = None, limit: int = -1, offset: int = 0,
+    ) -> tuple:
+        visibility = ""
+        parameters = [user_id, book_id, book_id]
+        if visible_to is not None:
+            visibility = (
+                f"AND EXISTS (SELECT 1 FROM books WHERE books.book_id = book_reviews.book_id "
+                f"AND {self._READABLE_BOOK})"
+            )
+            parameters.extend((visible_to.role, visible_to.user_id))
         with self._connection() as connection:
             self._require_user(connection, user_id)
             rows = connection.execute(
-                """
+                f"""
                 SELECT user_id, book_id, rating, review_text, created_at, updated_at
                 FROM book_reviews WHERE user_id = ?
-                ORDER BY updated_at DESC, book_id
+                  AND (? IS NULL OR book_id = ?)
+                  {visibility}
+                ORDER BY updated_at DESC, book_id LIMIT ? OFFSET ?
                 """,
-                (user_id,),
+                (*parameters, limit, offset),
             ).fetchall()
         return tuple(dict(row) for row in rows)
 
@@ -8129,7 +8169,10 @@ class StateStore:
             "last_client_sequence": row["last_client_sequence"],
         }
 
-    def list_reading_sessions_for_user(self, user_id: str) -> tuple:
+    def list_reading_sessions_for_user(
+        self, user_id: str, *, book_id: str | None = None,
+        chapter_index: int | None = None, limit: int = -1, offset: int = 0,
+    ) -> tuple:
         with self._connection() as connection:
             self._require_user(connection, user_id)
             rows = connection.execute(
@@ -8138,9 +8181,11 @@ class StateStore:
                 FROM reading_sessions
                 LEFT JOIN books ON books.book_id = reading_sessions.book_id
                 WHERE reading_sessions.user_id = ?
-                ORDER BY reading_sessions.started_at DESC, reading_sessions.id DESC
+                  AND (? IS NULL OR reading_sessions.book_id = ?)
+                  AND (? IS NULL OR reading_sessions.chapter_index = ?)
+                ORDER BY reading_sessions.started_at DESC, reading_sessions.id DESC LIMIT ? OFFSET ?
                 """,
-                (user_id,),
+                (user_id, book_id, book_id, chapter_index, chapter_index, limit, offset),
             ).fetchall()
         return tuple(self._reading_session_data(row) for row in rows)
 
@@ -8467,6 +8512,7 @@ class StateStore:
         period: str,
         anchor_date: date,
         timezone_name: str,
+        *, maximum_rank_limit: int | None = None,
     ) -> dict:
         try:
             zone = ZoneInfo(timezone_name)
@@ -8490,6 +8536,9 @@ class StateStore:
                 """,
                 (user_id, range_end, range_start),
             ).fetchall()
+
+        if maximum_rank_limit is not None:
+            rank_limit = min(rank_limit, maximum_rank_limit)
 
         # Fingerprint the actual query snapshot so heartbeats, title edits and
         # writes from other processes invalidate the affected reports.
@@ -8753,7 +8802,10 @@ class StateStore:
                 (user_id, book_hash),
             )
 
-    def list_reading_progress(self, user_id: str, limit: Optional[int] = None) -> tuple:
+    def list_reading_progress(
+        self, user_id: str, limit: Optional[int] = None, *, offset: int = 0,
+        book_id: str | None = None, visible_to: Principal | None = None,
+    ) -> tuple:
         """Return the caller's reading progress, most recently updated first.
 
         ``limit`` is applied in SQL so a large library does not materialise
@@ -8762,15 +8814,21 @@ class StateStore:
         sql = """
             SELECT user_id, book_hash AS book_id, chapter_index, updated_at
             FROM reading_progress WHERE user_id = ?
-            ORDER BY updated_at DESC, book_hash
+            AND (? IS NULL OR book_hash = ?)
             """
-        parameters: list = [user_id]
-        if isinstance(limit, int) and not isinstance(limit, bool) and limit >= 0:
-            sql += "LIMIT ?"
-            parameters.append(limit)
+        visibility = ""
+        parameters = [user_id, book_id, book_id]
+        if visible_to is not None:
+            visibility = (
+                f"AND EXISTS (SELECT 1 FROM books WHERE books.book_id = reading_progress.book_hash "
+                f"AND {self._READABLE_BOOK})"
+            )
+            parameters.extend((visible_to.role, visible_to.user_id))
+        sql += visibility + " ORDER BY updated_at DESC, book_hash LIMIT ? OFFSET ?"
+        bounded_limit = limit if type(limit) is int and limit >= 0 else -1
         with self._connection() as connection:
             self._require_user(connection, user_id)
-            rows = connection.execute(sql, tuple(parameters)).fetchall()
+            rows = connection.execute(sql, (*parameters, bounded_limit, offset)).fetchall()
         return tuple(dict(row) for row in rows)
 
     @staticmethod
