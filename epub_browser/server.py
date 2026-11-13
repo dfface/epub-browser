@@ -24,6 +24,7 @@ from urllib.parse import parse_qs, quote, unquote, unquote_to_bytes, urlsplit
 from zoneinfo import ZoneInfo
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from anyio import CancelScope, to_thread
 from starlette.applications import Starlette
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -101,6 +102,7 @@ from .server_concurrency import (
     run_render,
 )
 from .server_library import (
+    BookCacheUnavailable,
     PDF_METADATA_SCHEMA_VERSION,
     PDF_OUTPUT_REVISION,
     PDF_OUTPUT_REVISION_FILE,
@@ -781,7 +783,33 @@ def create_app(
         upload_sources_dir = data_directory / "data" / "sources"
         upload_sources_dir.mkdir(parents=True, exist_ok=True)
     migrate_legacy_dictionary_directory(base_directory, data_directory)
-    ai_reading = AIReadingService(store, base_directory)
+    book_cache = library_manager.book_cache if library_manager is not None else None
+    ai_reading = AIReadingService(store, base_directory, book_cache=book_cache)
+
+    async def pin_book_cache(request, book_id, *, read=False, restore=True):
+        if library_manager is None:
+            return
+        with CancelScope(shield=True):
+            await to_thread.run_sync(
+                lambda: library_manager.acquire_book_cache(book_id, read=read, restore=restore)
+            )
+            request.scope['epub_browser.book_cache_pin'] = book_id
+
+    class BookCacheLeaseMiddleware:
+        """Keep static resources pinned until Starlette finishes streaming them."""
+
+        def __init__(self, app):
+            self.app = app
+
+        async def __call__(self, scope, receive, send):
+            try:
+                await self.app(scope, receive, send)
+            finally:
+                book_id = scope.pop('epub_browser.book_cache_pin', None)
+                if book_id is not None:
+                    with CancelScope(shield=True):
+                        await to_thread.run_sync(library_manager.release_book_cache, book_id)
+
     webhook_service = WebhookService(store)
     dictionary_service = DictionaryService(store, data_directory)
     encyclopedia = WikimediaEncyclopedia()
@@ -3114,29 +3142,40 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('invalid_ai_settings', 'Invalid AI settings'), 400)
         return response({'settings': settings})
 
+    def general_settings_response(settings):
+        # Preserve exact values when the browser cannot represent them as numbers.
+        if settings['book_cache_limit'] > 2**53 - 1:
+            settings['book_cache_limit'] = str(settings['book_cache_limit'])
+        return response({'settings': settings})
+
     async def admin_general_settings(request):
         require_admin(request)
         if request.method == 'GET':
             settings = await run_db(store.get_general_settings)
-            return response({'settings': settings})
+            return general_settings_response(settings)
         data = await json_object(request)
         if data is None:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
         changes = {
             key: data[key]
-            for key in ('recent_reading_limit', 'reading_insights_rank_limit')
+            for key in ('recent_reading_limit', 'reading_insights_rank_limit', 'book_cache_limit')
             if key in data
         }
         try:
             if not changes or any(value is None for value in changes.values()):
                 raise ValueError
+            cache_limit = changes.get('book_cache_limit')
+            if isinstance(cache_limit, str) and re.fullmatch(r'[0-9]+', cache_limit):
+                changes['book_cache_limit'] = int(cache_limit)
             settings = await run_db(store.set_general_settings, **changes)
         except ValueError:
             return response(
                 error_payload('invalid_general_settings', 'Invalid general settings'),
                 400,
             )
-        return response({'settings': settings})
+        if library_manager is not None and 'book_cache_limit' in changes:
+            await run_io(library_manager.trim_book_cache)
+        return general_settings_response(settings)
 
     async def admin_ai_user_access(request):
         require_admin(request)
@@ -4361,7 +4400,9 @@ window.location.assign(payload.redirect||'/');
                 if book_id not in visible:
                     continue
                 cache = Path(base_directory) / "book" / book_id / "content"
-                if not (cache / f"chapter_{chapter}.json").is_file():
+                if not (cache / f"chapter_{chapter}.json").is_file() and not (
+                    library_manager is not None and library_manager.book_cache_is_cold(book_id)
+                ):
                     continue
                 recent.append((book_id, chapter))
                 if len(recent) == limit:
@@ -4551,6 +4592,11 @@ window.location.assign(payload.redirect||'/');
         if book is None or book.source_format != PDF_FORMAT:
             return response(error_payload('not_found', 'Not Found'), 404)
 
+        try:
+            await pin_book_cache(request, book_id, read=True)
+        except BookCacheUnavailable:
+            return response(error_payload('pdf_cache_stale', 'PDF cache requires refresh'), 409)
+
         if (
             not isinstance(book.source_size, int)
             or isinstance(book.source_size, bool)
@@ -4638,6 +4684,110 @@ window.location.assign(payload.redirect||'/');
             os.close(descriptor)
             raise
 
+    async def book_preparation_page(request, book, kindle_page):
+        locale = resolve_request_locale(request)
+        english = get_bundle('en')
+        bundle = get_bundle(locale)
+
+        def label(key):
+            return html.escape(bundle.get(key) or english[key])
+
+        def query_link(**params):
+            return '?' + html.escape(request.url.include_query_params(**params).query, quote=True)
+
+        fallback = query_link(open='1')
+        start_url = query_link(prepare='start')
+        status_url = query_link(prepare='status')
+        shelf = '/kindle-library.html' if kindle_page else '/'
+        markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title data-i18n="admin.bookPreparation.title">{label('admin.bookPreparation.title')} · EPUB Browser</title>
+<link rel="stylesheet" href="{current_asset_url('theme.css')}">
+<link rel="stylesheet" href="{current_asset_url('account.css')}">
+<script src="{current_asset_url('theme-bootstrap.js')}"></script>
+{render_i18n_bootstrap(locale, None, core_url=i18n_core_immutable_url())}
+</head><body class="auth-page"><main class="auth-shell">
+<div class="auth-stack"><section class="auth-card book-prepare-card" aria-labelledby="bookPrepareTitle">
+<h1 id="bookPrepareTitle" data-i18n="admin.bookPreparation.title">{label('admin.bookPreparation.title')}</h1>
+<p class="book-prepare-name">{html.escape(book.title)}</p>
+<div class="book-prepare-status" role="status" aria-live="polite" aria-atomic="true">
+<p id="bookPrepareStatus" tabindex="-1" data-start="{start_url}" data-status="{status_url}" data-i18n="admin.bookPreparation.queued">{label('admin.bookPreparation.queued')}</p>
+</div>
+<progress id="bookPrepareProgress" aria-labelledby="bookPrepareStatus" hidden></progress>
+<div class="book-prepare-actions">
+<a class="book-prepare-back" href="{shelf}" data-i18n="library.title">{label('library.title')}</a>
+<button id="bookPrepareRetry" class="auth-primary-button" type="button" hidden
+ data-i18n="admin.ai.jobs.retry">{label('admin.ai.jobs.retry')}</button>
+<a id="bookPrepareOpen" class="auth-primary-button" href="{fallback}"
+ data-i18n="admin.bookPreparation.open">{label('admin.bookPreparation.open')}</a>
+</div></section></div></main>
+<script>
+(function () {{
+    var status = document.getElementById('bookPrepareStatus');
+    var progress = document.getElementById('bookPrepareProgress');
+    var retry = document.getElementById('bookPrepareRetry');
+    var i18n = window.EpubBrowserI18n;
+    var timer;
+    var attempt = 0;
+    var prepareUrl = status.getAttribute('data-start');
+    var statusUrl = status.getAttribute('data-status');
+
+    function update(key) {{
+        if (status.getAttribute('data-i18n') === key) return;
+        status.setAttribute('data-i18n', key);
+        status.textContent = i18n.t(key);
+    }}
+
+    function get(url, complete) {{
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.onreadystatechange = function () {{
+            if (xhr.readyState === 4) complete(xhr);
+        }};
+        xhr.send();
+    }}
+
+    function prepare() {{
+        var current = ++attempt;
+        var pending = true;
+        if (document.activeElement === retry) status.focus();
+        retry.hidden = true;
+        progress.hidden = false;
+        update('admin.bookPreparation.queued');
+
+        function poll() {{
+            get(statusUrl, function (xhr) {{
+                if (!pending || current !== attempt) return;
+                if (xhr.status === 200 && xhr.responseText === 'running') {{
+                    update('admin.bookPreparation.running');
+                }}
+                timer = window.setTimeout(poll, 650);
+            }});
+        }}
+
+        get(prepareUrl, function (xhr) {{
+            pending = false;
+            window.clearTimeout(timer);
+            if (xhr.status === 204) {{
+                window.location.reload();
+                return;
+            }}
+            progress.hidden = true;
+            retry.hidden = false;
+            update('admin.bookPreparation.failed');
+        }});
+        poll();
+    }}
+
+    retry.addEventListener('click', prepare);
+    prepare();
+    document.getElementById('bookPrepareOpen').hidden = true;
+}}());
+</script></body></html>'''
+        page = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
+        return await apply_security_headers(page, markup=markup, inline_scripts=kindle_page)
+
     async def protected_public_file(request):
         try:
             path = normalize_public_path(request.path_params['path'])
@@ -4684,12 +4834,7 @@ window.location.assign(payload.redirect||'/');
             ):
                 return response(error_payload('forbidden', 'Forbidden'), 403)
             book = await run_db(store.book_by_id, book_id)
-            if book is None or not await run_io(
-                server_book_output_is_current,
-                base_directory,
-                book_id,
-                book.source_format,
-            ):
+            if book is None:
                 return response(error_payload('not_found', 'Not Found'), 404)
             book_relative_path = '/'.join(path.split('/')[2:])
 
@@ -4721,6 +4866,48 @@ window.location.assign(payload.redirect||'/');
                 or kindle_page_allowed
             ):
                 return response(error_payload('not_found', 'Not Found'), 404)
+            reader_page = book_relative_path.lower().endswith('.html')
+            is_cover = recorded_cover == book_relative_path
+            keep_cold = is_cover or book_relative_path == 'toc.json'
+            prepare_action = request.query_params.get('prepare')
+            if reader_page and library_manager is not None and prepare_action == 'status':
+                running = await run_io(library_manager.book_cache_is_restoring, book_id)
+                return Response(
+                    'running' if running else 'queued',
+                    media_type='text/plain',
+                    headers={'Cache-Control': 'private, no-store'},
+                )
+            if reader_page and library_manager is not None and prepare_action == 'start':
+                try:
+                    await pin_book_cache(request, book_id, read=True)
+                except BookCacheUnavailable:
+                    return response(error_payload('book_content_unavailable', 'Book content is unavailable'), 503)
+                return Response(status_code=204, headers={'Cache-Control': 'private, no-store'})
+            if (
+                reader_page and library_manager is not None
+                and request.query_params.get('open') != '1'
+                and (
+                    request.headers.get('sec-fetch-mode') == 'navigate'
+                    or (not request.headers.get('sec-fetch-mode')
+                        and 'text/html' in request.headers.get('accept', ''))
+                )
+                and await run_io(library_manager.book_cache_is_cold, book_id)
+            ):
+                return await book_preparation_page(request, book, kindle_page_allowed)
+            try:
+                await pin_book_cache(request, book_id, read=reader_page, restore=not keep_cold)
+            except BookCacheUnavailable:
+                return response(error_payload('book_content_unavailable', 'Book content is unavailable'), 503)
+            cold_metadata = (
+                keep_cold and library_manager is not None
+                and await run_io(library_manager.book_cache_is_cold, book_id)
+            )
+            if not cold_metadata and not await run_io(
+                server_book_output_is_current, base_directory, book_id, book.source_format,
+            ):
+                return response(error_payload('not_found', 'Not Found'), 404)
+            if not reader_page and book_relative_path != 'toc.json':
+                return await public_files.get_response(path, request.scope)
             ai_settings = await run_db(store.get_ai_settings)
             ai_reading_enabled = bool(ai_settings.get("enabled"))
 
@@ -5741,7 +5928,7 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('webhook_event_not_found', 'WebHook event not found'), 404, 'private, no-store')
         return response({'delivery_id': delivery_id}, 202, 'private, no-store')
 
-    public_api_context = PublicAPIContext(store=store, public_dir=Path(base_directory))
+    public_api_context = PublicAPIContext(store=store, public_dir=Path(base_directory), book_cache=book_cache)
     routes = [
         Route('/setup', setup, methods=['GET', 'POST']),
         Route('/login', login, methods=['GET', 'POST']),
@@ -5978,5 +6165,8 @@ window.location.assign(payload.redirect||'/');
         compresslevel=6,
     )
     app.add_middleware(BaseHTTPMiddleware, dispatch=auth_middleware)
+
+    if library_manager is not None:
+        app.add_middleware(BookCacheLeaseMiddleware)
 
     return app

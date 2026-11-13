@@ -6,6 +6,8 @@ import shutil
 import tempfile
 import threading
 import uuid
+from collections import Counter
+from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,6 +32,7 @@ from .processor import (
     EPUBProcessor,
     SERVER_OUTPUT_REVISION,
     SERVER_OUTPUT_REVISION_FILE,
+    server_book_public_path_allowed,
 )
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
@@ -47,6 +50,12 @@ from .urls import SiteURLs
 PDF_OUTPUT_REVISION = "server-pdf-v2"
 PDF_OUTPUT_REVISION_FILE = ".server-pdf-revision"
 PDF_METADATA_SCHEMA_VERSION = 2
+_EVICTED = ".server-book-evicted"
+_ACCESSED = ".server-book-access"
+
+
+class BookCacheUnavailable(ValueError):
+    """An evicted book could not be restored from its source."""
 
 
 def library_metadata(
@@ -70,7 +79,7 @@ def library_metadata(
                 (book_root / "content" / "metadata.json").is_file()
                 or (book_root / "index.html").is_file()
             )
-        if not available:
+        if not available and not (book_root / _EVICTED).is_file():
             continue
         try:
             metadata = json.loads(record.metadata_json)
@@ -135,7 +144,6 @@ class _ConversionPlan:
     source: Path
     record: BookRecord
     fingerprint: str
-    metadata: BookMetadata
     source_size: int
     source_mtime_ns: int
     source_format: str
@@ -191,6 +199,9 @@ class ServerLibraryManager:
         self._assets = None
         self._published_library_signature = None
         self._staging_prepared = False
+        self._cache_readers = Counter()
+        self._cache_needs_trim = False
+        self._restoring_books = set()
         self._reconcile_lock = threading.Lock()
         self._commit_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -309,9 +320,7 @@ class ServerLibraryManager:
                 try:
                     format_name = source_format(source)
                     source_stat = source.stat()
-                    existing_cache_valid = bool(
-                        existing and self._cache_valid(existing)
-                    )
+                    existing_cache_valid = bool(existing and self._book_available(existing))
                     known_fingerprint = None
                     if (
                         existing
@@ -445,7 +454,7 @@ class ServerLibraryManager:
 
                     if (
                         record.source_fingerprint == resolved.source_fingerprint
-                        and self._cache_valid(record)
+                        and self._book_available(record)
                     ):
                         with self._commit_lock:
                             if self._stop_event.is_set():
@@ -479,7 +488,6 @@ class ServerLibraryManager:
                             source=source,
                             record=record,
                             fingerprint=resolved.source_fingerprint,
-                            metadata=metadata,
                             source_size=resolved.source_size,
                             source_mtime_ns=resolved.source_mtime_ns,
                             source_format=format_name,
@@ -578,6 +586,7 @@ class ServerLibraryManager:
                     active_records, visible_changed = self._publish_current_state(failures)
                     if visible_changed:
                         self.progress_broker.catalog_published(len(active_records))
+                    self.trim_book_cache()
                     if error is None:
                         self.progress_broker.record_converted(plan.source)
                     elif not isinstance(error, _ConversionCancelled):
@@ -597,6 +606,7 @@ class ServerLibraryManager:
             active_records, visible_changed = self._publish_current_state(failures)
             if visible_changed:
                 self.progress_broker.catalog_published(len(active_records))
+            self.trim_book_cache()
             summary = ReconcileSummary(
                 converted=len(converted_records),
                 reused=len(reused_records),
@@ -830,7 +840,7 @@ class ServerLibraryManager:
             finally:
                 processor.cleanup()
 
-    def _convert_plan(self, plan: _ConversionPlan) -> BookRecord:
+    def _convert_plan(self, plan: _ConversionPlan, *, restore=False) -> BookRecord:
         if self._stop_event.is_set():
             raise _ConversionCancelled("Server is stopping")
         self.staging_dir.mkdir(parents=True, exist_ok=True)
@@ -842,7 +852,7 @@ class ServerLibraryManager:
         )
         if plan.source_format == PDF_FORMAT:
             try:
-                return self._convert_pdf_plan(plan, job_root)
+                return self._convert_pdf_plan(plan, job_root, restore=restore)
             finally:
                 shutil.rmtree(job_root, ignore_errors=True)
         processor = self.converter_factory(
@@ -877,7 +887,8 @@ class ServerLibraryManager:
                     os.replace(destination, rollback)
                 try:
                     os.replace(converted.output_dir, destination)
-                    updated = self.state_store.update_book_version(
+                    self._preserve_access_time(rollback, destination)
+                    updated = plan.record if restore else self.state_store.update_book_version(
                         plan.record.book_id,
                         plan.fingerprint,
                         converted.metadata,
@@ -902,7 +913,7 @@ class ServerLibraryManager:
                 cleanup()
             shutil.rmtree(job_root, ignore_errors=True)
 
-    def _convert_pdf_plan(self, plan: _ConversionPlan, job_root: Path) -> BookRecord:
+    def _convert_pdf_plan(self, plan: _ConversionPlan, job_root: Path, *, restore=False) -> BookRecord:
         metadata = plan.pdf_metadata or inspect_pdf(plan.source)
         pdf_dir = job_root / "pdf"
         pdf_dir.mkdir(parents=True, exist_ok=True)
@@ -966,7 +977,8 @@ class ServerLibraryManager:
                     os.replace(destination, rollback)
                 os.replace(job_root, destination)
                 activated = True
-                updated = self.state_store.update_book_version(
+                self._preserve_access_time(rollback, destination)
+                updated = plan.record if restore else self.state_store.update_book_version(
                     plan.record.book_id,
                     plan.fingerprint,
                     converted_metadata,
@@ -1220,6 +1232,157 @@ class ServerLibraryManager:
                 f"converted book is missing cover {converted.metadata.cover}"
             )
 
+    def _book_available(self, record: BookRecord) -> bool:
+        directory = self.public_dir / "book" / record.book_id
+        revision = PDF_OUTPUT_REVISION if record.source_format == PDF_FORMAT else SERVER_OUTPUT_REVISION
+        try:
+            if (directory / _EVICTED).read_text(encoding="utf-8") == revision:
+                return True
+        except (OSError, UnicodeDecodeError):
+            pass
+        return self._cache_valid(record)
+
+    def _is_evicted(self, book_id: str) -> bool:
+        return (self.public_dir / "book" / book_id / _EVICTED).is_file()
+
+    def book_cache_is_cold(self, book_id: str) -> bool:
+        with self._commit_lock:
+            return self._is_evicted(book_id)
+
+    def book_cache_is_restoring(self, book_id: str) -> bool:
+        with self._commit_lock:
+            return book_id in self._restoring_books
+
+    @staticmethod
+    def _preserve_access_time(previous: Path, destination: Path) -> None:
+        marker = previous / _ACCESSED
+        if marker.is_file():
+            os.link(marker, destination / _ACCESSED)
+
+    def trim_book_cache(self) -> None:
+        with self._commit_lock:
+            self._trim_book_cache_locked()
+
+    def _trim_book_cache_locked(self) -> None:
+        book_root = self.public_dir / "book"
+        records = {record.book_id: record for record in self.state_store.book_records()}
+        limit = self.state_store.get_general_settings()["book_cache_limit"]
+        candidates = []
+        if not book_root.is_dir():
+            return
+        for directory in book_root.iterdir():
+            record = records.get(directory.name)
+            if record is None or (directory / _EVICTED).exists():
+                continue
+            revision = (
+                PDF_OUTPUT_REVISION_FILE if record.source_format == PDF_FORMAT
+                else SERVER_OUTPUT_REVISION_FILE
+            )
+            if not (directory / revision).is_file():
+                continue
+            access = directory / _ACCESSED
+            access_time = access.stat().st_mtime_ns if access.exists() else 0
+            candidates.append((record.active, access_time, record.book_id))
+        self._cache_needs_trim = False
+        for _, _, book_id in sorted(candidates, reverse=True)[limit:]:
+            if self._cache_readers[book_id]:
+                self._cache_needs_trim = True
+                continue
+            self._evict_book(records[book_id])
+
+    def _evict_book(self, record: BookRecord) -> None:
+        directory = self.public_dir / "book" / record.book_id
+        cold = Path(tempfile.mkdtemp(prefix="cold-", dir=self.staging_dir))
+        previous = cold / "previous"
+        thin = cold / "book"
+        thin.mkdir()
+        try:
+            cover = json.loads(record.metadata_json).get("cover")
+            # Keep shelf artwork and small navigation data available without
+            # warming the cache when the library or reading history is viewed.
+            relative_paths = [
+                _ACCESSED, "content/metadata.json", "content/toc.json", "pdf/metadata.json",
+            ]
+            if cover and (
+                cover == "cover.png" or server_book_public_path_allowed(cover)
+            ):
+                relative_paths.append(cover)
+            for name in relative_paths:
+                if (directory / name).is_file():
+                    target = thin / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    os.link(directory / name, target)
+            revision = PDF_OUTPUT_REVISION if record.source_format == PDF_FORMAT else SERVER_OUTPUT_REVISION
+            (thin / _EVICTED).write_text(revision, encoding="utf-8")
+            os.replace(directory, previous)
+            try:
+                os.replace(thin, directory)
+            except OSError:
+                os.replace(previous, directory)
+                raise
+        finally:
+            shutil.rmtree(cold, ignore_errors=True)
+
+    def acquire_book_cache(self, book_id: str, *, read=False, restore=True) -> None:
+        """Pin this generation against eviction until its caller finishes."""
+        with self._commit_lock:
+            self._cache_readers[book_id] += 1
+        try:
+            directory = self.public_dir / "book" / book_id
+            if restore and self.book_cache_is_cold(book_id):
+                with self._reconcile_lock:
+                    if self.book_cache_is_cold(book_id):
+                        with self._commit_lock:
+                            self._restoring_books.add(book_id)
+                        try:
+                            self._restore_book_cache(book_id)
+                        finally:
+                            with self._commit_lock:
+                                self._restoring_books.discard(book_id)
+            with self._commit_lock:
+                if read and directory.is_dir() and not (directory / _EVICTED).exists():
+                    (directory / _ACCESSED).touch()
+        except BaseException:
+            self.release_book_cache(book_id)
+            raise
+
+    def release_book_cache(self, book_id: str) -> None:
+        with self._commit_lock:
+            self._cache_readers[book_id] -= 1
+            if not self._cache_readers[book_id]:
+                del self._cache_readers[book_id]
+            if self._cache_needs_trim:
+                self._trim_book_cache_locked()
+
+    @contextmanager
+    def book_cache(self, book_id: str, *, read=False, restore=True):
+        self.acquire_book_cache(book_id, read=read, restore=restore)
+        try:
+            yield
+        finally:
+            self.release_book_cache(book_id)
+
+    def _restore_book_cache(self, book_id: str) -> None:
+        record = self.state_store.book_by_id(book_id)
+        if record is None or self._stop_event.is_set():
+            raise BookCacheUnavailable("Book is unavailable")
+        source = Path(record.source_path)
+        try:
+            self._require_source_stat(source, record)
+            self._convert_plan(_ConversionPlan(
+                source=source,
+                record=record,
+                fingerprint=record.source_fingerprint,
+                source_size=record.source_size,
+                source_mtime_ns=record.source_mtime_ns,
+                source_format=record.source_format,
+            ), restore=True)
+        except Exception as error:
+            self.reporter.detail(f"Could not restore book cache {book_id}: {error}")
+            raise BookCacheUnavailable("Book content is unavailable") from error
+        with self._commit_lock:
+            self._cache_needs_trim = True
+
     def _cache_valid(self, record: BookRecord) -> bool:
         directory = self.public_dir / "book" / record.book_id
         if record.source_format == PDF_FORMAT:
@@ -1265,12 +1428,13 @@ class ServerLibraryManager:
             else SERVER_OUTPUT_REVISION_FILE
         )
         (directory / marker).unlink(missing_ok=True)
+        (directory / _EVICTED).unlink(missing_ok=True)
 
     def _valid_active_records(self) -> tuple[BookRecord, ...]:
         return tuple(
             record
             for record in self.state_store.active_books()
-            if self._cache_valid(record)
+            if self._book_available(record)
         )
 
     def _mark_missing_if_deleted(
@@ -1419,6 +1583,7 @@ class ServerLibraryManager:
                 self.progress_broker.start_generation("watch")
                 self.progress_broker.mark_discovered(total=0, removed=1)
                 self.state_store.mark_missing(record.book_id)
+                self._trim_book_cache_locked()
                 active_records, visible_changed = self._publish_current_state_locked(
                     (),
                     allow_stopped=True,

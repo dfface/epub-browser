@@ -221,6 +221,15 @@ SERVER_ACCOUNT_PANEL = '''
                     </div>
                     <p class="admin-setting-help" id="adminGeneralRankHelp" data-i18n="admin.general.readingInsightsRankLimitHelp">The default is 10 books. Showing more books increases the size of the initial reading insights response.</p>
                 </div>
+                <div class="admin-setting-row">
+                    <div class="admin-setting-main">
+                        <label class="admin-setting-label" for="adminGeneralBookCacheLimit">
+                            <span data-i18n="admin.general.bookCacheLimit">Books cached on disk</span>
+                        </label>
+                        <input class="admin-general-input" type="text" name="book_cache_limit" id="adminGeneralBookCacheLimit" inputmode="numeric" pattern="[0-9]+" required aria-describedby="adminGeneralBookCacheHelp adminGeneralError">
+                    </div>
+                    <p class="admin-setting-help" id="adminGeneralBookCacheHelp" data-i18n="admin.general.bookCacheLimitHelp">The server keeps this many recently opened books ready to read. Other books are prepared when opened.</p>
+                </div>
                 <p class="admin-setting-error" id="adminGeneralError" role="alert" hidden></p>
             </div>
             <div class="admin-form-actions">

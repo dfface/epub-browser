@@ -4,6 +4,7 @@ import asyncio
 import hashlib
 import json
 import re
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import date
 from html.parser import HTMLParser
@@ -19,6 +20,7 @@ from .prompt_templates import (
     profile_system_prompt,
     template_for,
 )
+from .server_library import BookCacheUnavailable
 from .server_concurrency import run_db, run_render
 from .state import (
     StateStore,
@@ -782,11 +784,13 @@ class AIReadingService:
         client_factory: Callable[[ProviderConfig], OpenAICompatibleClient] = OpenAICompatibleClient,
         *,
         sleeper: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        book_cache: Optional[Callable] = None,
     ):
         self.store = store
         self.public_dir = Path(public_dir)
         self._client_factory = client_factory
         self._sleep = sleeper
+        self._book_cache = book_cache
         self._call_controls = {}
         self._tasks: set[asyncio.Task] = set()
         self._worker_states: dict[asyncio.AbstractEventLoop, _WorkerState] = {}
@@ -866,6 +870,20 @@ class AIReadingService:
         return cache_key.endswith(f":force:{job_id}")
 
     def _material_for_request(
+        self, principal: Principal, request: ReadingRequest
+    ) -> tuple[str, dict, int, tuple[tuple[int, str], ...]]:
+        needs_content = request.scope == "chapter" or request.mode != "spoiler_free"
+        if needs_content and self._book_cache and not self.store.can_read_book(
+            principal.user_id, principal.role, request.book_id
+        ):
+            raise AIReadingError("ai_not_authorized")
+        try:
+            with self._book_cache(request.book_id) if needs_content and self._book_cache else nullcontext():
+                return self._read_material(principal, request)
+        except BookCacheUnavailable as error:
+            raise AIReadingError("source_unavailable") from error
+
+    def _read_material(
         self, principal: Principal, request: ReadingRequest
     ) -> tuple[str, dict, int, tuple[tuple[int, str], ...]]:
         metadata = self._book_metadata(request.book_id)
