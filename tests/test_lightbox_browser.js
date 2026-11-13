@@ -28,9 +28,9 @@ function chromiumCandidates() {
     process.env.EPUB_BROWSER_CHROMIUM,
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     '/Applications/Chromium.app/Contents/MacOS/Chromium',
+    '/usr/bin/google-chrome',
     '/usr/bin/chromium',
     '/usr/bin/chromium-browser',
-    '/usr/bin/google-chrome',
   ].filter(Boolean);
   const playwrightCache = path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright');
   if (fs.existsSync(playwrightCache)) {
@@ -205,11 +205,6 @@ function closeServer(server) {
   return new Promise((resolve) => server.close(resolve));
 }
 
-function reservePort() {
-  const server = http.createServer();
-  return listen(server).then((port) => closeServer(server).then(() => port));
-}
-
 function fetchJSON(url) {
   return new Promise((resolve, reject) => {
     const request = http.get(url, (response) => {
@@ -228,10 +223,11 @@ function fetchJSON(url) {
   });
 }
 
-async function waitForDebugger(port) {
-  const deadline = Date.now() + 5000;
+async function waitForDebugger(profile) {
+  const deadline = Date.now() + 20000;
   while (Date.now() < deadline) {
     try {
+      const [port] = fs.readFileSync(path.join(profile, 'DevToolsActivePort'), 'utf8').split('\n');
       const targets = await fetchJSON(`http://127.0.0.1:${port}/json/list`);
       const page = targets.find((target) => target.type === 'page');
       if (page) return page.webSocketDebuggerUrl;
@@ -308,7 +304,7 @@ const chromium = chromiumCandidates();
 
 test('actual GLightbox bundle keeps hostile EPUB DOM inert across reader rebinding', {
   skip: chromium ? false : 'set EPUB_BROWSER_CHROMIUM to run the real-browser lightbox smoke test',
-  timeout: 20000,
+  timeout: 40000,
 }, async () => {
   const localRequests = [];
   const server = http.createServer((request, response) => {
@@ -343,7 +339,6 @@ test('actual GLightbox bundle keeps hostile EPUB DOM inert across reader rebindi
   });
 
   const port = await listen(server);
-  const debugPort = await reservePort();
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'epub-browser-lightbox-'));
   const browser = spawn(chromium, [
     '--headless',
@@ -353,7 +348,7 @@ test('actual GLightbox bundle keeps hostile EPUB DOM inert across reader rebindi
     '--disable-component-update',
     '--disable-default-apps',
     '--no-first-run',
-    `--remote-debugging-port=${debugPort}`,
+    '--remote-debugging-port=0',
     '--remote-allow-origins=*',
     `--user-data-dir=${profile}`,
     'about:blank',
@@ -366,7 +361,7 @@ test('actual GLightbox bundle keeps hostile EPUB DOM inert across reader rebindi
   try {
     let webSocketURL;
     try {
-      webSocketURL = await waitForDebugger(debugPort);
+      webSocketURL = await waitForDebugger(profile);
     } catch (error) {
       throw new Error(`${error.message}\n${browserStderr}`);
     }

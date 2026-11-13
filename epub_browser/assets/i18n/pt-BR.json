@@ -275,6 +275,7 @@
   "admin.books.uploading": "Enviando…",
   "admin.books.uploadMany": "Enviar {count} livros",
   "admin.books.uploadRetry": "Tentar enviar novamente {count} livros",
+  "admin.books.uploadClear": "Limpar",
   "admin.books.uploadBatchResult": "{success} livro(s) enviado(s); {failed} falharam.",
   "admin.books.fileRemove": "Remover {filename}",
   "admin.books.uploadSuccess": "{filename} enviado. A conversão começará em breve.",

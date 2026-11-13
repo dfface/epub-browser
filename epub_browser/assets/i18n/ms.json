@@ -275,6 +275,7 @@
   "admin.books.uploading": "Memuat naik…",
   "admin.books.uploadMany": "Muat naik {count} buku",
   "admin.books.uploadRetry": "Cuba semula {count} buku",
+  "admin.books.uploadClear": "Kosongkan",
   "admin.books.uploadBatchResult": "{success} buku dimuat naik; {failed} gagal.",
   "admin.books.fileRemove": "Alih keluar {filename}",
   "admin.books.uploadSuccess": "{filename} dimuat naik. Penukaran akan bermula sebentar lagi.",

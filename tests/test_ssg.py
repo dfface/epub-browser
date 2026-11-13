@@ -721,8 +721,8 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertIn(
                 "location.replace('kindle_chapter_0.html')", full_chapter
             )
-            self.assertIn('href="index.html?full=1"', index)
-            self.assertIn("Open full reader", index)
+            self.assertIn('href="/kindle-library.html"', index)
+            self.assertIn('href="/index.html?full=1"', minimal_library)
 
     def test_kindle_minimal_reader_pages_are_not_generated_for_pdf(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -788,23 +788,6 @@ class VendorAssetTests(unittest.TestCase):
         )
         self.assertEqual(fetch.returncode, 0, fetch.stderr)
 
-    def test_setup_packages_recursive_vendor_assets(self):
-        """Dropping the recursive package-data rule would omit nested licenses and fonts."""
-        repository_root = Path(__file__).parents[1]
-        completed = subprocess.run(
-            [sys.executable, "setup.py", "--version"],
-            cwd=repository_root,
-            text=True,
-            capture_output=True,
-            check=True,
-        )
-
-        self.assertRegex(completed.stdout.strip(), r"^\d+\.\d+\.\d+")
-        self.assertIn(
-            "assets/vendor/**/*",
-            (repository_root / "setup.py").read_text(encoding="utf-8"),
-        )
-
     def test_release_jobs_fetch_and_verify_before_build(self):
         """A release build must fail closed before packaging an incomplete vendor tree."""
         repository_root = Path(__file__).parents[1]

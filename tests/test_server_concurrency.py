@@ -1,10 +1,33 @@
 import asyncio
 import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
-from epub_browser.server_concurrency import SetupStateMonitor, StatKeyedCache
+from epub_browser.server_concurrency import SetupStateMonitor, StatKeyedCache, run_db
+
+
+class DatabaseCancellationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_cancellation_waits_for_an_in_flight_database_call(self):
+        loop = asyncio.get_running_loop()
+        started = asyncio.Event()
+        release = threading.Event()
+
+        def write():
+            loop.call_soon_threadsafe(started.set)
+            release.wait(timeout=5)
+
+        task = asyncio.create_task(run_db(write))
+        await asyncio.wait_for(started.wait(), timeout=5)
+        try:
+            task.cancel()
+            await asyncio.sleep(0)
+            self.assertFalse(task.done())
+        finally:
+            release.set()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
 
 
 class StatKeyedCacheTests(unittest.TestCase):

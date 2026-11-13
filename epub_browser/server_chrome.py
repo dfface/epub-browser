@@ -54,7 +54,7 @@ SERVER_ACCOUNT_CONTROL = '''<button type="button" class="library-meta-action app
         <i class="fas fa-user-shield" aria-hidden="true"></i><span data-i18n="admin.menu">Administration</span>
     </button>
     <button type="button" class="library-meta-action app-nav-action" id="accountMenu" aria-haspopup="dialog" aria-controls="accountPanel" aria-label="Account" data-i18n-aria-label="account.menu">
-        <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue">Account</span>
+        <i class="fas fa-user" aria-hidden="true"></i><span id="accountMenuValue"></span>
     </button>'''
 SERVER_ACCOUNT_PANEL = '''
 <div class="bookshelf-modal account-modal" id="accountPanel" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="accountTitle">
@@ -569,7 +569,7 @@ def render_account_panel(kindle=False):
                 <textarea id="kindleMemoText" name="memo_text" rows="4" maxlength="4000" aria-describedby="kindleMemoHelp"></textarea>
                 <p class="account-help" id="kindleMemoHelp" data-i18n="account.kindle.memoHelp">Only your account can read this memo.</p>
                 <label for="kindleCalendarUrl" data-i18n="account.kindle.subscription">Calendar subscription</label>
-                <textarea id="kindleCalendarUrl" name="calendar_urls" rows="4" maxlength="16391" placeholder="https://" autocomplete="off" spellcheck="false" aria-describedby="kindleCalendarHelp"></textarea>
+                <textarea id="kindleCalendarUrl" name="calendar_urls" rows="4" maxlength="16391" placeholder="https://" autocomplete="off" spellcheck="false" aria-describedby="kindleCalendarHelp"></textarea><!-- i18n-allow-literal: URL/protocol value -->
                 <p class="account-help" id="kindleCalendarHelp" data-i18n="account.kindle.subscriptionHelp">Enter up to eight HTTPS or webcal iCalendar links, one per line.</p>
             </div>
             <div class="account-kindle-actions">

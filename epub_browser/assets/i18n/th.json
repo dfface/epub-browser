@@ -275,6 +275,7 @@
   "admin.books.uploading": "กำลังอัปโหลด…",
   "admin.books.uploadMany": "อัปโหลดหนังสือ {count} เล่ม",
   "admin.books.uploadRetry": "ลองอัปโหลดหนังสือ {count} เล่มอีกครั้ง",
+  "admin.books.uploadClear": "ล้าง",
   "admin.books.uploadBatchResult": "อัปโหลดหนังสือสำเร็จ {success} เล่ม; ล้มเหลว {failed} เล่ม",
   "admin.books.fileRemove": "นำ {filename} ออก",
   "admin.books.uploadSuccess": "อัปโหลด {filename} แล้ว การแปลงจะเริ่มในไม่ช้า",

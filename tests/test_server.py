@@ -5285,7 +5285,8 @@ class ReadingInsightsAPITests(unittest.TestCase):
                     "vendor/mermaid/mermaid.min.js",
                     "bookshelf.js", "annotation-hub.css", "annotation.js",
                     "annotation-hub.js", "vendor/sortablejs/sortable.min.js", "book-reviews.css",
-                    "book-reviews.js",
+                    "book-reviews.js", "dictionary.css", "dictionary.js",
+                    "vocabulary.css", "vocabulary.js",
                 )
         }
         manifest.update({
@@ -5857,7 +5858,8 @@ class ServerKindleTests(unittest.TestCase):
                     "vendor/pinyin-pro/pinyin-pro.min.js",
                     "bookshelf.js", "annotation-hub.css", "annotation.js",
                     "annotation-hub.js", "vendor/sortablejs/sortable.min.js", "book-reviews.css",
-                    "book-reviews.js",
+                    "book-reviews.js", "dictionary.css", "dictionary.js",
+                    "vocabulary.css", "vocabulary.js",
                 )
         }
         manifest.update({
@@ -6154,10 +6156,9 @@ class ServerKindleTests(unittest.TestCase):
         self.assertEqual(kindle_index.status_code, 200)
         self.assertIn("Continue reading", kindle_index.text)
         self.assertIn('data-i18n="continueReading"', kindle_index.text)
-        # the book title links back to the minimal library (absolute route in
-        # Server mode), while the footer still offers the full reader
+        # The book dock returns to the minimal library, which offers full mode.
         self.assertIn('href="/kindle-library.html"', kindle_index.text)
-        self.assertIn("index.html?full=1", kindle_index.text)
+        self.assertIn('href="/index.html?full=1"', shelf.text)
         # the minimal index reads the saved server progress to resume reading
         self.assertIn("api/reading-progress/", kindle_index.text)
 
