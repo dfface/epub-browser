@@ -11,49 +11,74 @@ function initTheme() {
         { id: 'lavender', nameKey: 'theme.lavender', icon: 'fa-spa' }
     ];
 
-    // 检查本地存储中的主题设置
+    var bootstrap = window.EpubBrowserThemeBootstrap;
+    var serverMode = window.EpubBrowserMode === 'server';
+
     function getCurrentTheme() {
-        // 优先从 window 读取
-        if (window.epubBrowserCache && window.epubBrowserCache.theme) {
-            return window.epubBrowserCache.theme;
-        }
-        try {
-            var theme = localStorage.getItem('theme');
-            if (theme) {
-                // 缓存到 window
-                if (!window.epubBrowserCache) {
-                    window.epubBrowserCache = {};
-                }
-                window.epubBrowserCache.theme = theme;
-                return theme;
+        return bootstrap.storedTheme(window);
+    }
+
+    var saving = false;
+    var syncAppearance = function() {};
+    var refreshTheme = applyTheme;
+
+    function saveAppearance(changes, fromPanel) {
+        if (saving) return;
+        var status = document.getElementById('accountAppearanceStatus');
+        function showStatus(key) {
+            if (status) {
+                if (key) status.setAttribute('data-i18n', key);
+                else status.removeAttribute('data-i18n');
+                status.textContent = key ? window.EpubBrowserI18n.t(key) : '';
             }
-            return 'light';
-        } catch (e) {
-            return 'light';
         }
+
+        saving = true;
+        syncAppearance();
+        showStatus('');
+        window.EpubBrowserAuth.fetch('/api/account/appearance', {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(changes)
+        }).then(function(response) {
+            if (!response.ok) throw new Error('Appearance update failed');
+            return response.json();
+        }).then(function(preferences) {
+            window.EpubBrowserAppearance = preferences;
+            refreshTheme();
+            if (fromPanel) showStatus('settings.saved');
+        }).catch(function() {
+            showStatus('theme.saveFailed');
+            if (!fromPanel && window.showNotification) {
+                window.showNotification(window.EpubBrowserI18n.t('theme.saveFailed'), 'error');
+            }
+        }).then(function() {
+            saving = false;
+            syncAppearance();
+        });
     }
 
-    // 保存主题设置
-    function saveTheme(theme) {
-        try {
-            localStorage.setItem('theme', theme);
-        } catch (e) {
-            // 忽略错误
+    function chooseTheme(theme) {
+        if (!serverMode) {
+            bootstrap.saveManualTheme(window, theme);
+            applyTheme();
+            return;
         }
-        // 缓存到 window
-        if (!window.epubBrowserCache) {
-            window.epubBrowserCache = {};
+
+        var preferences = bootstrap.preferences(window);
+        var key = 'manual';
+        if (preferences.automatic) {
+            var scheme = bootstrap.deviceScheme(window);
+            key = scheme && scheme.matches ? 'night' : 'day';
         }
-        window.epubBrowserCache.theme = theme;
+        var changes = {};
+        changes[key] = theme;
+        saveAppearance(changes, false);
     }
 
-    // 应用主题
-    function applyTheme(theme) {
-        // 移除所有主题类
-        document.documentElement.classList.remove('light-mode', 'dark-mode', 'sepia-mode', 'forest-mode', 'ocean-mode', 'peach-mode', 'lavender-mode');
-        // 添加当前主题类
-        document.documentElement.classList.add(theme + '-mode');
-        
+    function applyTheme() {
+        var theme = bootstrap.apply(window);
+
         // 更新theme-toggle图标
         var themeToggle = document.getElementById('themeToggle');
         var currentTheme = null;
@@ -71,13 +96,45 @@ function initTheme() {
             }
         }
         
-        // 保存主题设置
-        saveTheme(theme);
-        
-        // 切换代码主题（如果存在）
-        if (typeof switchCodeTheme === 'function') {
-            switchCodeTheme(theme === 'dark');
+        var lightCode = document.getElementById('code-light');
+        var darkCode = document.getElementById('code-dark');
+        if (lightCode && darkCode) {
+            lightCode.disabled = theme === 'dark';
+            darkCode.disabled = theme !== 'dark';
         }
+        return theme;
+    }
+
+    function bindAppearance() {
+        var day = document.getElementById('accountDayTheme');
+        var night = document.getElementById('accountNightTheme');
+        var automatic = document.getElementById('accountAutoTheme');
+        if (!automatic) return;
+
+        [day, night].forEach(function(select) {
+            themes.forEach(function(theme) {
+                var option = document.createElement('option');
+                option.value = theme.id;
+                option.setAttribute('data-i18n', theme.nameKey);
+                option.textContent = window.EpubBrowserI18n.t(theme.nameKey);
+                select.appendChild(option);
+            });
+        });
+
+        syncAppearance = function() {
+            var preferences = bootstrap.preferences(window);
+            day.disabled = night.disabled = automatic.disabled = saving;
+            day.value = preferences.day;
+            night.value = preferences.night;
+            automatic.checked = preferences.automatic;
+        };
+
+        day.addEventListener('change', function() { saveAppearance({day: day.value}, true); });
+        night.addEventListener('change', function() { saveAppearance({night: night.value}, true); });
+        automatic.addEventListener('change', function() {
+            saveAppearance({automatic: automatic.checked}, true);
+        });
+        syncAppearance();
     }
 
     function renderThemeMenu(menu, currentTheme, themeToggle) {
@@ -94,8 +151,7 @@ function initTheme() {
             
             item.addEventListener('click', function(themeId) {
                 return function() {
-                    applyTheme(themeId);
-                    renderThemeMenu(menu, themeId, themeToggle);
+                    chooseTheme(themeId);
                     menu.style.display = 'none';
                     themeToggle.setAttribute('aria-expanded', 'false');
                     themeToggle.focus({ preventScroll: true });
@@ -155,13 +211,29 @@ function initTheme() {
         themeToggle.setAttribute('aria-expanded', 'false');
 
         // 应用初始主题
-        var currentTheme = getCurrentTheme();
-        applyTheme(currentTheme);
+        var currentTheme = applyTheme();
 
         // 初始化主题菜单
         var themeMenu = null;
         var currentToggleBtn = null;
         var themeMenuFocusIndex = themeIndex(currentTheme);
+
+        refreshTheme = function() {
+            var activeTheme = applyTheme();
+            if (themeMenu) {
+                // Keep the focused menu item in place during a device change.
+                themes.forEach(function(theme, index) {
+                    themeMenu.children[index].setAttribute('aria-checked', String(theme.id === activeTheme));
+                });
+            }
+        };
+
+        if (serverMode) {
+            bindAppearance();
+            var scheme = bootstrap.deviceScheme(window);
+            if (scheme && scheme.addEventListener) scheme.addEventListener('change', refreshTheme);
+            else if (scheme && scheme.addListener) scheme.addListener(refreshTheme);
+        }
 
         if (window.EpubBrowserI18n && window.EpubBrowserI18n.onLocaleChange) {
             window.EpubBrowserI18n.onLocaleChange(function() {

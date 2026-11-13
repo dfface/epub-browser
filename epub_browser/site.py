@@ -900,36 +900,7 @@ def render_library_shell(
 {server_account_stylesheet}
 {server_progress_stylesheet}
 {recent_reading_stylesheet}
-<script>
-// 立即应用主题，避免闪现
-var theme = "light";
-
-try {
-  // 优先从 window 缓存读取
-  var storedTheme = null;
-  if (window.epubBrowserCache && window.epubBrowserCache.theme) {
-    storedTheme = window.epubBrowserCache.theme;
-  } else {
-    storedTheme = localStorage.getItem("theme");
-    if (storedTheme) {
-      if (!window.epubBrowserCache) {
-        window.epubBrowserCache = {};
-      }
-      window.epubBrowserCache.theme = storedTheme;
-    }
-  }
-
-  if (storedTheme) {
-    theme = storedTheme;
-  }
-} catch (e) {
-  // localStorage 不可用时保持默认主题
-}
-
-// 使用 html 元素添加类名
-var htmlElement = document.documentElement;
-htmlElement.classList.add(theme + "-mode");
-</script>
+<script src="/assets/theme-bootstrap.js"></script>
 {kindle_entry_script}
 </head>
 <body>

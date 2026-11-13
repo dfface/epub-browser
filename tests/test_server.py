@@ -3729,6 +3729,27 @@ class ServerAccountSecurityMatrixTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
 
+    def test_appearance_preferences_are_scoped_to_the_signed_in_account(self):
+        path = "/api/account/appearance"
+        with TestClient(self.app) as anonymous:
+            self.assertEqual(anonymous.get(path).status_code, 401)
+        admin = self.login_admin()
+        self.create_member("reader", "reader-password")
+        member = self.login_member("reader", "reader-password")
+        defaults = {"automatic": False, "day": "light", "night": "dark", "manual": "light"}
+        self.assertEqual(member.get(path).json(), defaults)
+        self.assertEqual(member.put(path, json={"day": "unknown"}).status_code, 400)
+        self.assertEqual(member.put(path, json={"automatic": 1}).status_code, 400)
+        with TestClient(self.app, cookies=member.cookies) as no_csrf:
+            self.assertEqual(no_csrf.put(path, json={"day": "sepia"}).status_code, 403)
+
+        changed = {"day": "sepia", "night": "lavender", "automatic": True, "manual": "forest"}
+        self.assertEqual(member.put(path, json=changed).json(), changed)
+        other_browser = self._login("reader", "reader-password")
+        self.assertEqual(other_browser.get(path).json(), changed)
+        self.assertEqual(admin.get(path).json(), defaults)
+        self.assertEqual(other_browser.put(path, json={"night": "ocean"}).json(), {**changed, "night": "ocean"})
+
     def test_member_lifecycle_from_login_to_restricted_book_revocation(self):
         self.login_admin()
         self.create_member("reader", "initial-password")

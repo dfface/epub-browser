@@ -77,6 +77,7 @@ SERVER_ACCOUNT_PANEL = '''
     <button type="button" class="admin-section-tab is-active" id="accountProfileTab" role="tab" aria-selected="true" aria-controls="accountProfilePanel" data-account-section="profile"><i class="fas fa-user" aria-hidden="true"></i><span data-i18n="account.profile">Profile</span></button>
     <button type="button" class="admin-section-tab" id="accountSecurityTab" role="tab" aria-selected="false" aria-controls="accountSecurityPanel" data-account-section="security"><i class="fas fa-lock" aria-hidden="true"></i><span data-i18n="account.security">Security</span></button>
     <button type="button" class="admin-section-tab" id="accountTokensTab" role="tab" aria-selected="false" aria-controls="accountTokensPanel" data-account-section="tokens"><i class="fas fa-key" aria-hidden="true"></i><span data-i18n="account.pats.title">Personal access tokens</span></button>
+    <button type="button" class="admin-section-tab" id="accountAppearanceTab" role="tab" aria-selected="false" aria-controls="accountAppearancePanel" data-account-section="appearance"><i class="fas fa-palette" aria-hidden="true"></i><span data-i18n="settings.appearance">Appearance</span></button>
     {kindle_settings_tab}
 </nav>
 <div class="account-modal-body"><div class="account-layout">
@@ -114,6 +115,17 @@ SERVER_ACCOUNT_PANEL = '''
     <ul class="account-list" id="sessionList"></ul>
 </section>
 </div>
+</div>
+<div role="tabpanel" id="accountAppearancePanel" aria-labelledby="accountAppearanceTab" data-account-panel="appearance" hidden>
+<section class="account-card" aria-labelledby="accountAppearanceTitle">
+    <h3 id="accountAppearanceTitle" data-i18n="settings.appearance">Appearance</h3>
+    <div class="account-form">
+        <label><span data-i18n="theme.day">Day theme</span><select id="accountDayTheme"></select></label>
+        <label><span data-i18n="theme.night">Night theme</span><select id="accountNightTheme"></select></label>
+        <label class="account-theme-auto"><input type="checkbox" id="accountAutoTheme"><span data-i18n="theme.automatic">Automatically switch between day and night themes based on the device</span></label>
+        <p class="account-form-message" id="accountAppearanceStatus" role="status"></p>
+    </div>
+</section>
 </div>
 {kindle_settings_panel}
 <div role="tabpanel" id="accountTokensPanel" aria-labelledby="accountTokensTab" data-account-panel="tokens" hidden>
@@ -468,7 +480,7 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
 <link rel="stylesheet" href="/assets/loading.css?v=15">
 {SERVER_ACCOUNT_STYLESHEET}
 <link rel="stylesheet" href="{insights_css}">
-<script>try{{var epubBrowserTheme=localStorage.getItem("theme")||"light";document.documentElement.classList.add(epubBrowserTheme+"-mode");}}catch(error){{document.documentElement.classList.add("light-mode");}}</script>
+<script src="/assets/theme-bootstrap.js"></script>
 </head>
 <body>
 <header class="app-header">
@@ -519,7 +531,7 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
 <script src="/assets/version-check.js" defer></script>
 {SERVER_LOCALE_SCRIPT}
 <script src="{insights_script}" defer></script>
-<script>document.addEventListener("DOMContentLoaded",function(){{function start(){{if(!window.EpubBrowserAuth||!window.EpubReadingInsights)return;window.EpubBrowserAuth.init().then(function(session){{if(session)window.EpubReadingInsights.mount(document.querySelector("[data-reading-insights]"));}});}}if(window.EpubBrowserCacheBoundary)window.EpubBrowserCacheBoundary.start(start);else start();}});</script>
+<script>document.addEventListener("DOMContentLoaded",function(){{window.initTheme();function start(){{if(!window.EpubBrowserAuth||!window.EpubReadingInsights)return;window.EpubBrowserAuth.init().then(function(session){{if(session)window.EpubReadingInsights.mount(document.querySelector("[data-reading-insights]"));}});}}if(window.EpubBrowserCacheBoundary)window.EpubBrowserCacheBoundary.start(start);else start();}});</script>
 </body>
 </html>'''
 

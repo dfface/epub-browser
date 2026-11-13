@@ -636,6 +636,22 @@ body.auth-page {
     font-weight: 650;
 }
 
+.account-form .account-theme-auto {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+.account-theme-auto input[type="checkbox"] {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    min-height: 18px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--account-primary);
+}
+
 .account-kindle-options {
     min-width: 0;
     margin: 0;

@@ -38,7 +38,9 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 31
+DB_SCHEMA_VERSION = 32
+APPEARANCE_DEFAULTS = {"automatic": False, "day": "light", "night": "dark", "manual": "light"}
+APPEARANCE_THEMES = frozenset({"light", "dark", "sepia", "forest", "ocean", "peach", "lavender"})
 
 
 # A browser may briefly reload or restore a reader while the person remains in
@@ -488,6 +490,14 @@ class StateStore:
                     "TEXT NOT NULL DEFAULT '100'",
                 )
                 connection.execute("PRAGMA user_version = 31")
+            if version < 32:
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS account_appearance (
+                        user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+                        preferences_json TEXT NOT NULL
+                    )
+                """)
+                connection.execute("PRAGMA user_version = 32")
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -3182,6 +3192,7 @@ class StateStore:
                     ("book_access", "user_id"),
                     ("bookshelves", "user_id"),
                     ("library_orders", "user_id"),
+                    ("account_appearance", "user_id"),
                     ("reading_progress", "user_id"),
                     ("annotations", "user_id"),
                     ("book_reviews", "user_id"),
@@ -4270,6 +4281,27 @@ class StateStore:
                 (principal.role, principal.user_id, source_format, source_format, limit, offset),
             ).fetchall()
         return tuple(self._book_record(row) for row in rows)
+
+    def get_account_appearance(self, user_id: str) -> dict:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT preferences_json FROM account_appearance WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        return {**APPEARANCE_DEFAULTS, **(json.loads(row[0]) if row else {})}
+
+    def update_account_appearance(self, user_id: str, changes: dict) -> dict:
+        with self._connection() as connection:
+            row = connection.execute(
+                """
+                INSERT INTO account_appearance (user_id, preferences_json) VALUES (?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET preferences_json =
+                    json_patch(account_appearance.preferences_json, excluded.preferences_json)
+                RETURNING preferences_json
+                """,
+                (user_id, json.dumps(changes)),
+            ).fetchone()
+        return {**APPEARANCE_DEFAULTS, **json.loads(row[0])}
 
     def library_order(self, user_id: str) -> tuple[str, ...]:
         with self._connection() as connection:
