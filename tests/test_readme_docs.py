@@ -43,14 +43,14 @@ class ReadmeDocumentationTests(unittest.TestCase):
 
         readmes = {
             Path("README.md"): (
-                "AI-native reading, grounded in the text",
-                "Private reading insights",
+                "evidence-linked explanations",
+                "activity calendars",
                 "docs/readme/assets/ai-native-reading.png",
                 "docs/readme/assets/reading-insights.png",
             ),
             Path("docs/readme/README.zh-CN.md"): (
-                "贴着原文的 AI 原生阅读",
-                "只属于你的阅读洞察",
+                "证据解释",
+                "阅读日历",
                 "assets/ai-native-reading.png",
                 "assets/reading-insights.png",
             ),
@@ -120,18 +120,25 @@ class ReadmeDocumentationTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertEqual(expected, headings)
 
-        compact_readmes = [
-            path
-            for path in sorted(Path("docs/readme").glob("README.*.md"))
-            if path.name not in {"README.zh-CN.md"}
-        ]
-        for path in compact_readmes:
+        reference_lines = Path("README.md").read_text(encoding="utf-8").splitlines()
+        reference_headings = tuple(
+            line[: len(line) - len(line.lstrip("#"))]
+            for line in reference_lines
+            if re.match(r"^#{1,6} ", line)
+        )
+        reference_fences = sum(line.startswith("```") for line in reference_lines)
+        for path in sorted(Path("docs/readme").glob("README.*.md")):
             lines = path.read_text(encoding="utf-8").splitlines()
+            headings = tuple(
+                line[: len(line) - len(line.lstrip("#"))]
+                for line in lines
+                if re.match(r"^#{1,6} ", line)
+            )
             with self.subTest(path=path):
-                self.assertEqual(4, sum(line.startswith("## ") for line in lines))
-                self.assertGreaterEqual(
-                    sum(line.startswith("### ") for line in lines),
-                    7,
+                self.assertEqual(reference_headings, headings)
+                self.assertEqual(
+                    reference_fences,
+                    sum(line.startswith("```") for line in lines),
                 )
 
     def test_documentation_hub_links_the_stable_entry_points(self):
@@ -211,8 +218,8 @@ class ReadmeDocumentationTests(unittest.TestCase):
                 "规范化目录",
                 "outline 标题作为 marker",
                 "--book-id-storage embedded",
-                "必须回退到相邻的 sidecar",
-                "不能把 ID 写进 PDF 字节",
+                "PDF 文档信息字典",
+                "同一个 ID 会保存到相邻的 sidecar",
                 "没有可用文本层时",
                 "跨页选择可以继续",
                 "完整且 逐字节一致的源文件",

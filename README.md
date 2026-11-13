@@ -1,14 +1,13 @@
 # EPUB Browser
 
-> Publish EPUB and PDF books as a website readers can open in their browser.
-> Host the generated files on any static host, or run a private library with
-> accounts, synced progress, and annotations.
+> **Turn books into websites. Build a library that’s yours.**
+>
+> Publish EPUB and PDF books as a static website, or run a private, self-hosted library
+> with accounts, synced progress, annotations, and optional AI-native reading.
 
 [Explore the static library](https://epub-browser-test.yuhan.tech/) · [Try the private library](#live-demos)
 
 **README:** [English](README.md) | [简体中文](docs/readme/README.zh-CN.md) | [繁體中文](docs/readme/README.zh-TW.md) | [日本語](docs/readme/README.ja.md) | [한국어](docs/readme/README.ko.md) | [Español](docs/readme/README.es.md) | [Deutsch](docs/readme/README.de.md) | [Français](docs/readme/README.fr.md) | [Русский](docs/readme/README.ru.md) | [Italiano](docs/readme/README.it.md) | [Português (Brasil)](docs/readme/README.pt-BR.md) | [العربية](docs/readme/README.ar.md) | [Bahasa Indonesia](docs/readme/README.id.md) | [हिन्दी](docs/readme/README.hi.md) | [Tiếng Việt](docs/readme/README.vi.md) | [ไทย](docs/readme/README.th.md) | [Bahasa Melayu](docs/readme/README.ms.md)
-
-**Interface languages (17):** English, 简体中文, 繁體中文, 日本語, 한국어, Español, Deutsch, Français, Русский, Italiano, Português (Brasil), العربية, Bahasa Indonesia, हिन्दी, Tiếng Việt, ไทย, and Bahasa Melayu.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/dfface/epub-browser/main/epub_browser/assets/logo-lockup-color.png" alt="EPUB Browser logo" width="520">
@@ -20,11 +19,11 @@
 
 ![A PDF rendered in the shared EPUB Browser reader, with the original page, navigation, themes, and reading tools.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.8.0-pdf-reader.png)
 
-EPUB Browser accepts `.epub` and `.pdf` books. It gives both formats the same
-Library, book page, table of contents, reading modes, themes, progress tracking,
-and annotation workflow. PDF is not opened in a separate download or browser
-preview: every PDF page becomes a reader chapter, rendered locally by PDF.js
-inside the existing reading experience.
+EPUB Browser is more than a book converter. It is a complete reading platform you
+can publish anywhere or host yourself. EPUB and PDF share the same Library, book
+page, table of contents, reading modes, themes, progress tracking, and annotation
+workflow. Every PDF page becomes a reader chapter, rendered locally by PDF.js
+inside the same reading experience—no separate viewer, no runtime CDN.
 
 ## Contents
 
@@ -57,39 +56,34 @@ inside the existing reading experience.
 
 ### Why EPUB Browser
 
-- **EPUB and PDF, one reader:** EPUB chapters and PDF pages use the same
-  navigation, responsive layout, themes, fullscreen mode, search, bookshelf,
-  progress, reading time, and book-detail surfaces.
-- **Three reading behaviors:** Scroll one chapter at a time, read continuously
-  with a bounded rendering window, or turn pages. PDF adds fit-width, fit-page,
-  and arbitrary zoom without leaving the reading stage.
-- **AI-native reading, grounded in the text:** In Server mode, chapter guides,
-  evidence-linked explanations, vocabulary help, mind maps, reflection prompts,
-  and private Ask AI conversations stay beside the EPUB text—not in a detached
-  generic summary.
-- **Annotations where you read:** Highlight text, add notes, browse or export
-  annotations, and use Dictionary or Encyclopedia actions. Text-based PDFs
-  reuse the same selection popup; image-only PDFs degrade explicitly.
-- **Private reading insights:** See active reading time, activity calendars,
-  trends, sessions, and most-read books. Server mode keeps every insight private
-  to the signed-in account.
-- **A real personal library:** Covers, metadata, tags, ratings, reviews,
-  nested shelves, search, and reading history stay connected by a stable book
-  ID—even when a Server source temporarily leaves a watched folder.
-- **A private, governable Server:** Accounts, book permissions, per-member AI
-  access, synchronized reading data, administration, OpenAPI, and WebHooks are
-  available when a persistent service is wanted.
-- **Bring your own single sign-on:** Server mode connects to a generic OIDC
-  Provider such as Authelia, Authentik, or Keycloak. Readers can safely link an
-  existing account or be provisioned as members without duplicating reading data.
-- **Self-contained at runtime:** Application assets, fonts, icons, PDF.js, and
-  rich-text renderers are served locally. Reading never depends on a CDN.
-- **17 interface languages:** English, 简体中文, 繁體中文, 日本語, 한국어,
-  Español, Deutsch, Français, Русский, Italiano, Português (Brasil), العربية,
-  Bahasa Indonesia, हिन्दी, Tiếng Việt, ไทย, and Bahasa Melayu.
-- **Kindle minimal mode:** A dependency-free, e-ink-friendly reading surface
-  (`--kindle` for both SSG and Server) with theme and font controls, a 17-language
-  UI, table-of-contents navigation, and per-account reading progress on the Server.
+- **Publish anywhere. Keep control.** Build a complete static site for Pages,
+  object storage, or Nginx with one command, or run a persistent Server with
+  accounts, book permissions, and OIDC. Application assets, fonts, PDF.js, and
+  renderers are served locally, so reading never depends on a CDN.
+- **EPUB and PDF, one real reader.** Both formats share the Library, book page,
+  TOC, responsive layout, three reading modes, themes, fullscreen, and progress.
+  Every PDF page stays inside the reading stage, with zoom, text-layer selection,
+  and annotations instead of a separate previewer.
+- **Find the book—and the passage.** Library search covers metadata, tags, and
+  pinyin, with sorting and pagination. Server-side full-book search for EPUB
+  returns complete chapter-grouped results and jumps to the highlighted passage.
+  Stable book IDs keep resume points, annotations, and history attached to the
+  same book.
+- **Understand, not just scroll.** In Server mode, EPUB chapter guides,
+  evidence-linked explanations, mind maps, and private Ask AI stay beside the
+  source text. Highlights, notes, Dictionary, and Encyclopedia work across EPUB
+  and text-layer PDFs; Server vocabulary lists record each word's source and
+  mastery state.
+- **Turn reading into a history worth keeping.** Nested shelves, ratings,
+  reviews, annotation export, activity calendars, trends, per-book stats, and
+  reading-time rankings form a connected record. Server keeps reading data
+  private to each account and synchronized across devices.
+- **Run a reading service, not just a viewer.** In Server mode, add books through
+  administrator web uploads or watched folders, bound disk usage with configurable
+  LRU cache eviction, manage member and AI permissions, and integrate through
+  OpenAPI, PATs, and WebHooks. Kindle minimal reading supports constrained
+  devices; Server also provides a personal Kindle screensaver dashboard with a
+  clock, calendar, agenda, memo, and Pomodoro timer.
 
 ![A chapter guide embedded beside the original EPUB text, with a private Ask AI drawer.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/ai-native-reading.png)
 
@@ -106,7 +100,7 @@ application has no SPA framework and does not require a Node.js runtime:
 
 | Layer | Technology | Role |
 | --- | --- | --- |
-| Frontend | Semantic HTML, CSS, **Vanilla JavaScript** with ES modules and browser APIs | One shared responsive UI for SSG and Server |
+| Frontend | Semantic HTML, CSS, VanillaJS with ES modules and browser APIs | One shared responsive UI for SSG and Server |
 | CLI and Server | Python 3.9+, Starlette, Uvicorn | Conversion commands, authenticated pages, APIs, and background work |
 | Data | SQLite plus rebuildable JSON content caches | User state remains separate from derived EPUB/PDF content |
 | Book formats | lxml, pypdf, pypdfium2, PDF.js | Unified strict-first EPUB parsing/sanitisation, PDF metadata/covers, local browser rendering |
@@ -172,8 +166,8 @@ Each EPUB book (PDF books are excluded) gains three extra pages:
 
 These pages are tuned for e-Ink: minimal markup, CSS-only theming, ES5-compatible
 scripts, no Service Worker, and no framework. You can read without any JavaScript;
-theme switching (Light / Sepia / Dark), font sizing (A- / A+), and the 17-language
-UI are lightweight inline scripts layered on top of the plain HTML.
+theme switching (Light / Sepia / Dark), font sizing (A- / A+), and interface
+localization use lightweight inline scripts layered on top of the plain HTML.
 
 Every page offers theme and font controls (in the header, and again in the chapter
 footer), table-of-contents navigation, previous/next chapter, and a "Continue
