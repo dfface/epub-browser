@@ -117,7 +117,17 @@ function initScript() {
     var metadataCompletedRevision = -1;
     var metadataWaiters = [];
     var lastMetadataBooks = [];
-    var bookCardRenderGeneration = 0;
+    var orderedBooks = null;
+    var pageBooks = [];
+    var currentPage = 1;
+    var libraryPageSize = 24;
+    var bookGrid = document.querySelector('.book-grid');
+    var pager = document.getElementById('libraryPager');
+    var previousPage = document.getElementById('libraryPreviousPage');
+    var nextPage = document.getElementById('libraryNextPage');
+    var pageStatus = document.getElementById('libraryPageStatus');
+    var jumpForm = document.getElementById('libraryJumpForm');
+    var jumpInput = document.getElementById('libraryJumpInput');
 
     function settleMetadataWaiters(revision, error, books) {
         var remaining = [];
@@ -412,24 +422,6 @@ function initScript() {
         setTagCloudToggleLabel(toggle, expanded);
     }
 
-    function appendBookCardsInBatches(bookGrid, cards, generation, done) {
-        var offset = 0;
-        function appendBatch() {
-            if (generation !== bookCardRenderGeneration) return;
-            cards.slice(offset, offset + 24).forEach(function(card) {
-                bookGrid.appendChild(card);
-            });
-            offset += 24;
-            if (offset < cards.length) {
-                if (window.requestAnimationFrame) window.requestAnimationFrame(appendBatch);
-                else setTimeout(appendBatch, 0);
-                return;
-            }
-            done();
-        }
-        appendBatch();
-    }
-
     function uniqueBooksById(books) {
         var seenIds = {};
         var seenUrls = {};
@@ -446,44 +438,18 @@ function initScript() {
     }
 
     function replaceBookCards(books) {
-        var bookGrid = document.querySelector('.book-grid');
         var activeTag = document.querySelector('.tag-cloud-item.active');
         var activeTagId = activeTag ? activeTag.getAttribute('data-id') : 'All';
-        books = uniqueBooksById(books);
+        orderedBooks = uniqueBooksById(books);
         if (!serverMode && bookSort) {
-            books = bookSort.sortBooks(books, selectedSort(), i18n && i18n.getLocale());
+            orderedBooks = bookSort.sortBooks(orderedBooks, selectedSort(), i18n && i18n.getLocale());
         }
-        setBookDragEnabled(false);
-        var cards = books.map(createBookCard);
-        var tagNames = collectTagNames(books);
-        var generation = ++bookCardRenderGeneration;
-        if (!bookGrid) return;
-
         hideBookGridLoading();
-        removeLibraryCardsAndStates(bookGrid);
-        var tagCount = rebuildTagItems(tagNames, activeTagId);
-        updateLibraryCounts(books, tagCount);
-
-        if (!books.length) {
-            showLibraryState(
-                'library.emptyTitle',
-                window.EpubBrowserMode === 'server'
-                    ? 'library.emptyServerDescription'
-                    : 'library.emptySsgDescription',
-                'empty'
-            );
-            restoreTagCloudOrder();
-            updateTagCloudCollapse();
-            applyLibraryFilters();
-            return;
-        }
-
-        appendBookCardsInBatches(bookGrid, cards, generation, function() {
-            setBookDragEnabled(selectedSort() === 'manual');
-            restoreTagCloudOrder();
-            updateTagCloudCollapse();
-            applyLibraryFilters();
-        });
+        var tagCount = rebuildTagItems(collectTagNames(orderedBooks), activeTagId);
+        updateLibraryCounts(orderedBooks, tagCount);
+        restoreTagCloudOrder();
+        updateTagCloudCollapse();
+        applyLibraryFilters();
     }
 
     // 页面加载时恢复顺序
@@ -588,9 +554,17 @@ function initScript() {
             draggable: '.book-card',
             onEnd: function(evt) {
                 if (evt.oldIndex === evt.newIndex) return;
-                var itemIds = Array.prototype.map.call(evt.from.querySelectorAll('.book-card'), function(card) {
-                    return card.getAttribute('data-id');
+                var booksById = new Map(pageBooks.map(function(book) { return [book.hash, book]; }));
+                var reorderedPage = Array.prototype.map.call(evt.from.querySelectorAll('.book-card'), function(card) {
+                    return booksById.get(card.getAttribute('data-id'));
                 });
+                // Replace only the slots occupied by this filtered page.
+                var index = 0;
+                orderedBooks = orderedBooks.map(function(book) {
+                    return booksById.has(book.hash) ? reorderedPage[index++] : book;
+                });
+                pageBooks = reorderedPage;
+                var itemIds = orderedBooks.map(function(book) { return book.hash; });
                 if (serverMode) {
                     manualSave = manualSave.then(function() {
                         return saveServerOrder(itemIds, false);
@@ -675,56 +649,79 @@ function initScript() {
     var searchBox = document.querySelector('.search-box');
     var tagCloud = document.querySelector('.tag-cloud');
 
-    function cardMatchesSearch(card, searchTerm) {
-        var title = card.querySelector('.book-title').textContent.toLowerCase();
-        var author = card.querySelector('.book-author').textContent.toLowerCase();
-        var pinyinMatch = false;
-        if (searchTerm === '') return true;
-        if (typeof pinyinPro !== 'undefined') {
-            try {
-                var titlePinyin = pinyinPro.pinyin(title, { toneType: 'none' }).toLowerCase().replace(/ /g, '');
-                var authorPinyin = pinyinPro.pinyin(author, { toneType: 'none' }).toLowerCase().replace(/ /g, '');
-                var searchPinyin = pinyinPro.pinyin(searchTerm, { toneType: 'none' }).toLowerCase().replace(/ /g, '');
-                pinyinMatch = titlePinyin.indexOf(searchPinyin) !== -1 || authorPinyin.indexOf(searchPinyin) !== -1;
-            } catch (e) {
-                console.log('Pinyin match error:', e);
-            }
+    function searchablePinyin(text) {
+        try {
+            return pinyinPro.pinyin(text, { toneType: 'none' }).toLowerCase().replace(/ /g, '');
+        } catch (error) {
+            return '';
         }
-        return title.includes(searchTerm) || author.includes(searchTerm) || pinyinMatch;
-    }
-
-    function cardMatchesTag(card, tagId) {
-        var tags = card.querySelectorAll('.book-tag');
-        if (tagId === 'All') return true;
-        if (tagId === 'NoTag') return tags.length === 0;
-        return Array.prototype.some.call(tags, function(tag) {
-            return tag.textContent === tagId;
-        });
     }
 
     function applyLibraryFilters() {
+        if (!bookGrid || !orderedBooks) return;
         var searchTerm = (searchBox.value || '').toLowerCase().trim();
+        var searchPinyin = searchTerm && typeof pinyinPro !== 'undefined' ? searchablePinyin(searchTerm) : '';
         var activeTag = document.querySelector('.tag-cloud-item.active');
         var tagId = activeTag ? activeTag.getAttribute('data-id') : 'All';
-        var bookGrid = document.querySelector('.book-grid');
-        var filteredState = bookGrid && bookGrid.querySelector('.library-state--filtered');
-        var visibleCount = 0;
-        var cards = document.querySelectorAll('.book-card');
-        if (filteredState) bookGrid.removeChild(filteredState);
-        cards.forEach(function(card) {
-            var textMatches = cardMatchesSearch(card, searchTerm);
-            var tagMatches = cardMatchesTag(card, tagId);
-            var visible = textMatches && tagMatches;
-            card.style.display = visible ? 'block' : 'none';
-            if (visible) visibleCount += 1;
+        var matches = orderedBooks.filter(function(book) {
+            var tags = book.tags || [];
+            if (tagId === 'NoTag' && tags.length) return false;
+            if (tagId !== 'All' && tagId !== 'NoTag' && tags.indexOf(tagId) === -1) return false;
+            if (!searchTerm) return true;
+            var text = [book.title].concat(book.authors || [], tags).join(' ').toLowerCase();
+            return text.includes(searchTerm) || !!(searchPinyin && searchablePinyin(text).includes(searchPinyin));
         });
-        if (cards.length && visibleCount === 0) {
-            showLibraryState(
-                'library.noResultsTitle',
-                'library.noResultsDescription',
-                'filtered'
-            );
+        var totalPages = Math.max(1, Math.ceil(matches.length / libraryPageSize));
+        currentPage = Math.min(currentPage, totalPages);
+        var offset = (currentPage - 1) * libraryPageSize;
+        pageBooks = matches.slice(offset, offset + libraryPageSize);
+        removeLibraryCardsAndStates(bookGrid);
+
+        if (!orderedBooks.length) {
+            showLibraryState('library.emptyTitle', serverMode
+                ? 'library.emptyServerDescription' : 'library.emptySsgDescription', 'empty');
+        } else if (!matches.length) {
+            showLibraryState('library.noResultsTitle', 'library.noResultsDescription', 'filtered');
+        } else {
+            pageBooks.forEach(function(book) {
+                bookGrid.appendChild(createBookCard(book));
+            });
         }
+        setBookDragEnabled(pageBooks.length > 1 && selectedSort() === 'manual');
+
+        if (pager) {
+            pager.hidden = totalPages < 2;
+            previousPage.disabled = currentPage === 1;
+            nextPage.disabled = currentPage === totalPages;
+            var params = { number: currentPage, total: totalPages };
+            pageStatus.setAttribute('data-i18n-params', JSON.stringify(params));
+            pageStatus.textContent = t('pdf.pageOf', params);
+            jumpInput.max = totalPages;
+            jumpInput.value = currentPage;
+        }
+    }
+
+    function goToLibraryPage(page) {
+        currentPage = page;
+        applyLibraryFilters();
+        if (bookGrid.focus) bookGrid.focus({ preventScroll: true });
+        if (bookGrid.scrollIntoView) bookGrid.scrollIntoView({ block: 'start' });
+    }
+
+    if (pager) {
+        previousPage.addEventListener('click', function() {
+            if (!previousPage.disabled) goToLibraryPage(currentPage - 1);
+        });
+        nextPage.addEventListener('click', function() {
+            if (!nextPage.disabled) goToLibraryPage(currentPage + 1);
+        });
+        jumpForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            var page = Number(jumpInput.value);
+            if (Number.isInteger(page) && page >= 1 && page <= Number(jumpInput.max)) {
+                goToLibraryPage(page);
+            }
+        });
     }
 
     function loadPinyinForSearch() {
@@ -738,12 +735,14 @@ function initScript() {
             tagItem.classList.remove('active');
             if (tagItem.getAttribute('data-id') === tagId) tagItem.classList.add('active');
         });
+        currentPage = 1;
         applyLibraryFilters();
     }
 
     if (searchBox && searchBox.getAttribute('data-library-filter-listener') !== 'true') {
         searchBox.setAttribute('data-library-filter-listener', 'true');
         searchBox.addEventListener('input', function() {
+            currentPage = 1;
             applyLibraryFilters();
             loadPinyinForSearch();
         });
@@ -795,6 +794,7 @@ function initScript() {
         if (savedSort) sortControl.value = savedSort;
         if (!sortControl.value) sortControl.value = 'manual';
         sortControl.addEventListener('change', function() {
+            currentPage = 1;
             var location = new URL(window.location.href);
             location.searchParams.set('sort', selectedSort());
             window.history.replaceState(window.history.state, '', location.href);

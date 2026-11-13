@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "제목(Z–A)",
   "library.sort.createdDesc": "최근 추가됨",
   "library.sort.updatedDesc": "최근 수정됨",
+  "library.pagination": "서재 페이지",
   "library.searchPlaceholder": "책 제목, 저자 또는 태그로 검색...",
   "library.all": "전체",
   "library.noTag": "태그 없음",

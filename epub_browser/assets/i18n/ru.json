@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "Названию (Я–А)",
   "library.sort.createdDesc": "Сначала новые",
   "library.sort.updatedDesc": "Сначала обновлённые",
+  "library.pagination": "Страницы библиотеки",
   "library.searchPlaceholder": "Поиск по названию, автору или метке…",
   "library.all": "Все",
   "library.noTag": "Без метки",

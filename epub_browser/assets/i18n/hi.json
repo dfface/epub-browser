@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "शीर्षक (Z–A)",
   "library.sort.createdDesc": "हाल में जोड़ी गईं",
   "library.sort.updatedDesc": "हाल में अपडेट हुईं",
+  "library.pagination": "पुस्तकालय के पृष्ठ",
   "library.searchPlaceholder": "पुस्तक के शीर्षक, लेखक या टैग से खोजें…",
   "library.all": "सभी",
   "library.noTag": "बिना टैग",

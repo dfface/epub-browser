@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "タイトル (Z-A)",
   "library.sort.createdDesc": "最近追加されました",
   "library.sort.updatedDesc": "最近更新されました",
+  "library.pagination": "ライブラリのページ",
   "library.searchPlaceholder": "本のタイトル、著者、またはタグで検索...",
   "library.all": "すべて",
   "library.noTag": "タグなし",

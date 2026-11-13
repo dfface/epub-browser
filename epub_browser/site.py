@@ -1003,13 +1003,23 @@ htmlElement.classList.add(theme + "-mode");
     </div>"""
 
     library_html += """
-    <div class="book-grid" data-id="book-grid">
+    <div class="book-grid" id="libraryBooks" data-id="book-grid" tabindex="-1">
         <div class="book-grid-loading" id="bookGridLoading" data-id="bookGridLoading" role="status" aria-label="Loading library" data-i18n-aria-label="library.loading">
             <div class="loading-spinner"></div>
         </div>
 """
     library_html += f"""
     </div>
+    <nav id="libraryPager" class="library-pager" aria-label="Library pages" data-i18n-aria-label="library.pagination" hidden>
+        <button id="libraryPreviousPage" type="button" aria-controls="libraryBooks" aria-label="Previous page" data-i18n-aria-label="reader.previousPage"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+        <span id="libraryPageStatus" role="status" data-i18n="pdf.pageOf"></span>
+        <button id="libraryNextPage" type="button" aria-controls="libraryBooks" aria-label="Next page" data-i18n-aria-label="reader.nextPage"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+        <form id="libraryJumpForm" class="library-jump">
+            <input id="libraryJumpInput" type="number" min="1" max="1" step="1" required inputmode="numeric"
+                aria-label="Page number" data-i18n-aria-label="reader.currentPage" aria-describedby="libraryPageStatus">
+            <button type="submit" aria-controls="libraryBooks" data-i18n="reader.jump">Jump</button>
+        </form>
+    </nav>
     <div class="reading-controls" data-id="reading-controls">
     <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="library.top">
         <i class="fas fa-arrow-up"></i>

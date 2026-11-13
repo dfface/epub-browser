@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "书名（Z → A）",
   "library.sort.createdDesc": "最近加入",
   "library.sort.updatedDesc": "最近更新",
+  "library.pagination": "书库分页",
   "library.searchPlaceholder": "按书名、作者或标签搜索…",
   "library.all": "全部",
   "library.noTag": "无标签",

@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "Tajuk (Z–A)",
   "library.sort.createdDesc": "Baru ditambah",
   "library.sort.updatedDesc": "Baru dikemas kini",
+  "library.pagination": "Halaman perpustakaan",
   "library.searchPlaceholder": "Cari mengikut tajuk, pengarang atau tag…",
   "library.all": "Semua",
   "library.noTag": "Tanpa tag",
