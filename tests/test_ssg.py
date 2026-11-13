@@ -118,6 +118,8 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertIn('"documentUrl":"/reader/book/{}/document.pdf"'.format(book_id), chapter_html)
             self.assertNotIn("/api/", chapter_html)
             self.assertNotIn("reading-sessions.js", chapter_html)
+            worker = (output / "sw.js").read_text(encoding="utf-8")
+            self.assertIn("/reader/assets/immutable/vendor/pdfjs/build/pdf.worker.", worker)
             self.assertEqual(metadata[0]["format"], "pdf")
             self.assertEqual(metadata[0]["cover"], "/reader/book/{}/cover.png".format(book_id))
             sidecar = read_exact_sidecar(source)
@@ -526,6 +528,8 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertNotIn('"/assets/', worker)
             self.assertNotIn('"/index.html"', worker)
             self.assertIn('"/project/index.html"', worker)
+            self.assertNotIn("/vendor/pdfjs/", worker)
+            self.assertNotIn("/vendor/highlight/", worker)
 
     def test_failed_build_preserves_previous_snapshot_and_removes_staging(self):
         with tempfile.TemporaryDirectory() as directory:

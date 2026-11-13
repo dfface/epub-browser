@@ -739,6 +739,7 @@ function initScript() {
         wrapAllElements('table', 'div', content);
         wrapAllElements('img', 'div', content);
         prepareChapterCodeBlocks(content);
+        highlightCodeBlocks(content);
         document.querySelectorAll('.eb-content a').forEach(function(item) {
             var href = item.getAttribute('href');
             if (!href) return;
@@ -1846,15 +1847,46 @@ function initScript() {
         }
     }
 
+    var highlightLoading;
     function highlightCodeBlocks(root) {
-        if (typeof hljs === 'undefined') return;
-        // Only highlight listings we did not receive pre-tokenised. Calling
-        // highlightElement per block keeps the publisher-tokenised blocks
-        // (marked with .eb-tokenized) out of highlight.js entirely.
-        var blocks = (root || document).querySelectorAll('pre:not(.eb-tokenized) > code');
-        for (var i = 0; i < blocks.length; i++) {
-            hljs.highlightElement(blocks[i]);
+        var blocks = root.querySelectorAll('pre:not(.eb-tokenized) > code:not([data-highlighted])');
+        if (!blocks.length) return;
+        function paint() {
+            blocks.forEach(function(block) {
+                if (block.isConnected && !block.dataset.highlighted) window.hljs.highlightElement(block);
+            });
         }
+        if (window.hljs) {
+            paint();
+            return;
+        }
+        if (!content.dataset.highlightScript) return;
+        if (!highlightLoading) {
+            ['light', 'dark'].forEach(function(theme) {
+                var id = 'code-' + theme;
+                if (document.getElementById(id)) return;
+                var stylesheet = document.createElement('link');
+                stylesheet.id = id;
+                stylesheet.rel = 'stylesheet';
+                stylesheet.disabled = (theme === 'dark') !== document.documentElement.classList.contains('dark-mode');
+                stylesheet.href = theme === 'dark' ? content.dataset.highlightDark : content.dataset.highlightLight;
+                document.head.appendChild(stylesheet);
+            });
+            highlightLoading = new Promise(function(resolve, reject) {
+                var script = document.createElement('script');
+                script.src = content.dataset.highlightScript;
+                script.onload = resolve;
+                script.onerror = function() {
+                    script.remove();
+                    highlightLoading = null;
+                    reject();
+                };
+                document.head.appendChild(script);
+            });
+        }
+        highlightLoading.then(paint).catch(function() {
+            // Keep the original code readable when the optional renderer fails.
+        });
     }
 
     prepareChapterCodeBlocks(content);
@@ -2588,6 +2620,8 @@ function initScript() {
             chapterSection.appendChild(childNodes[i].cloneNode(true));
         }
         content.appendChild(chapterSection);
+        prepareChapterCodeBlocks(chapterSection);
+        highlightCodeBlocks(chapterSection);
         dispatchChapterContentLifecycle('added', chapterSection);
         if (typeof Fancybox !== 'undefined') {
             Fancybox.bind('#eb-content img', {});
@@ -2748,6 +2782,8 @@ function initScript() {
                     }
                     var viewportAnchor = EpubViewportAnchor.capture(content);
                     content.appendChild(chapterSection);
+                    prepareChapterCodeBlocks(chapterSection);
+                    highlightCodeBlocks(chapterSection);
                     dispatchChapterContentLifecycle('added', chapterSection);
                     
                     loadedChapters[nextIdx] = true;
@@ -2863,6 +2899,8 @@ function initScript() {
                     } else {
                         content.appendChild(chapterSection);
                     }
+                    prepareChapterCodeBlocks(chapterSection);
+                    highlightCodeBlocks(chapterSection);
                     dispatchChapterContentLifecycle('added', chapterSection);
                     
                     loadedChapters[prevIdx] = true;
