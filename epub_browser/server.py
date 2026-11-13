@@ -86,11 +86,13 @@ from .pdf_delivery import (
 from .public_api import (
     PUBLIC_API_CONTEXT_KEY,
     PublicAPIContext,
+    bounded_public_json_object,
     openapi_document,
     public_api_operations,
     public_api_routes,
 )
 from .server_api_docs import render_api_docs
+from .vocabulary import MASTERY_STATES, vocabulary_page_options
 from .server_concurrency import (
     SetupStateMonitor,
     StatKeyedCache,
@@ -994,32 +996,6 @@ def create_app(
         except (UnicodeDecodeError, json.JSONDecodeError):
             return None
         return data if isinstance(data, dict) else None
-
-    async def bounded_public_json_object(request, maximum_size=64 * 1024):
-        content_type = request.headers.get('content-type', '').split(';', 1)[0]
-        if content_type.strip().casefold() != 'application/json':
-            return None, 'unsupported_media_type'
-        content_length = request.headers.get('content-length')
-        if content_length:
-            try:
-                if int(content_length) < 0:
-                    return None, 'invalid_json'
-                if int(content_length) > maximum_size:
-                    return None, 'body_too_large'
-            except ValueError:
-                return None, 'invalid_json'
-        body = bytearray()
-        async for chunk in request.stream():
-            body.extend(chunk)
-            if len(body) > maximum_size:
-                return None, 'body_too_large'
-        try:
-            data = json.loads(bytes(body).decode('utf-8'))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            return None, 'invalid_json'
-        if not isinstance(data, dict):
-            return None, 'invalid_json'
-        return data, None
 
     async def bounded_unique_json_object(request, maximum_size=None):
         content_type = request.headers.get('content-type', '').split(';', 1)[0]
@@ -3469,6 +3445,14 @@ window.location.assign(payload.redirect||'/');
         data, error = await bounded_public_json_object(request, maximum_size=2048)
         if error or not isinstance(data.get("text"), str) or not isinstance(data.get("dictionary_id"), str):
             return response(error_payload("invalid_dictionary_query", "Invalid dictionary query"), 400, "private, no-store")
+        chapter_index = data.get("chapter_index")
+        lookup_id = data.get("lookup_id")
+        track = "chapter_index" in data or "lookup_id" in data
+        if track and (
+            type(chapter_index) is not int or chapter_index < 0
+            or not isinstance(lookup_id, str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", lookup_id)
+        ):
+            return response(error_payload("invalid_dictionary_query", "Invalid dictionary query"), 400, "private, no-store")
         try:
             result = await run_io(
                 dictionary_service.lookup, data["dictionary_id"], data["text"]
@@ -3478,8 +3462,21 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload(error.code, "Dictionary lookup failed"), status, "private, no-store")
         except ValueError:
             return response(error_payload("not_found", "Not Found"), 404, "private, no-store")
+        recorded = None
+        if track:
+            recorded = False
+            try:
+                await run_db(authorized_chapter_snapshot, book_id, chapter_index)
+                recorded = await run_db(
+                    store.record_vocabulary_lookup, principal, book_id, chapter_index,
+                    lookup_id, " ".join(data["text"].split()), result.query,
+                )
+            except (ValueError, ServerPageError, sqlite3.Error):
+                # A recording failure must not suppress a valid dictionary result.
+                pass
         return response({
             "found": result.found,
+            **({"vocabulary_recorded": recorded} if track else {}),
             "query": result.query,
             "asset_base_path": result.asset_base_path,
             "allow_scripts": result.allow_scripts,
@@ -3489,6 +3486,35 @@ window.location.assign(payload.redirect||'/');
             },
             "entries": list(result.entries),
         }, cache_control="private, no-store")
+
+    async def vocabulary(request):
+        principal = require_principal(request)
+        book_id = request.query_params.get("book_id")
+        cache_control = "private, no-store"
+        if book_id is not None and await run_db(book_access_denied, principal, book_id):
+            return response(error_payload("forbidden", "Forbidden"), 403, cache_control)
+        if request.method in ("GET", "HEAD"):
+            try:
+                options = vocabulary_page_options(request.query_params)
+            except ValueError:
+                return response(error_payload("invalid_vocabulary_query", "Invalid vocabulary query"), 400, cache_control)
+            result = await run_db(store.list_vocabulary, principal, book_id, **options)
+            return response(result, cache_control=cache_control)
+        mastery = None
+        if request.method == "PATCH":
+            data, error = await bounded_public_json_object(request, maximum_size=1024)
+            if error or data.get("mastery") not in MASTERY_STATES:
+                return response(error_payload("invalid_vocabulary_mastery", "Invalid mastery state"), 400, cache_control)
+            mastery = data["mastery"]
+        changed = await run_db(
+            store.change_vocabulary, principal, request.path_params["word_id"],
+            book_id=book_id, mastery=mastery,
+        )
+        if not changed:
+            return response(error_payload("not_found", "Not found"), 404, cache_control)
+        if request.method == "DELETE":
+            return Response(status_code=204, headers={"Cache-Control": cache_control})
+        return response({"mastery": mastery}, cache_control=cache_control)
 
     async def dictionary_choices(request):
         principal = require_principal(request)
@@ -5813,6 +5839,8 @@ window.location.assign(payload.redirect||'/');
         Route('/api/books/{book_id}/insights', book_reading_insights, methods=['GET']),
         Route('/api/ai/status', ai_status, methods=['GET']),
         Route('/api/books/{book_id}/metadata', book_effective_metadata, methods=['GET']),
+        Route('/api/vocabulary', vocabulary, methods=['GET']),
+        Route('/api/vocabulary/{word_id}', vocabulary, methods=['PATCH', 'DELETE']),
         Route('/api/books/{book_id}/dictionary/lookup', dictionary_lookup, methods=['POST']),
         Route('/api/books/{book_id}/dictionaries/{dictionary_id}/assets/{asset_path:path}', dictionary_asset, methods=['GET']),
         Route('/api/books/{book_id}/dictionaries/{dictionary_id}/resources/{media_id}', dictionary_media, methods=['GET']),

@@ -636,7 +636,7 @@ body.api-docs-page {
     color: var(--api-primary);
 }
 
-.api-method-put {
+.api-method-put, .api-method-patch {
     background: color-mix(in srgb, var(--api-warning) 10%, var(--api-surface));
     color: var(--api-warning);
 }

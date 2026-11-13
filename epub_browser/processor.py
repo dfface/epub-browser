@@ -55,6 +55,8 @@ from .server_chrome import (
     SERVER_LOCALE_CONTROL,
     SERVER_LOCALE_SCRIPT,
     render_account_panel,
+    render_vocabulary_assets,
+    render_vocabulary_navigation,
 )
 from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .urls import SiteURLs, rewrite_root_urls
@@ -2692,6 +2694,7 @@ class EPUBProcessor:
         <div class="app-nav-links">
             <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
+            {render_vocabulary_navigation(self.book_hash) if self.deployment_mode == "server" else ""}
             {reading_insights_navigation}
             {ai_reading_navigation}
         </div>
@@ -2925,6 +2928,7 @@ if (window.EpubBrowserCacheBoundary) {
 <script src="/assets/book-feature-loader.js" defer></script>
 <script src="/assets/book.js?v=13" defer></script>
 {ai_reading_script}
+{render_vocabulary_assets(self.asset_manifest) if self.deployment_mode == "server" else ""}
 {ai_book_chat_script}
 <script>
 document.addEventListener('DOMContentLoaded', function() {{
@@ -4182,6 +4186,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
             <div class="app-nav-links">
                 <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
                 <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
+                {render_vocabulary_navigation(self.book_hash) if self.deployment_mode == "server" else ""}
                 {reading_insights_navigation}
                 {ai_reading_navigation}
             </div>
@@ -4573,6 +4578,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     <script src="/assets/annotation-hub.js" defer></script>
     <script src="/assets/vendor/sortablejs/sortable.min.js" defer></script>
     {dictionary_assets}
+    {render_vocabulary_assets(self.asset_manifest, include_dictionary=False) if self.deployment_mode == "server" else ""}
     <script src="/assets/vendor/highlight/highlight.min.js" defer></script>
     <script src="/assets/bookshelf.js" defer></script>
     {reading_insights_assets}

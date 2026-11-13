@@ -57,6 +57,8 @@ SERVER_ONLY_ASSET_PATHS = frozenset({
     'reading-sessions.js',
     'reading-insights.css',
     'reading-insights.js',
+    'vocabulary.css',
+    'vocabulary.js',
     # Legacy AI-reading renderer kept for backwards-compatible source trees.
     'ai-reading.css',
     'ai-reading.js',

@@ -51,6 +51,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 deployment_mode='server',
             )
 
+            pdf_html = processor.create_pdf_chapter_template(1, '/book/pdf-book/document.pdf')
+            self.assertRegex(pdf_html, r'(?s)data-annotation-hub.*data-vocabulary="pdf-book".*data-reading-insights')
+
             self.assertEqual(processor.book_title, 'A PDF')
             self.assertEqual(processor.authors, ['Author One', 'Author Two'])
             self.assertEqual(processor.tags, ['reference'])
@@ -2506,7 +2509,7 @@ assert.deepEqual(
         self.assertIn('function closeWhenClickedOutside(dialog)', dictionary)
         self.assertIn('closeWhenClickedOutside(dialog);', dictionary)
         self.assertIn('if (choices.length > 1)', dictionary)
-        self.assertIn("select.setAttribute('aria-label', t('choose'));", dictionary)
+        self.assertIn("label.setAttribute('data-i18n', 'dictionary.choose');", dictionary)
         self.assertIn("var preferredDictionaryStorageKey = 'epub-browser.dictionary-preference';", dictionary)
         self.assertIn('function dictionaryChoiceId(choices, defaultDictionaryId)', dictionary)
         self.assertIn('dictionaryChoiceId(choices, data.default_dictionary_id)', dictionary)
@@ -4536,6 +4539,14 @@ assert.deepEqual(
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         self.assertIn("new CustomEvent('epub-browser:chapter-change'", chapter_script)
         self.assertGreaterEqual(chapter_script.count('announceReadingSessionChapter('), 4)
+
+    def test_vocabulary_navigation_is_between_annotations_and_insights_in_server_mode(self):
+        for html in (self._server_html(), self._server_book_html(), self._server_chapter_html()):
+            self.assertRegex(html, r"(?s)data-annotation-hub.*data-vocabulary.*data-reading-insights")
+            self.assertRegex(html, r"vocabulary\.[0-9a-f]{12}\.js")
+        for html in (self._library_html(), self._book_html(), self._chapter_html()):
+            self.assertNotIn("data-vocabulary", html)
+            self.assertNotRegex(html, r"/vocabulary\.[0-9a-f]{12}\.(?:css|js)")
 
     def test_reading_insights_is_a_server_only_modal_feature(self):
         server_library = self._server_html()

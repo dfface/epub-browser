@@ -168,6 +168,51 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         )
         self.assertEqual(managed["tags"], ["Managed tag"])
 
+    def test_vocabulary_pages_and_token_permissions(self):
+        path = "/api/v1/me/vocabulary"
+        for index, word in enumerate(("Run", "Runner", "Walk")):
+            self.store.record_vocabulary_lookup(
+                self.principal, "book", 0, str(index), word, word.casefold()
+            )
+        self.store.record_vocabulary_lookup(self.principal, "pdf", 0, "pdf", "Run", "run")
+        read = self.bearer("vocabulary:read")
+        write = self.bearer("vocabulary:read", "vocabulary:write")
+        self.assertEqual(self.client.get(path).status_code, 401)
+        self.assertEqual(self.client.get(path, headers=self.bearer("library:read")).status_code, 403)
+        page = self.client.get(path, params={"q": "RUN", "page_size": 1}, headers=read).json()
+        self.assertEqual((page["page"], page["total"], page["total_pages"]), (1, 2, 2))
+        self.assertEqual(page["words"][0]["word"], "Run")
+        self.assertEqual(page["words"][0]["lookup_count"], 2)
+        second = self.client.get(path, params={
+            "q": "run", "page_size": 1, "page": 2, "book_id": "book"
+        }, headers=read).json()
+        self.assertEqual(second["words"][0]["word"], "Run")
+        self.assertEqual(second["words"][0]["lookup_count"], 1)
+        self.assertEqual(self.client.get(path, params={"page_size": 101}, headers=read).status_code, 400)
+        word_path = path + "/" + page["words"][0]["id"]
+        self.assertEqual(self.client.patch(word_path, json={"mastery": "learning"}, headers=read).status_code, 403)
+        self.assertEqual(self.client.patch(word_path, json={"mastery": "learning"}, headers=write).status_code, 200)
+        result = self.client.get(path, params={"mastery": "learning"}, headers=read).json()
+        self.assertEqual([word["word"] for word in result["words"]], ["Run"])
+        other = self.store.create_user("other", None)
+        token = self.store.create_personal_access_token(other.user_id, "Other", ("vocabulary:read", "vocabulary:write"), expires_at=None)
+        other_headers = {"Authorization": "Bearer " + token.raw_token}
+        self.assertEqual(self.client.get(path, headers=other_headers).json()["total"], 0)
+        self.assertEqual(self.client.delete(word_path, headers=other_headers).status_code, 404)
+        self.assertEqual(self.client.delete(word_path, params={"book_id": "book"}, headers=write).status_code, 204)
+        self.assertEqual(self.client.get(path, params={"book_id": "book", "q": "run"}, headers=read).json()["total"], 1)
+        self.assertEqual(self.client.delete(word_path, headers=write).status_code, 204)
+        lookup = {"word": "Run", "book_id": "pdf", "chapter_index": 1, "lookup_id": "retry"}
+        self.assertEqual(self.client.post(path, json=lookup, headers=read).status_code, 403)
+        for _ in range(2):
+            self.assertEqual(self.client.post(path, json=lookup, headers=write).status_code, 204)
+        entry = self.client.get(path, params={"book_id": "pdf"}, headers=read).json()["words"][0]
+        self.assertEqual((entry["lookup_count"], entry["sources"][0]["chapter_index"]), (1, 1))
+        self.assertEqual(self.client.post(path, json={**lookup, "chapter_index": 2}, headers=write).status_code, 400)
+        operation = openapi_document()["paths"][path]["get"]
+        self.assertEqual({p["name"] for p in operation["parameters"]},
+                         {"book_id", "q", "mastery", "page", "page_size"})
+
     def test_openapi_contract_matches_declared_operations_and_scopes(self):
         document = openapi_document()
         self.assertEqual(document["openapi"], "3.1.0")

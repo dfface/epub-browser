@@ -1,6 +1,7 @@
 """Reusable Server-only navigation, account, and administration chrome."""
 
 from datetime import datetime
+from html import escape
 
 from .asset_publisher import PublishedAssets
 from .book_sort import BOOK_SORT_LABEL, BOOK_SORT_OPTIONS, book_sort_options
@@ -12,6 +13,29 @@ from .version import render_footer
 SERVER_ACCOUNT_STYLESHEET = '<link rel="stylesheet" href="/assets/account.css">'
 SERVER_AUTH_SCRIPT = '<script src="/assets/auth.js" defer></script>'
 SERVER_LOCALE_SCRIPT = '<script src="/assets/locale-nav.js" defer></script>'
+
+def render_vocabulary_navigation(book_id: str = "") -> str:
+    return (
+        '<button type="button" class="app-nav-link" aria-haspopup="dialog" '
+        f'data-vocabulary="{escape(book_id, quote=True)}">'
+        '<i class="fas fa-spell-check" aria-hidden="true"></i>'
+        '<span data-i18n="vocabulary.navigation">Vocabulary</span></button>'
+    )
+
+
+def render_vocabulary_assets(assets: PublishedAssets, *, include_dictionary=True) -> str:
+    dictionary = (
+        f'<link rel="stylesheet" href="{assets.url_for("annotation-hub.css")}">'
+        f'<link rel="stylesheet" href="{assets.url_for("dictionary.css")}">'
+        f'<script src="{assets.url_for("dictionary.js")}" defer></script>'
+        if include_dictionary else ""
+    )
+    return (
+        dictionary
+        + f'<link rel="stylesheet" href="{assets.url_for("vocabulary.css")}">'
+        f'<script src="{assets.url_for("vocabulary.js")}" defer></script>'
+    )
+
 
 _SERVER_LOCALE_OPTIONS = ''.join(
     '<option value="{code}" data-i18n="locale.name.{code}">{name}</option>'.format(
@@ -111,6 +135,7 @@ SERVER_ACCOUNT_PANEL = '''
             <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.progress">Progress</strong><label><input type="checkbox" name="scopes" value="progress:read"> <span data-i18n="account.pats.scope.progressRead">Read progress</span></label><label><input type="checkbox" name="scopes" value="progress:write"> <span data-i18n="account.pats.scope.progressWrite">Update progress</span></label></div>
             <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.annotations">Annotations</strong><label><input type="checkbox" name="scopes" value="annotations:read"> <span data-i18n="account.pats.scope.annotationsRead">Read annotations</span></label><label><input type="checkbox" name="scopes" value="annotations:write"> <span data-i18n="account.pats.scope.annotationsWrite">Update annotations</span></label></div>
             <div class="account-pat-scope-group"><strong data-i18n="account.pats.group.reviews">Reviews</strong><label><input type="checkbox" name="scopes" value="reviews:read"> <span data-i18n="account.pats.scope.reviewsRead">Read reviews</span></label><label><input type="checkbox" name="scopes" value="reviews:write"> <span data-i18n="account.pats.scope.reviewsWrite">Update reviews</span></label></div>
+            <div class="account-pat-scope-group"><strong data-i18n="vocabulary.navigation">Vocabulary</strong><label><input type="checkbox" name="scopes" value="vocabulary:read"> <span data-i18n="vocabulary.scopeRead">Read vocabulary</span></label><label><input type="checkbox" name="scopes" value="vocabulary:write"> <span data-i18n="vocabulary.scopeWrite">Manage vocabulary</span></label></div>
             <div class="account-pat-scope-group"><strong data-i18n="account.kindle.memo">Memo</strong><label><input type="checkbox" name="scopes" value="kindle-memo:read"> <span data-i18n="account.kindle.memoRead">Read Kindle memo</span></label><label><input type="checkbox" name="scopes" value="kindle-memo:write"> <span data-i18n="account.kindle.memoWrite">Update Kindle memo</span></label></div>
             <div class="account-pat-scope-group" id="patAdminScopeLabel" hidden><strong data-i18n="account.pats.group.administration">Administration</strong><label><input type="checkbox" name="scopes" value="admin:data:read"> <span data-i18n="account.pats.scope.adminDataRead">Read all users' non-secret data</span></label></div>
         </fieldset>
