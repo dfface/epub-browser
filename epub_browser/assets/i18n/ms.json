@@ -19,6 +19,7 @@
   "theme.day": "Tema siang",
   "theme.night": "Tema malam",
   "theme.automatic": "Tukar antara tema siang dan malam secara automatik mengikut tetapan peranti",
+  "theme.automaticHelp": "Pertukaran automatik menyembunyikan butang tema pada bar alat. Pilih tema siang dan malam di sini.",
   "theme.invalid": "Tetapan penampilan tidak sah.",
   "theme.saveFailed": "Tetapan penampilan tidak dapat disimpan.",
   "reader.library": "Perpustakaan",

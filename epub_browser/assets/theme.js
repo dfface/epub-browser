@@ -65,15 +65,8 @@ function initTheme() {
             return;
         }
 
-        var preferences = bootstrap.preferences(window);
-        var key = 'manual';
-        if (preferences.automatic) {
-            var scheme = bootstrap.deviceScheme(window);
-            key = scheme && scheme.matches ? 'night' : 'day';
-        }
-        var changes = {};
-        changes[key] = theme;
-        saveAppearance(changes, false);
+        if (bootstrap.preferences(window).automatic) return;
+        saveAppearance({manual: theme}, false);
     }
 
     function applyTheme() {
@@ -89,6 +82,9 @@ function initTheme() {
             }
         }
         
+        if (themeToggle) {
+            themeToggle.hidden = serverMode && bootstrap.preferences(window).automatic;
+        }
         if (themeToggle && currentTheme) {
             var icon = themeToggle.querySelector('i');
             if (icon) {
@@ -220,6 +216,10 @@ function initTheme() {
 
         refreshTheme = function() {
             var activeTheme = applyTheme();
+            if (themeMenu && themeToggle.hidden) {
+                themeMenu.style.display = 'none';
+                themeToggle.setAttribute('aria-expanded', 'false');
+            }
             if (themeMenu) {
                 // Keep the focused menu item in place during a device change.
                 themes.forEach(function(theme, index) {
@@ -244,6 +244,7 @@ function initTheme() {
         }
         
         function handleThemeToggle(e) {
+            if (themeToggle.hidden) return;
             e.stopPropagation();
             
             // 显示主题选择菜单

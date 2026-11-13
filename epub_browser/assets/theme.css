@@ -1968,3 +1968,7 @@
     outline-offset: 3px;
     border-radius: 2px;
 }
+
+#themeToggle[hidden] {
+    display: none;
+}

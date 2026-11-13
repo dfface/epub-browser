@@ -19,6 +19,7 @@
   "theme.day": "Tagdesign",
   "theme.night": "Nachtdesign",
   "theme.automatic": "Je nach Geräteeinstellung automatisch zwischen Tag- und Nachtdesign wechseln",
+  "theme.automaticHelp": "Die automatische Umschaltung blendet die Design-Schaltfläche in der Symbolleiste aus. Wähle hier dein Tag- und Nachtdesign.",
   "theme.invalid": "Die Darstellungseinstellungen sind ungültig.",
   "theme.saveFailed": "Die Darstellungseinstellungen konnten nicht gespeichert werden.",
   "reader.library": "Bibliothek",

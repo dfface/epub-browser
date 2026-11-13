@@ -19,6 +19,7 @@
   "theme.day": "日间主题",
   "theme.night": "夜间主题",
   "theme.automatic": "跟随设备设置自动切换日间和夜间主题",
+  "theme.automaticHelp": "开启自动切换后，工具栏会隐藏主题按钮。你可以在这里选择日间和夜间主题。",
   "theme.invalid": "外观设置无效。",
   "theme.saveFailed": "无法保存外观设置。",
   "reader.library": "书库",

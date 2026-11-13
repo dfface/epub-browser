@@ -19,6 +19,7 @@
   "theme.day": "Tema diurno",
   "theme.night": "Tema nocturno",
   "theme.automatic": "Cambiar automáticamente entre los temas diurno y nocturno según el dispositivo",
+  "theme.automaticHelp": "El cambio automático oculta el botón de tema de la barra de herramientas. Elige aquí tus temas diurno y nocturno.",
   "theme.invalid": "Los ajustes de apariencia no son válidos.",
   "theme.saveFailed": "No se pudieron guardar los ajustes de apariencia.",
   "reader.library": "Biblioteca",

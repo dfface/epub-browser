@@ -19,6 +19,7 @@
   "theme.day": "Day theme",
   "theme.night": "Night theme",
   "theme.automatic": "Automatically switch between day and night themes based on the device",
+  "theme.automaticHelp": "Automatic switching hides the toolbar theme button. Choose your day and night themes here.",
   "theme.invalid": "Invalid appearance settings.",
   "theme.saveFailed": "Unable to save appearance settings.",
   "reader.library": "Library",

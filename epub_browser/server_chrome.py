@@ -122,7 +122,8 @@ SERVER_ACCOUNT_PANEL = '''
     <div class="account-form">
         <label><span data-i18n="theme.day">Day theme</span><select id="accountDayTheme"></select></label>
         <label><span data-i18n="theme.night">Night theme</span><select id="accountNightTheme"></select></label>
-        <label class="account-theme-auto"><input type="checkbox" id="accountAutoTheme"><span data-i18n="theme.automatic">Automatically switch between day and night themes based on the device</span></label>
+        <label class="account-theme-auto"><input type="checkbox" id="accountAutoTheme" aria-describedby="accountAutoThemeHelp"><span data-i18n="theme.automatic">Automatically switch between day and night themes based on the device</span></label>
+        <p class="account-help" id="accountAutoThemeHelp" data-i18n="theme.automaticHelp">Automatic switching hides the toolbar theme button. Choose your day and night themes here.</p>
         <p class="account-form-message" id="accountAppearanceStatus" role="status"></p>
     </div>
 </section>

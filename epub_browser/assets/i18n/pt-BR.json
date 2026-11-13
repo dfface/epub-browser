@@ -19,6 +19,7 @@
   "theme.day": "Tema diurno",
   "theme.night": "Tema noturno",
   "theme.automatic": "Alternar automaticamente entre os temas diurno e noturno conforme as configurações do dispositivo",
+  "theme.automaticHelp": "A alternância automática oculta o botão de tema da barra de ferramentas. Escolha aqui os temas diurno e noturno.",
   "theme.invalid": "As configurações de aparência são inválidas.",
   "theme.saveFailed": "Não foi possível salvar as configurações de aparência.",
   "reader.library": "Biblioteca",

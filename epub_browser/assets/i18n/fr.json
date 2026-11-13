@@ -19,6 +19,7 @@
   "theme.day": "Thème de jour",
   "theme.night": "Thème de nuit",
   "theme.automatic": "Basculer automatiquement entre les thèmes de jour et de nuit selon les réglages de l’appareil",
+  "theme.automaticHelp": "Le basculement automatique masque le bouton de thème de la barre d’outils. Choisissez ici vos thèmes de jour et de nuit.",
   "theme.invalid": "Les réglages d’apparence sont invalides.",
   "theme.saveFailed": "Impossible d’enregistrer les réglages d’apparence.",
   "reader.library": "Bibliothèque",

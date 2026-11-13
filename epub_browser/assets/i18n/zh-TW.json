@@ -19,6 +19,7 @@
   "theme.day": "日間主題",
   "theme.night": "夜間主題",
   "theme.automatic": "依裝置設定自動切換日間與夜間主題",
+  "theme.automaticHelp": "開啟自動切換後，工具列會隱藏主題按鈕。你可以在這裡選擇日間和夜間主題。",
   "theme.invalid": "外觀設定無效。",
   "theme.saveFailed": "無法儲存外觀設定。",
   "reader.library": "圖書館",
