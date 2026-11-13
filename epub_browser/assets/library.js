@@ -120,7 +120,8 @@ function initScript() {
     var orderedBooks = null;
     var pageBooks = [];
     var currentPage = 1;
-    var libraryPageSize = 24;
+    var libraryPageTarget = 24;
+    var libraryPageSize = libraryPageTarget;
     var bookGrid = document.querySelector('.book-grid');
     var pager = document.getElementById('libraryPager');
     var previousPage = document.getElementById('libraryPreviousPage');
@@ -657,8 +658,39 @@ function initScript() {
         }
     }
 
+    function libraryGridColumns() {
+        var tracks;
+        var i;
+        if (!bookGrid || !window.getComputedStyle) return 0;
+        tracks = window.getComputedStyle(bookGrid).gridTemplateColumns;
+        if (!tracks || tracks === 'none') return 0;
+        tracks = tracks.trim().split(/\s+/);
+        if (!tracks.length) return 0;
+        // auto-fill/auto-fit 只有在解析成具体像素轨道时才能确定列数
+        for (i = 0; i < tracks.length; i++) {
+            if (!/^[0-9.]+px$/.test(tracks[i])) return 0;
+        }
+        return tracks.length;
+    }
+
+    // 每页行数保持接近 libraryPageTarget，但页大小必须是当前列数的整数倍，
+    // 否则最后一行会缺卡；窗口宽度改变列数时同步调整。
+    function syncLibraryPageSize() {
+        var columns = libraryGridColumns();
+        var nextSize = columns > 0
+            ? columns * Math.max(1, Math.round(libraryPageTarget / columns))
+            : libraryPageTarget;
+        var firstVisibleIndex;
+        if (nextSize === libraryPageSize) return false;
+        firstVisibleIndex = (currentPage - 1) * libraryPageSize;
+        libraryPageSize = nextSize;
+        currentPage = Math.floor(firstVisibleIndex / nextSize) + 1;
+        return true;
+    }
+
     function applyLibraryFilters() {
         if (!bookGrid || !orderedBooks) return;
+        syncLibraryPageSize();
         var searchTerm = (searchBox.value || '').toLowerCase().trim();
         var searchPinyin = searchTerm && typeof pinyinPro !== 'undefined' ? searchablePinyin(searchTerm) : '';
         var activeTag = document.querySelector('.tag-cloud-item.active');
@@ -769,7 +801,12 @@ function initScript() {
             }
         });
     }
-    if (window.addEventListener) window.addEventListener('resize', updateTagCloudCollapse);
+    if (window.addEventListener) {
+        window.addEventListener('resize', updateTagCloudCollapse);
+        window.addEventListener('resize', function() {
+            if (syncLibraryPageSize()) applyLibraryFilters();
+        });
+    }
     var libraryGrid = document.querySelector('.book-grid');
     if (libraryGrid && libraryGrid.getAttribute('data-library-filter-listener') !== 'true') {
         libraryGrid.setAttribute('data-library-filter-listener', 'true');

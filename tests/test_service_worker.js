@@ -6,10 +6,18 @@ const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
 
+function projectPython() {
+  const venvPython = path.join(__dirname, '..', '.venv', 'bin', 'python');
+  if (fs.existsSync(venvPython)) {
+    return venvPython;
+  }
+  return process.env.PYTHON || 'python3';
+}
+
 function loadWorker() {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'epub-browser-worker-'));
   try {
-    execFileSync('python3', [
+    execFileSync(projectPython(), [
       '-c',
       "from epub_browser.asset_publisher import AssetPublisher; import sys; AssetPublisher('epub_browser/assets', sys.argv[1]).publish()",
       output,

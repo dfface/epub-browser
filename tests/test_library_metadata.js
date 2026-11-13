@@ -360,6 +360,44 @@ test('pages through the sorted catalogue and searches across pages', () => {
   assert.equal(harness.pager.hidden, true);
 });
 
+test('sizes each page from the rendered grid columns so every row stays complete', () => {
+  const books = Array.from({ length: 26 }, (_, index) => ({
+    hash: 'book-' + index, title: 'Book ' + index, authors: [], tags: [],
+    url: '/book/' + index + '/', cover: null,
+  }));
+  const harness = createLibraryHarness([books]);
+  harness.window.getComputedStyle = () => ({
+    gridTemplateColumns: '150px 150px 150px 150px 150px',
+  });
+
+  harness.window.initScriptLibrary();
+
+  assert.equal(harness.cardIds().length, 25);
+  harness.next.dispatch('click');
+  assert.deepEqual(harness.cardIds(), ['book-25']);
+});
+
+test('recomputes the page size when the grid column count changes', () => {
+  const books = Array.from({ length: 30 }, (_, index) => ({
+    hash: 'book-' + index, title: 'Book ' + index, authors: [], tags: [],
+    url: '/book/' + index + '/', cover: null,
+  }));
+  const grid = { gridTemplateColumns: '150px 150px 150px 150px' };
+  const harness = createLibraryHarness([books]);
+  harness.window.getComputedStyle = () => grid;
+
+  harness.window.initScriptLibrary();
+  assert.equal(harness.cardIds().length, 24);
+  harness.next.dispatch('click');
+  assert.equal(harness.cardIds().length, 6);
+
+  grid.gridTemplateColumns = '150px 150px 150px 150px 150px';
+  harness.resize();
+
+  assert.equal(harness.cardIds().length, 25);
+  assert.equal(harness.cardIds()[0], 'book-0');
+});
+
 test('jumps directly to a page and rejects a page outside the results', () => {
   const books = Array.from({ length: 50 }, (_, index) => ({
     hash: 'book-' + index, title: 'Book ' + index, authors: [], tags: [],
