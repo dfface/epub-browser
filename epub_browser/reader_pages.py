@@ -36,6 +36,26 @@ if TYPE_CHECKING:
 _READER_FONT_SIZES_REM = (0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.2, 2.5, 2.8, 3.2, 3.6, 4.0)
 _DEFAULT_READER_FONT_LEVEL = 3
 
+# Shared by the Server EPUB book dialog and chapter drawer.
+_BOOK_SEARCH_BODY = '''
+        <form class="book-search-form" id="bookSearchForm" role="search">
+            <label class="visually-hidden" for="bookSearchInput" data-i18n="book.search">Search this book</label>
+            <input id="bookSearchInput" type="search" autocomplete="off" enterkeyhint="search" maxlength="128" placeholder="Search this book" data-i18n-placeholder="book.searchPlaceholder">
+            <button class="book-search-submit" type="submit" aria-label="Search this book" data-i18n-aria-label="book.search"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></button>
+        </form>
+        <p class="book-search-status" id="bookSearchStatus" role="status"></p>
+        <ul class="toc-list book-search-results" id="bookSearchResults"></ul>
+        <form class="book-search-pagination" id="bookSearchPagination" hidden>
+            <button class="book-search-page-btn" id="bookSearchPrev" type="button" aria-label="Previous page" data-i18n-aria-label="book.searchPrevPage"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
+            <label class="visually-hidden" for="bookSearchPageInput" data-i18n="reader.currentPage">Current page</label>
+            <input class="book-search-page-input" id="bookSearchPageInput" type="number" min="1" step="1" required inputmode="numeric" enterkeyhint="go" aria-describedby="bookSearchPageStatus">
+            <span class="book-search-page-total" id="bookSearchPageTotal" aria-hidden="true"></span>
+            <span class="visually-hidden" id="bookSearchPageStatus" aria-live="polite"></span>
+            <button class="book-search-page-btn book-search-page-jump" id="bookSearchPageJump" type="submit" data-i18n="reader.jump">Jump</button>
+            <button class="book-search-page-btn" id="bookSearchNext" type="button" aria-label="Next page" data-i18n-aria-label="book.searchNextPage"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
+        </form>
+'''
+
 # Kindle minimal reader: a deliberately dependency-free surface for legacy
 # Kindle WebKit browsers. All CSS/JS is inlined into the page, preferences and
 # reading progress use cookies (no localStorage), and the script stays ES5
@@ -1103,18 +1123,7 @@ class ReaderPageRenderer:
             <h2 data-i18n="book.search">Search this book</h2>
             <button class="book-search-close" id="bookSearchClose" type="button" aria-label="Close search" data-i18n-aria-label="book.closeSearch"><i class="fas fa-times" aria-hidden="true"></i></button>
         </div>
-        <form class="book-search-form" id="bookSearchForm" role="search">
-            <label class="visually-hidden" for="bookSearchInput" data-i18n="book.search">Search this book</label>
-            <input id="bookSearchInput" type="search" autocomplete="off" enterkeyhint="search" maxlength="128" placeholder="Search this book" data-i18n-placeholder="book.searchPlaceholder">
-            <button class="book-search-submit" type="submit" aria-label="Search this book" data-i18n-aria-label="book.search"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></button>
-        </form>
-        <p class="book-search-status" id="bookSearchStatus" role="status"></p>
-        <ul class="toc-list book-search-results" id="bookSearchResults"></ul>
-        <div class="book-search-pagination" id="bookSearchPagination" hidden>
-            <button class="book-search-page-btn" id="bookSearchPrev" type="button" aria-label="Previous page" data-i18n-aria-label="book.searchPrevPage"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
-            <span class="book-search-page-status" id="bookSearchPageStatus"></span>
-            <button class="book-search-page-btn" id="bookSearchNext" type="button" aria-label="Next page" data-i18n-aria-label="book.searchNextPage"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
-        </div>
+{_BOOK_SEARCH_BODY}
     </section>
 </div>'''
             book_search_script = '<script src="/assets/book-search.js" defer></script>'
@@ -2064,24 +2073,13 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
             <button class="control-btn" id="bookSearchToggle" type="button" aria-label="Search this book" data-i18n-aria-label="book.search" aria-controls="bookSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span class="control-name" data-i18n="book.search">Search this book</span></button>'''
             book_search_mobile_controls = '''
         <button class="control-btn" id="mobileBookSearchToggle" type="button" aria-label="Search this book" title="Search this book" data-i18n-aria-label="book.search" data-i18n-title="book.search" aria-controls="bookSearchDrawer" aria-expanded="false"><i class="fas fa-magnifying-glass" aria-hidden="true"></i><span data-i18n="book.search">Search this book</span></button>'''
-            book_search_drawer = '''
+            book_search_drawer = f'''
     <nav class="toc-floating reader-drawer book-search-drawer" id="bookSearchDrawer" aria-label="Search this book" data-i18n-aria-label="book.search" aria-hidden="true">
         <div class="toc-header">
             <h3 data-i18n="book.search">Search this book</h3>
             <button class="toc-close" id="bookSearchClose" type="button" aria-label="Close search" data-i18n-aria-label="book.closeSearch"><i class="fas fa-times" aria-hidden="true"></i></button>
         </div>
-        <form class="book-search-form" id="bookSearchForm" role="search">
-            <label class="visually-hidden" for="bookSearchInput" data-i18n="book.search">Search this book</label>
-            <input id="bookSearchInput" type="search" autocomplete="off" enterkeyhint="search" maxlength="128" placeholder="Search this book" data-i18n-placeholder="book.searchPlaceholder">
-            <button class="book-search-submit" type="submit" aria-label="Search this book" data-i18n-aria-label="book.search"><i class="fas fa-magnifying-glass" aria-hidden="true"></i></button>
-        </form>
-        <p class="book-search-status" id="bookSearchStatus" role="status"></p>
-        <ul class="toc-list book-search-results" id="bookSearchResults"></ul>
-        <div class="book-search-pagination" id="bookSearchPagination" hidden>
-            <button class="book-search-page-btn" id="bookSearchPrev" type="button" aria-label="Previous page" data-i18n-aria-label="book.searchPrevPage"><i class="fas fa-chevron-left" aria-hidden="true"></i></button>
-            <span class="book-search-page-status" id="bookSearchPageStatus"></span>
-            <button class="book-search-page-btn" id="bookSearchNext" type="button" aria-label="Next page" data-i18n-aria-label="book.searchNextPage"><i class="fas fa-chevron-right" aria-hidden="true"></i></button>
-        </div>
+{_BOOK_SEARCH_BODY}
     </nav>'''
             book_search_script = '<script src="/assets/book-search.js" defer></script>'
         reading_session_context = (

@@ -295,17 +295,29 @@
     state.renderedQuery = state.query;
     state.renderedPage = state.page;
     var pagination = root.document.getElementById('bookSearchPagination');
-    var pageStatus = root.document.getElementById('bookSearchPageStatus');
-    if (pageStatus) {
-      pageStatus.textContent = t('book.searchPageStatus', { page: state.page, pages: pages });
-      pageStatus.setAttribute('data-i18n', 'book.searchPageStatus');
-      pageStatus.setAttribute('data-i18n-params', JSON.stringify({ page: state.page, pages: pages }));
+    var pageInput = root.document.getElementById('bookSearchPageInput');
+    var pageTotal = root.document.getElementById('bookSearchPageTotal');
+    if (pageInput) {
+      pageInput.value = state.page;
+      pageInput.max = pages;
     }
-    if (pagination) pagination.hidden = pages <= 1;
+    if (pageTotal) pageTotal.textContent = '/ ' + pages;
+    setStatus(root.document.getElementById('bookSearchPageStatus'),
+      'book.searchPageStatus', { page: state.page, pages: pages });
+    if (pagination) {
+      if (pages <= 1 && pagination.contains(root.document.activeElement)) {
+        root.document.getElementById('bookSearchInput').focus();
+      }
+      pagination.hidden = pages <= 1;
+    }
     var previous = root.document.getElementById('bookSearchPrev');
     var next = root.document.getElementById('bookSearchNext');
     if (previous) previous.disabled = state.page <= 1;
     if (next) next.disabled = state.page >= pages;
+    var focused = root.document.activeElement;
+    if (pageInput && focused && focused.disabled && (focused === previous || focused === next)) {
+      pageInput.focus();
+    }
     if (!results.length) {
       setStatus(statusEl, total ? 'book.searchPageOutOfRange' : 'book.searchNoResults');
       return;
@@ -458,7 +470,13 @@
     var list = root.document.getElementById('bookSearchResults');
     if (!form || !input || !list) return Promise.resolve();
     var value = String(query || '').replace(/[ \t\r\n\f]+/g, ' ').replace(/^ | $/g, '');
+    if (state.controller) state.controller.abort();
+    state.requestId += 1;
+    var requestId = state.requestId;
+    var pagination = root.document.getElementById('bookSearchPagination');
     if (!value) {
+      state.controller = null;
+      form.removeAttribute('aria-busy');
       state.query = '';
       state.page = 1;
       state.pages = 1;
@@ -468,14 +486,10 @@
       clearResults(list);
       setStatus(statusEl, '');
       renderHint(list);
-      var pagination = root.document.getElementById('bookSearchPagination');
       if (pagination) pagination.hidden = true;
       return Promise.resolve();
     }
     var pageNumber = Math.max(1, parseInt(page, 10) || 1);
-    if (state.controller) state.controller.abort();
-    state.requestId += 1;
-    var requestId = state.requestId;
     state.query = value;
     state.page = pageNumber;
     storeSearch(value, pageNumber);
@@ -483,8 +497,10 @@
     form.setAttribute('aria-busy', 'true');
     clearResults(list);
     setStatus(statusEl, 'book.searching');
-    var pendingPagination = root.document.getElementById('bookSearchPagination');
-    if (pendingPagination) pendingPagination.hidden = true;
+    if (pagination && value !== state.renderedQuery) pagination.hidden = true;
+    // These results are cleared while loading. A failed request must be
+    // retried on reopen even if it requested the last rendered page.
+    state.renderedQuery = '';
     var url = publicPath(
       '/api/books/' + encodeURIComponent(bookId()) + '/search?q=' + encodeURIComponent(value) +
       '&page=' + pageNumber
@@ -507,13 +523,17 @@
       if (requestId !== state.requestId) return;
       form.removeAttribute('aria-busy');
       state.controller = null;
+      if (!state.renderedQuery && pagination && !pagination.hidden) {
+        if (pagination.contains(root.document.activeElement)) input.focus();
+        pagination.hidden = true;
+      }
     });
   }
 
   function trapFocus(event, dialog) {
-    var focusable = dialog.querySelectorAll(
+    var focusable = Array.from(dialog.querySelectorAll(
       'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])'
-    );
+    )).filter(function (element) { return !element.closest('[hidden]'); });
     if (!focusable.length) return;
     var first = focusable[0];
     var last = focusable[focusable.length - 1];
@@ -617,14 +637,25 @@
     }
     var previous = root.document.getElementById('bookSearchPrev');
     var next = root.document.getElementById('bookSearchNext');
+    var pagination = root.document.getElementById('bookSearchPagination');
+    var pageInput = root.document.getElementById('bookSearchPageInput');
+    if (pagination && pageInput) {
+      pagination.addEventListener('submit', function (event) {
+        event.preventDefault();
+        if (form.hasAttribute('aria-busy')) return;
+        var page = pageInput.valueAsNumber;
+        if (!Number.isSafeInteger(page) || page < 1 || page > state.pages) return;
+        if (page !== state.page) search(state.query, page);
+      });
+    }
     if (previous) {
       previous.addEventListener('click', function () {
-        if (state.page > 1) search(state.query, state.page - 1);
+        if (!form.hasAttribute('aria-busy') && state.page > 1) search(state.query, state.page - 1);
       });
     }
     if (next) {
       next.addEventListener('click', function () {
-        if (state.page < state.pages) search(state.query, state.page + 1);
+        if (!form.hasAttribute('aria-busy') && state.page < state.pages) search(state.query, state.page + 1);
       });
     }
     form.addEventListener('submit', function (event) {

@@ -1692,6 +1692,10 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         )
         self.assertIn("bookSearchDrawer", server_chapter)
 
+        for html in (server_book, server_chapter):
+            self.assertIn('id="bookSearchPageInput"', html)
+            self.assertIn('id="bookSearchPageJump"', html)
+
         for html in (ssg_book, ssg_chapter):
             self.assertNotIn("data-book-search", html)
             self.assertNotIn("bookSearchDrawer", html)
