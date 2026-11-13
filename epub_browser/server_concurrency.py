@@ -46,8 +46,16 @@ def _run(pool: ThreadPoolExecutor, fn: Callable[..., Any], *args, **kwargs) -> A
 
 
 async def run_db(fn: Callable[..., Any], *args, **kwargs) -> Any:
-    """Run a synchronous StateStore call in the SQLite pool."""
-    return await _run(DB_POOL, fn, *args, **kwargs)
+    """Run a StateStore call and let in-flight transactions finish on cancellation."""
+    operation = _run(DB_POOL, fn, *args, **kwargs)
+    try:
+        return await asyncio.shield(operation)
+    except asyncio.CancelledError:
+        try:
+            await operation
+        except Exception:
+            LOGGER.exception("Database operation failed while its caller was cancelled")
+        raise
 
 
 async def run_render(fn: Callable[..., Any], *args, **kwargs) -> Any:

@@ -5,6 +5,8 @@ const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
+const { pathToFileURL } = require('node:url');
 
 const browser = [
   process.env.EPUB_BROWSER_TEST_BROWSER,
@@ -18,7 +20,7 @@ const browser = [
 
 test('cross-cell highlights preserve table geometry and wrapped highlights have no fragment borders', {
   skip: browser ? false : 'Chrome, Edge, or Chromium is required for annotation layout',
-}, () => {
+}, (t) => {
   const asset = filename => fs.readFileSync(path.join(__dirname, '../epub_browser/assets', filename), 'utf8');
   const annotation = asset('annotation.js').replace(
     /\}\)\(window\);\s*$/, 'window.interaction = HighlightInteraction; })(window);',
@@ -100,9 +102,13 @@ test('cross-cell highlights preserve table geometry and wrapped highlights have 
         document.body.dataset.result = error.message;
       }
     </script>`;
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'epub-browser-annotation-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const fixture = path.join(directory, 'index.html');
+  fs.writeFileSync(fixture, html);
   const result = spawnSync(browser, [
     '--headless=new', '--disable-gpu', '--no-sandbox', '--dump-dom',
-    'data:text/html;charset=utf-8,' + encodeURIComponent(html),
+    pathToFileURL(fixture).href,
   ], { encoding: 'utf8', timeout: 15000 });
 
   assert.ifError(result.error);
