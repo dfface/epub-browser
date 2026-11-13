@@ -175,10 +175,14 @@
   "library.loadError": "पुस्तकालय लोड नहीं हो सका। पृष्ठ रीफ़्रेश करके फिर प्रयास करें।",
   "library.progress.scanning": "पुस्तकालय स्कैन हो रहा है",
   "library.progress.processing": "पुस्तकालय अपडेट हो रहा है",
+  "library.progress.extracting": "पुस्तकों की जानकारी निकाली जा रही है",
+  "library.progress.converting": "रीडिंग कैश बनाया जा रहा है",
   "library.progress.complete": "पुस्तकालय अपडेट हो गया",
   "library.progress.degraded": "पुस्तकालय त्रुटियों के साथ अपडेट हुआ",
   "library.progress.reconnecting": "पुस्तकालय अपडेट से फिर जुड़ रहे हैं…",
   "library.progress.summary": "{total} में से {completed} पुस्तकें संसाधित हुईं",
+  "library.progress.extractingSummary": "{total} में से {completed} पुस्तकों की जानकारी देखी गई",
+  "library.progress.convertingSummary": "{total} में से {completed} पुस्तकें कैश की गईं",
   "library.progress.removed": {
     "one": "{count} पुस्तक हटाई गई",
     "other": "{count} पुस्तकें हटाई गईं"

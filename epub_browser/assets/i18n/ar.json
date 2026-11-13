@@ -175,10 +175,14 @@
   "library.loadError": "تعذر تحميل مكتبتك. حدّث الصفحة وحاول مجددًا.",
   "library.progress.scanning": "جارٍ فحص المكتبة",
   "library.progress.processing": "جارٍ تحديث المكتبة",
+  "library.progress.extracting": "جارٍ استخراج معلومات الكتب",
+  "library.progress.converting": "جارٍ إنشاء ذاكرة التخزين المؤقت للقراءة",
   "library.progress.complete": "تم تحديث المكتبة",
   "library.progress.degraded": "تم تحديث المكتبة مع وجود أخطاء",
   "library.progress.reconnecting": "جارٍ إعادة الاتصال بتحديثات المكتبة…",
   "library.progress.summary": "تمت معالجة {completed} من أصل {total} كتاب",
+  "library.progress.extractingSummary": "تم فحص {completed} من أصل {total} كتاب",
+  "library.progress.convertingSummary": "تم تخزين {completed} من أصل {total} كتاب مؤقتًا",
   "library.progress.removed": {
     "one": "تمت إزالة {count} كتاب",
     "other": "تمت إزالة {count} كتب"

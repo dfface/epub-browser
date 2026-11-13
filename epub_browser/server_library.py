@@ -149,6 +149,7 @@ class _ConversionPlan:
     source_format: str
     pdf_metadata: Optional[PDFMetadata] = None
     identity_inspection: object = None
+    prepared_epub: object = None
 
 
 class _StaleSourceError(RuntimeError):
@@ -311,12 +312,28 @@ class ServerLibraryManager:
             reused_records = []
             plans = []
             failures = []
+            existing_by_source = {
+                source: self.state_store.book_by_source(source)
+                for source in discovered
+            }
+            reading_recency = self.state_store.book_reading_recency()
+
+            def cache_priority(source):
+                record = existing_by_source[source]
+                read_at = reading_recency.get(record.book_id, 0) if record else 0
+                return (-read_at, str(source))
+
+            discovered = tuple(sorted(discovered, key=cache_priority))
+            cache_limit = self.state_store.get_general_settings()["book_cache_limit"]
+            cache_candidates = set(discovered[:cache_limit])
 
             for source in discovered:
                 if self._stop_event.is_set():
                     break
-                existing = self.state_store.book_by_source(source)
+                self.progress_broker.extraction_started(source)
+                existing = existing_by_source[source]
                 resolved_book_id = existing.book_id if existing else None
+                prepared_epub = None
                 try:
                     format_name = source_format(source)
                     source_stat = source.stat()
@@ -365,7 +382,9 @@ class ServerLibraryManager:
                         and legacy_book_id is None
                         and not inspection.has_current_carrier
                     ):
-                        metadata, pdf_metadata = self._probe_metadata(source)
+                        metadata, pdf_metadata, prepared_epub = self._probe_metadata(
+                            source, reusable=True
+                        )
                         inactive_matches = self.state_store.inactive_book_matches(
                             metadata.epub_identifier,
                             inspection.source_fingerprint,
@@ -431,7 +450,9 @@ class ServerLibraryManager:
                     if self._stop_event.is_set():
                         break
                     if metadata is None:
-                        metadata, pdf_metadata = self._probe_metadata(source)
+                        metadata, pdf_metadata, prepared_epub = self._probe_metadata(
+                            source, reusable=True
+                        )
                     if self._stop_event.is_set():
                         break
                     if existing:
@@ -483,18 +504,35 @@ class ServerLibraryManager:
                         if self._stop_event.is_set():
                             break
                         self._invalidate_public_output(record)
-                    plans.append(
-                        _ConversionPlan(
-                            source=source,
-                            record=record,
-                            fingerprint=resolved.source_fingerprint,
-                            source_size=resolved.source_size,
-                            source_mtime_ns=resolved.source_mtime_ns,
-                            source_format=format_name,
-                            pdf_metadata=pdf_metadata,
-                            identity_inspection=inspection if defer_identity else None,
-                        )
+                    plan = _ConversionPlan(
+                        source=source,
+                        record=record,
+                        fingerprint=resolved.source_fingerprint,
+                        source_size=resolved.source_size,
+                        source_mtime_ns=resolved.source_mtime_ns,
+                        source_format=format_name,
+                        pdf_metadata=pdf_metadata,
+                        identity_inspection=inspection if defer_identity else None,
+                        prepared_epub=prepared_epub,
                     )
+                    prepared_epub = None  # The plan now owns the prepared processor.
+                    if source not in cache_candidates:
+                        try:
+                            self._convert_plan(plan, metadata_only=True)
+                        except Exception:
+                            if (
+                                not self._stop_event.is_set()
+                                and not self._cache_valid(record)
+                            ):
+                                with self._commit_lock:
+                                    if not self._stop_event.is_set():
+                                        self.state_store.mark_missing(record.book_id)
+                            raise
+                        self.progress_broker.record_indexed(source)
+                        continue
+                    plans.append(plan)
+                    self.progress_broker.record_examined()
+                    self.progress_broker.record_conversion_planned(source)
                 except Exception as error:
                     kept = bool(existing and self._cache_valid(existing))
                     failures.append(
@@ -517,8 +555,12 @@ class ServerLibraryManager:
                     )
                     self.progress_broker.record_failure(source, error)
                     continue
+                finally:
+                    self._cleanup_prepared_epub(prepared_epub)
 
             if self._stop_event.is_set():
+                for plan in plans:
+                    self._cleanup_prepared_epub(plan.prepared_epub)
                 return self._stopped_summary(
                     reused=len(reused_records),
                     removed=removed,
@@ -661,50 +703,62 @@ class ServerLibraryManager:
         )
 
     def _conversion_outcomes(self, plans):
-        pending = queue.Queue()
-        completed = queue.Queue()
-        for plan in plans:
-            pending.put(plan)
+        try:
+            pending = queue.Queue()
+            completed = queue.Queue()
+            started = set()
+            started_lock = threading.Lock()
+            for plan in plans:
+                pending.put(plan)
 
-        def worker():
-            while not self._stop_event.is_set():
-                try:
-                    plan = pending.get_nowait()
-                except queue.Empty:
-                    return
-                if self._stop_event.is_set():
-                    return
-                try:
-                    self.progress_broker.conversion_started()
-                    converted = self._convert_plan(plan)
-                except BaseException as error:
-                    completed.put((plan, None, error))
-                else:
-                    completed.put((plan, converted, None))
+            def worker():
+                while not self._stop_event.is_set():
+                    try:
+                        plan = pending.get_nowait()
+                    except queue.Empty:
+                        return
+                    if self._stop_event.is_set():
+                        return
+                    try:
+                        self.progress_broker.conversion_started(plan.source)
+                        with started_lock:
+                            if self._stop_event.is_set():
+                                return
+                            started.add(id(plan))
+                        converted = self._convert_plan(plan)
+                    except BaseException as error:
+                        completed.put((plan, None, error))
+                    else:
+                        completed.put((plan, converted, None))
 
-        workers = [
-            threading.Thread(
-                target=worker,
-                name=f"epub_server_convert_{index}",
-                daemon=True,
-            )
-            for index in range(min(self.max_workers, len(plans)))
-        ]
-        for thread in workers:
-            thread.start()
-
-        remaining = len(plans)
-        while remaining and not self._stop_event.is_set():
-            try:
-                outcome = completed.get(timeout=0.05)
-            except queue.Empty:
-                continue
-            remaining -= 1
-            yield outcome
-
-        if not self._stop_event.is_set():
+            workers = [
+                threading.Thread(
+                    target=worker,
+                    name=f"epub_server_convert_{index}",
+                    daemon=True,
+                )
+                for index in range(min(self.max_workers, len(plans)))
+            ]
             for thread in workers:
-                thread.join()
+                thread.start()
+
+            remaining = len(plans)
+            while remaining and not self._stop_event.is_set():
+                try:
+                    outcome = completed.get(timeout=0.05)
+                except queue.Empty:
+                    continue
+                remaining -= 1
+                yield outcome
+
+            if not self._stop_event.is_set():
+                for thread in workers:
+                    thread.join()
+        finally:
+            with started_lock:
+                unstarted = [plan for plan in plans if id(plan) not in started]
+            for plan in unstarted:
+                self._cleanup_prepared_epub(plan.prepared_epub)
 
     def _notify_callback(self, callback, *args) -> None:
         if callback is None:
@@ -807,7 +861,7 @@ class ServerLibraryManager:
                 aliases[source] = tuple(source_aliases)
         return aliases
 
-    def _probe_metadata(self, source: Path) -> tuple[BookMetadata, Optional[PDFMetadata]]:
+    def _probe_metadata(self, source: Path, *, reusable=False):
         if source_format(source) == PDF_FORMAT:
             metadata = inspect_pdf(source)
             return BookMetadata(
@@ -818,7 +872,28 @@ class ServerLibraryManager:
                 language=metadata.language or "en",
                 epub_identifier=None,
                 source_format=PDF_FORMAT,
-            ), metadata
+            ), metadata, None
+        if reusable and self.converter_factory is EPUBProcessor and self._assets is not None:
+            self.staging_dir.mkdir(parents=True, exist_ok=True)
+            job_root = Path(tempfile.mkdtemp(
+                prefix="epub-browser-server-prepare-",
+                dir=self.staging_dir,
+            ))
+            processor = EPUBProcessor(
+                source,
+                job_root,
+                self._assets,
+                urls=self.urls,
+                reporter=self.reporter,
+                deployment_mode="server",
+            )
+            try:
+                processor.prepare()
+                return processor.get_metadata(), None, (processor, job_root)
+            except Exception:
+                processor.cleanup()
+                shutil.rmtree(job_root, ignore_errors=True)
+                raise
         with tempfile.TemporaryDirectory(
             prefix="epub-browser-server-probe-",
             dir=self.staging_dir if self.staging_dir.is_dir() else None,
@@ -831,48 +906,72 @@ class ServerLibraryManager:
                 reporter=self.reporter,
             )
             try:
-                if not processor.extract_epub():
-                    raise ValueError("unable to extract EPUB archive")
-                opf_path = processor.parse_container()
-                if not opf_path or not processor.parse_opf(opf_path):
-                    raise ValueError("unable to parse EPUB package")
-                return processor.get_metadata(), None
+                processor.prepare()
+                return processor.get_metadata(), None, None
             finally:
                 processor.cleanup()
 
-    def _convert_plan(self, plan: _ConversionPlan, *, restore=False) -> BookRecord:
+    @staticmethod
+    def _cleanup_prepared_epub(prepared) -> None:
+        if prepared is None:
+            return
+        processor, job_root = prepared
+        try:
+            processor.cleanup()
+        finally:
+            shutil.rmtree(job_root, ignore_errors=True)
+
+    def _convert_plan(
+        self, plan: _ConversionPlan, *, restore=False, metadata_only=False
+    ) -> BookRecord:
         if self._stop_event.is_set():
+            self._cleanup_prepared_epub(plan.prepared_epub)
             raise _ConversionCancelled("Server is stopping")
         self.staging_dir.mkdir(parents=True, exist_ok=True)
-        job_root = Path(
-            tempfile.mkdtemp(
-                prefix=f"{plan.record.book_id}-",
-                dir=self.staging_dir,
+        if plan.prepared_epub is not None:
+            processor, job_root = plan.prepared_epub
+        else:
+            job_root = Path(
+                tempfile.mkdtemp(
+                    prefix=f"{plan.record.book_id}-",
+                    dir=self.staging_dir,
+                )
             )
-        )
         if plan.source_format == PDF_FORMAT:
             try:
-                return self._convert_pdf_plan(plan, job_root, restore=restore)
+                return self._convert_pdf_plan(
+                    plan, job_root, restore=restore, metadata_only=metadata_only
+                )
             finally:
                 shutil.rmtree(job_root, ignore_errors=True)
-        processor = self.converter_factory(
-            plan.source,
-            job_root,
-            self._assets,
-            book_id=plan.record.book_id,
-            urls=self.urls,
-            reporter=self.reporter,
-            deployment_mode="server",
-        )
+        if plan.prepared_epub is None:
+            processor = self.converter_factory(
+                plan.source,
+                job_root,
+                self._assets,
+                book_id=plan.record.book_id,
+                urls=self.urls,
+                reporter=self.reporter,
+                deployment_mode="server",
+            )
         try:
-            converted: ConvertedBook = processor.convert()
+            if plan.prepared_epub is not None:
+                processor.bind_book_id(plan.record.book_id)
+            converted: ConvertedBook = (
+                processor.create_shelf_cache() if metadata_only else processor.convert()
+            )
             if self._stop_event.is_set():
                 raise _ConversionCancelled("Server is stopping")
             if source_sha256(plan.source) != plan.fingerprint:
                 raise _StaleSourceError(
                     "source changed while conversion was in progress"
                 )
-            self._validate_converted_book(converted)
+            if metadata_only:
+                (converted.output_dir / _EVICTED).write_text(
+                    SERVER_OUTPUT_REVISION + "\n", encoding="utf-8"
+                )
+            else:
+                self._validate_converted_book(converted)
             with self._commit_lock:
                 if self._stop_event.is_set():
                     raise _ConversionCancelled("Server is stopping")
@@ -913,15 +1012,22 @@ class ServerLibraryManager:
                 cleanup()
             shutil.rmtree(job_root, ignore_errors=True)
 
-    def _convert_pdf_plan(self, plan: _ConversionPlan, job_root: Path, *, restore=False) -> BookRecord:
+    def _convert_pdf_plan(
+        self, plan: _ConversionPlan, job_root: Path, *, restore=False, metadata_only=False
+    ) -> BookRecord:
         metadata = plan.pdf_metadata or inspect_pdf(plan.source)
         pdf_dir = job_root / "pdf"
         pdf_dir.mkdir(parents=True, exist_ok=True)
-        document = pdf_dir / "document.pdf"
-        self._atomic_copy(plan.source, document)
-        document_digest = source_sha256(document)
-        if document_digest != plan.fingerprint:
-            raise _StaleSourceError("source changed while conversion was in progress")
+        if metadata_only:
+            document_digest = plan.fingerprint
+            document_size = plan.source_size
+        else:
+            document = pdf_dir / "document.pdf"
+            self._atomic_copy(plan.source, document)
+            document_digest = source_sha256(document)
+            if document_digest != plan.fingerprint:
+                raise _StaleSourceError("source changed while conversion was in progress")
+            document_size = document.stat().st_size
         cover_result = render_pdf_cover(plan.source, job_root / "cover.png")
         cover_name = "cover.png" if cover_result is not None else None
         payload = self._pdf_metadata_payload(
@@ -930,13 +1036,18 @@ class ServerLibraryManager:
             source_size=plan.source_size,
             source_mtime_ns=plan.source_mtime_ns,
             source_digest=plan.fingerprint,
-            document_size=document.stat().st_size,
+            document_size=document_size,
             document_digest=document_digest,
         )
         self._atomic_write_json(pdf_dir / "metadata.json", payload)
-        (job_root / PDF_OUTPUT_REVISION_FILE).write_text(
-            PDF_OUTPUT_REVISION + "\n", encoding="utf-8"
-        )
+        if metadata_only:
+            (job_root / _EVICTED).write_text(
+                PDF_OUTPUT_REVISION + "\n", encoding="utf-8"
+            )
+        else:
+            (job_root / PDF_OUTPUT_REVISION_FILE).write_text(
+                PDF_OUTPUT_REVISION + "\n", encoding="utf-8"
+            )
         converted_metadata = BookMetadata(
             title=metadata.title or "PDF Book",
             authors=metadata.authors,
@@ -946,7 +1057,8 @@ class ServerLibraryManager:
             epub_identifier=None,
             source_format=PDF_FORMAT,
         )
-        self._validate_pdf_cache(job_root, plan, converted_metadata)
+        if not metadata_only:
+            self._validate_pdf_cache(job_root, plan, converted_metadata)
 
         with self._commit_lock:
             if self._stop_event.is_set():
@@ -1236,7 +1348,7 @@ class ServerLibraryManager:
         directory = self.public_dir / "book" / record.book_id
         revision = PDF_OUTPUT_REVISION if record.source_format == PDF_FORMAT else SERVER_OUTPUT_REVISION
         try:
-            if (directory / _EVICTED).read_text(encoding="utf-8") == revision:
+            if (directory / _EVICTED).read_text(encoding="utf-8").strip() == revision:
                 return True
         except (OSError, UnicodeDecodeError):
             pass
@@ -1267,6 +1379,7 @@ class ServerLibraryManager:
         book_root = self.public_dir / "book"
         records = {record.book_id: record for record in self.state_store.book_records()}
         limit = self.state_store.get_general_settings()["book_cache_limit"]
+        reading_recency = self.state_store.book_reading_recency()
         candidates = []
         if not book_root.is_dir():
             return
@@ -1282,9 +1395,14 @@ class ServerLibraryManager:
                 continue
             access = directory / _ACCESSED
             access_time = access.stat().st_mtime_ns if access.exists() else 0
-            candidates.append((record.active, access_time, record.book_id))
+            candidates.append((
+                record.active,
+                reading_recency.get(record.book_id, 0),
+                access_time,
+                record.book_id,
+            ))
         self._cache_needs_trim = False
-        for _, _, book_id in sorted(candidates, reverse=True)[limit:]:
+        for _, _, _, book_id in sorted(candidates, reverse=True)[limit:]:
             if self._cache_readers[book_id]:
                 self._cache_needs_trim = True
                 continue

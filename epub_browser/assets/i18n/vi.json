@@ -175,10 +175,14 @@
   "library.loadError": "Không thể tải thư viện. Hãy làm mới trang rồi thử lại.",
   "library.progress.scanning": "Đang quét thư viện",
   "library.progress.processing": "Đang cập nhật thư viện",
+  "library.progress.extracting": "Đang trích xuất thông tin sách",
+  "library.progress.converting": "Đang xây dựng bộ nhớ đệm đọc",
   "library.progress.complete": "Đã cập nhật thư viện",
   "library.progress.degraded": "Đã cập nhật thư viện nhưng có lỗi",
   "library.progress.reconnecting": "Đang kết nối lại với luồng cập nhật thư viện…",
   "library.progress.summary": "Đã xử lý {completed} trên {total} cuốn sách",
+  "library.progress.extractingSummary": "Đã kiểm tra {completed} trên {total} cuốn sách",
+  "library.progress.convertingSummary": "Đã lưu {completed} trên {total} cuốn sách vào bộ nhớ đệm",
   "library.progress.removed": {
     "one": "Đã xóa {count} cuốn sách",
     "other": "Đã xóa {count} cuốn sách"

@@ -25,6 +25,10 @@ class LibraryProgressSnapshot:
     failed: int = 0
     removed: int = 0
     in_flight: int = 0
+    examined: int = 0
+    indexed: int = 0
+    cache_total: int = 0
+    cache_completed: int = 0
     active_books: int = 0
     catalog_revision: int = 0
     latest_book: Optional[str] = None
@@ -131,36 +135,71 @@ class LibraryProgressBroker:
             failed=0,
             removed=0,
             in_flight=0,
+            examined=0,
+            indexed=0,
+            cache_total=0,
+            cache_completed=0,
             latest_book=None,
             failures=(),
         )
 
     def mark_discovered(self, total: int, removed: int) -> LibraryProgressSnapshot:
         return self._update(
-            phase="processing",
+            phase="extracting" if total else "processing",
             total=total,
             removed=removed,
         )
 
+    def extraction_started(self, source) -> LibraryProgressSnapshot:
+        return self._update(
+            phase="extracting",
+            latest_book=Path(source).name,
+        )
+
+    def record_examined(self) -> LibraryProgressSnapshot:
+        return self._update(
+            phase="extracting",
+            examined=lambda snapshot: snapshot.examined + 1,
+        )
+
+    def record_conversion_planned(self, source=None) -> LibraryProgressSnapshot:
+        return self._update(
+            phase="extracting",
+            cache_total=lambda snapshot: snapshot.cache_total + 1,
+            latest_book=Path(source).name if source is not None else self.snapshot().latest_book,
+        )
+
     def record_reused(self, source) -> LibraryProgressSnapshot:
         return self._update(
-            phase="processing",
+            phase="extracting",
             completed=lambda snapshot: snapshot.completed + 1,
+            examined=lambda snapshot: snapshot.examined + 1,
             reused=lambda snapshot: snapshot.reused + 1,
             latest_book=Path(source).name,
         )
 
-    def conversion_started(self) -> LibraryProgressSnapshot:
+    def record_indexed(self, source) -> LibraryProgressSnapshot:
         return self._update(
-            phase="processing",
+            phase="extracting",
+            completed=lambda snapshot: snapshot.completed + 1,
+            examined=lambda snapshot: snapshot.examined + 1,
+            indexed=lambda snapshot: snapshot.indexed + 1,
+            latest_book=Path(source).name,
+        )
+
+    def conversion_started(self, source=None) -> LibraryProgressSnapshot:
+        return self._update(
+            phase="converting",
             in_flight=lambda snapshot: snapshot.in_flight + 1,
+            latest_book=Path(source).name if source is not None else self.snapshot().latest_book,
         )
 
     def record_converted(self, source) -> LibraryProgressSnapshot:
         return self._update(
-            phase="processing",
+            phase="converting",
             completed=lambda snapshot: snapshot.completed + 1,
             converted=lambda snapshot: snapshot.converted + 1,
+            cache_completed=lambda snapshot: snapshot.cache_completed + 1,
             in_flight=lambda snapshot: max(0, snapshot.in_flight - 1),
             latest_book=Path(source).name,
         )
@@ -168,8 +207,10 @@ class LibraryProgressBroker:
     def record_failure(self, source, error, in_flight: bool = False) -> LibraryProgressSnapshot:
         failure = ProgressFailure(Path(source).name, safe_progress_message(error))
         return self._update(
-            phase="processing",
+            phase="converting" if in_flight else "extracting",
             completed=lambda snapshot: snapshot.completed + 1,
+            examined=lambda snapshot: snapshot.examined + (0 if in_flight else 1),
+            cache_completed=lambda snapshot: snapshot.cache_completed + (1 if in_flight else 0),
             failed=lambda snapshot: snapshot.failed + 1,
             in_flight=(
                 (lambda snapshot: max(0, snapshot.in_flight - 1))

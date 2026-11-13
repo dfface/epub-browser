@@ -175,10 +175,14 @@
   "library.loadError": "無法載入書庫。請重新整理後再試。",
   "library.progress.scanning": "正在掃描書庫",
   "library.progress.processing": "正在更新書庫",
+  "library.progress.extracting": "正在擷取書籍資訊",
+  "library.progress.converting": "正在建立閱讀快取",
   "library.progress.complete": "書庫已更新",
   "library.progress.degraded": "書庫更新失敗",
   "library.progress.reconnecting": "正在重新連線以取得書庫更新…",
   "library.progress.summary": "已處理 {completed} / {total} 本圖書",
+  "library.progress.extractingSummary": "已擷取 {completed} / {total} 本圖書的資訊",
+  "library.progress.convertingSummary": "已快取 {completed} / {total} 本圖書的內文",
   "library.progress.removed": {
     "one": "已移除 {count} 本書",
     "other": "已移除 {count} 本書"
