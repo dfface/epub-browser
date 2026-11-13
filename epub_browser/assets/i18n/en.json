@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "Title (Z–A)",
   "library.sort.createdDesc": "Recently added",
   "library.sort.updatedDesc": "Recently updated",
+  "library.pagination": "Library pages",
   "library.searchPlaceholder": "Search by book title, author, or tag...",
   "library.all": "All",
   "library.noTag": "No tag",

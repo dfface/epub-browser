@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "العنوان (ي–أ)",
   "library.sort.createdDesc": "المضاف حديثًا",
   "library.sort.updatedDesc": "المحدّث حديثًا",
+  "library.pagination": "صفحات المكتبة",
   "library.searchPlaceholder": "ابحث بعنوان الكتاب أو المؤلف أو الوسم…",
   "library.all": "الكل",
   "library.noTag": "بلا وسم",

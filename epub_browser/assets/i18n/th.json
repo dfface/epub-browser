@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "ชื่อเรื่อง (Z–A)",
   "library.sort.createdDesc": "เพิ่มล่าสุด",
   "library.sort.updatedDesc": "อัปเดตล่าสุด",
+  "library.pagination": "หน้าคลังหนังสือ",
   "library.searchPlaceholder": "ค้นหาจากชื่อหนังสือ ผู้เขียน หรือแท็ก…",
   "library.all": "ทั้งหมด",
   "library.noTag": "ไม่มีแท็ก",

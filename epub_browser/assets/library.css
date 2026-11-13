@@ -271,6 +271,67 @@ body {
     margin-bottom: 30px;
 }
 
+.library-pager {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0 12px;
+    color: var(--search-text);
+}
+
+.library-pager[hidden] {
+    display: none;
+}
+
+.library-pager button {
+    min-width: 44px;
+    min-height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    background: var(--search-bg);
+    color: inherit;
+    cursor: pointer;
+}
+
+.library-jump {
+    display: flex;
+    gap: 8px;
+}
+
+.library-jump input,
+.library-jump button {
+    min-height: 44px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    background: var(--search-bg);
+    color: inherit;
+    font: inherit;
+}
+
+.library-jump input {
+    width: 5rem;
+    text-align: center;
+}
+
+.library-pager button:disabled {
+    opacity: .45;
+    cursor: default;
+}
+
+.library-pager button:focus-visible,
+.library-jump input:focus-visible,
+#libraryBooks:focus-visible {
+    outline: 2px solid var(--button-bg);
+    outline-offset: 3px;
+}
+
+[dir="rtl"] .library-pager i {
+    transform: scaleX(-1);
+}
+
 .library-toolbar {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(12rem, max-content);

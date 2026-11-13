@@ -143,6 +143,7 @@
   "library.sort.titleDesc": "Tên sách (Z–A)",
   "library.sort.createdDesc": "Mới thêm gần đây",
   "library.sort.updatedDesc": "Mới cập nhật gần đây",
+  "library.pagination": "Trang thư viện",
   "library.searchPlaceholder": "Tìm theo tên sách, tác giả hoặc thẻ…",
   "library.all": "Tất cả",
   "library.noTag": "Không có thẻ",

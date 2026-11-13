@@ -36,7 +36,7 @@ function element(tagName) {
       this.listeners[type].push(listener);
     },
     dispatch(type) {
-      (this.listeners[type] || []).forEach((listener) => listener({ target: this }));
+      (this.listeners[type] || []).forEach((listener) => listener({ target: this, preventDefault() {} }));
     },
     querySelector(selector) {
       return findAll(this, selector)[0] || null;
@@ -109,6 +109,12 @@ function createLibraryHarness(responses, mode = 'server') {
   const scrollToTop = element('button');
   const bookshelfModal = element('div');
   bookshelfModal.className = 'bookshelf-modal active';
+  const pager = element('nav');
+  const previous = element('button');
+  const next = element('button');
+  const pageStatus = element('span');
+  const jumpForm = element('form');
+  const jumpInput = element('input');
   const bookCount = element('span');
   const tagCount = element('span');
   const document = {
@@ -126,6 +132,12 @@ function createLibraryHarness(responses, mode = 'server') {
         bookGridLoading: loading,
         scrollToTopBtn: scrollToTop,
         libraryBookCount: bookCount,
+        libraryPager: pager,
+        libraryPreviousPage: previous,
+        libraryNextPage: next,
+        libraryPageStatus: pageStatus,
+        libraryJumpForm: jumpForm,
+        libraryJumpInput: jumpInput,
         libraryTagCount: tagCount,
         tagCloudToggle,
       }[id] || null;
@@ -198,7 +210,7 @@ function createLibraryHarness(responses, mode = 'server') {
     setTimeout() {}, decodeURIComponent, prompt() { return null; },
   });
   return {
-    window, searchBox, bookshelfModal,
+    window, searchBox, bookshelfModal, pager, previous, next, jumpForm, jumpInput,
     cardIds() { return bookGrid.querySelectorAll('.book-card').map((card) => card.getAttribute('data-id')); },
     card(id) { return bookGrid.children.find((card) => card.getAttribute('data-id') === id) || null; },
     tag(id) { return tagCloud.children.find((tagItem) => tagItem.getAttribute('data-id') === id) || null; },
@@ -322,12 +334,12 @@ test('renders adversarial book metadata as text and attributes, never HTML', () 
   assert.match(requestedUrl, /^\/reader\/book-metadata\.json\?/);
 });
 
-test('renders a large Library catalog in animation-frame batches', () => {
+test('pages through the sorted catalogue and searches across pages', () => {
   const books = Array.from({ length: 25 }, (_, index) => ({
     hash: 'book-' + index,
     title: 'Book ' + index,
     authors: [],
-    tags: [],
+    tags: index === 24 ? ['Last page'] : [],
     url: '/book/' + index + '/',
     cover: null,
   }));
@@ -335,9 +347,36 @@ test('renders a large Library catalog in animation-frame batches', () => {
 
   harness.window.initScriptLibrary();
 
+  assert.deepEqual(harness.cardIds(), books.slice(0, 24).map((book) => book.hash));
+  assert.equal(harness.previous.disabled, true);
+  harness.next.dispatch('click');
+  assert.deepEqual(harness.cardIds(), ['book-24']);
+  assert.equal(harness.next.disabled, true);
+  harness.previous.dispatch('click');
   assert.equal(harness.cardIds().length, 24);
-  harness.flushAnimationFrame();
-  assert.equal(harness.cardIds().length, 25);
+  harness.searchBox.value = 'Last page';
+  harness.searchBox.dispatch('input');
+  assert.deepEqual(harness.cardIds(), ['book-24']);
+  assert.equal(harness.pager.hidden, true);
+});
+
+test('jumps directly to a page and rejects a page outside the results', () => {
+  const books = Array.from({ length: 50 }, (_, index) => ({
+    hash: 'book-' + index, title: 'Book ' + index, authors: [], tags: [],
+    url: '/book/' + index + '/', cover: null,
+  }));
+  const harness = createLibraryHarness([books]);
+  harness.window.initScriptLibrary();
+
+  harness.jumpInput.value = '3';
+  harness.jumpForm.dispatch('submit');
+  assert.deepEqual(harness.cardIds(), ['book-48', 'book-49']);
+  assert.equal(harness.jumpInput.max, 3);
+  harness.jumpInput.value = '4';
+  harness.jumpForm.dispatch('submit');
+  assert.deepEqual(harness.cardIds(), ['book-48', 'book-49']);
+  harness.previous.dispatch('click');
+  assert.equal(harness.jumpInput.value, 2);
 });
 
 test('renders a PDF format badge below its optional cover rating', () => {
@@ -355,25 +394,19 @@ test('renders a PDF format badge below its optional cover rating', () => {
   assert.equal(frame.children[2].textContent, 'pdf.formatBadge');
 });
 
-test('cancels stale card batches when a metadata refresh starts during rendering', async () => {
+test('a catalogue refresh clamps the page after books are removed', async () => {
   const books = Array.from({ length: 25 }, (_, index) => ({
-    hash: 'book-' + index,
-    title: 'Book ' + index,
-    authors: [],
-    tags: [],
-    url: '/book/' + index + '/',
-    cover: null,
+    hash: 'book-' + index, title: 'Book ' + index, authors: [], tags: [],
+    url: '/book/' + index + '/', cover: null,
   }));
-  const harness = createLibraryHarness([books, books]);
+  const harness = createLibraryHarness([books, books.slice(0, 24)]);
 
   harness.window.initScriptLibrary();
+  harness.next.dispatch('click');
   await harness.window.refreshLibraryMetadata();
 
-  assert.equal(harness.cardIds().length, 24);
-  harness.flushAnimationFrame();
-  assert.equal(harness.cardIds().length, 24);
-  harness.flushAnimationFrame();
-  assert.deepEqual(harness.cardIds(), books.map((book) => book.hash));
+  assert.deepEqual(harness.cardIds(), books.slice(0, 24).map((book) => book.hash));
+  assert.equal(harness.pager.hidden, true);
 });
 
 test('renders one card when metadata contains the same book more than once', () => {
@@ -398,10 +431,8 @@ test('incremental metadata refresh replaces cards and preserves filters', async 
 
   await harness.window.refreshLibraryMetadata();
 
-  assert.deepEqual(harness.cardIds(), ['one', 'two']);
+  assert.deepEqual(harness.cardIds(), ['two']);
   assert.equal(harness.searchBox.value, 'two');
-  assert.equal(harness.card('one').style.display, 'none');
-  assert.equal(harness.card('two').style.display, 'block');
   assert.equal(harness.bookshelfModal.classList.contains('active'), true);
 });
 
@@ -483,10 +514,8 @@ test('incremental metadata refresh preserves quoted saved card order and the act
 
   await harness.window.refreshLibraryMetadata();
 
-  assert.deepEqual(harness.cardIds(), ['other', quotedHash]);
   assert.equal(harness.tag(quotedTag).classList.contains('active'), true);
-  assert.equal(harness.card(quotedHash).style.display, 'block');
-  assert.equal(harness.card('other').style.display, 'none');
+  assert.deepEqual(harness.cardIds(), [quotedHash]);
 });
 
 test('incremental metadata refresh rejects a valid JSON non-array without replacing cards', async () => {
