@@ -32,6 +32,7 @@ from .models import ConvertedBook
 from .identity import source_sha256
 from .pdf_processor import PDFMetadata, inspect_pdf, render_pdf_cover
 from .processor import EPUBProcessor
+from .reader_pages import ReaderPageRenderer
 from .reporting import Reporter
 from .site import LibraryBook, publish_library_shell
 from .sidecar_identity import (
@@ -374,7 +375,7 @@ class SSGPublisher:
 
             cover_result = render_pdf_cover(prepared.source, working / "cover.png")
             cover_name = "cover.png" if cover_result is not None else None
-            processor = EPUBProcessor.from_pdf_metadata(
+            renderer = ReaderPageRenderer.from_pdf_metadata(
                 book_id=prepared.book_id,
                 metadata=metadata,
                 cover_path=cover_name,
@@ -382,8 +383,8 @@ class SSGPublisher:
                 urls=self.urls,
                 deployment_mode="ssg",
             )
-            self._atomic_write_text(working / "index.html", processor.create_index_page(write=False))
-            toc = processor._build_toc_data()
+            self._atomic_write_text(working / "index.html", renderer.render_index())
+            toc = renderer._build_toc_data()
             self._atomic_write_text(
                 working / "toc.json",
                 json.dumps(toc, ensure_ascii=False, separators=(",", ":")),
@@ -394,14 +395,14 @@ class SSGPublisher:
             for chapter_index in range(len(metadata.pages)):
                 self._atomic_write_text(
                     working / f"chapter_{chapter_index}.html",
-                    processor.create_pdf_chapter_template(
+                    renderer.create_pdf_chapter_template(
                         chapter_index, document_url
                     ),
                 )
             self._validate_pdf_book(working, toc, len(metadata.pages))
             os.replace(working, destination)
             working = None
-            book_metadata = processor.get_metadata()
+            book_metadata = renderer.get_metadata()
             return LibraryBook(
                 book_id=prepared.book_id,
                 title=book_metadata.title,

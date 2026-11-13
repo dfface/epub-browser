@@ -163,7 +163,7 @@ async def _book_detail(request, authenticated: AuthenticatedPAT):
 
 def _chapter_list(renderer):
     if renderer.source_format == PDF_FORMAT:
-        metadata, _processor = renderer._pdf_processor()
+        metadata, _processor = renderer._pdf_renderer()
         return [
             {
                 "index": index,

@@ -7,8 +7,8 @@ from pathlib import Path
 from urllib.parse import quote
 
 from .asset_publisher import PublishedAssets
-from .processor import EPUBProcessor
 from .pdf_processor import PDFMetadata, PDFPageMetadata
+from .reader_pages import ReaderPageRenderer
 from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .urls import SiteURLs
 
@@ -18,13 +18,7 @@ class ServerPageError(ValueError):
 
 
 class ServerPageRenderer:
-    """Render current reader chrome around cached EPUB content.
-
-    The cache intentionally contains only parsed EPUB metadata, sanitized
-    chapter fragments, EPUB stylesheet references, and passive resources.
-    This object hydrates the existing page renderer with that content and the
-    freshly published asset manifest, avoiding a second HTML template system.
-    """
+    """Load cached EPUB or PDF content for the shared reader templates."""
 
     def __init__(
         self,
@@ -53,14 +47,14 @@ class ServerPageRenderer:
         """Render the dependency-free minimal reader index (EPUB only)."""
         if self.source_format != EPUB_FORMAT:
             raise ServerPageError("Kindle minimal pages are EPUB-only")
-        return self._processor().create_kindle_index_page(locale=locale, tools=tools)
+        return self._epub_renderer().create_kindle_index_page(locale=locale, tools=tools)
 
     def render_kindle_chapter(self, chapter_index: int, *, locale=None) -> str:
         """Render the dependency-free minimal reader chapter (EPUB only)."""
         if self.source_format != EPUB_FORMAT:
             raise ServerPageError("Kindle minimal pages are EPUB-only")
         payload = self.chapter_content(chapter_index)
-        return self._processor().create_kindle_chapter_page(
+        return self._epub_renderer().create_kindle_chapter_page(
             payload["content"],
             payload["style_links"],
             chapter_index,
@@ -69,8 +63,7 @@ class ServerPageRenderer:
         )
 
     def render_index(self, initial_book_review=None) -> str:
-        return self._active_processor().create_index_page(
-            write=False,
+        return self._reader().render_index(
             initial_book_review=initial_book_review,
         )
 
@@ -81,17 +74,17 @@ class ServerPageRenderer:
         title = payload["title"]
         content = payload["content"]
         style_links = payload["style_links"]
-        return self._processor().create_chapter_template(
+        return self._epub_renderer().create_chapter_template(
             content, style_links, chapter_index, title
         )
 
     def render_pdf_chapter(self, chapter_index: int) -> str:
-        metadata, processor = self._pdf_processor()
+        metadata, renderer = self._pdf_renderer()
         if chapter_index < 0 or chapter_index >= len(metadata.pages):
             raise ServerPageError("Chapter not found")
         document_url = f"/api/books/{quote(self.book_id, safe='')}/document"
         try:
-            return processor.create_pdf_chapter_template(chapter_index, document_url)
+            return renderer.create_pdf_chapter_template(chapter_index, document_url)
         except ValueError as error:
             raise ServerPageError("Chapter not found") from error
 
@@ -114,9 +107,9 @@ class ServerPageRenderer:
 
     def toc_bytes(self) -> bytes:
         if self.source_format == PDF_FORMAT:
-            _metadata, processor = self._pdf_processor()
+            _metadata, renderer = self._pdf_renderer()
             return json.dumps(
-                processor._build_toc_data(),
+                renderer._build_toc_data(),
                 ensure_ascii=False,
                 separators=(",", ":"),
             ).encode("utf-8")
@@ -126,34 +119,29 @@ class ServerPageRenderer:
         except OSError as error:
             raise ServerPageError("Book table of contents is unavailable") from error
 
-    def _processor(self) -> EPUBProcessor:
+    def _epub_renderer(self) -> ReaderPageRenderer:
         metadata = self._read_json(self.content_dir / "metadata.json")
         for key in ("title", "authors", "tags"):
             if key in self.metadata_overrides:
                 metadata[key] = self.metadata_overrides[key]
-        # EPUBProcessor already owns the single source of truth for page
-        # templates. Hydrating an instance avoids duplicating its large,
-        # security-sensitive reader chrome while keeping transient state out
-        # of the persistent cache.
         try:
-            processor = EPUBProcessor.from_server_content_cache(
+            return ReaderPageRenderer.from_server_content_cache(
                 book_id=self.book_id,
                 metadata=metadata,
                 asset_manifest=PublishedAssets(self._asset_manifest()),
                 urls=self.urls,
                 kindle_support=self.kindle,
+                ai_reading_enabled=self.ai_reading_enabled,
             )
         except ValueError as error:
             raise ServerPageError("Book content cache is invalid") from error
-        processor.ai_reading_enabled = self.ai_reading_enabled
-        return processor
 
-    def _active_processor(self) -> EPUBProcessor:
+    def _reader(self) -> ReaderPageRenderer:
         if self.source_format == PDF_FORMAT:
-            return self._pdf_processor()[1]
-        return self._processor()
+            return self._pdf_renderer()[1]
+        return self._epub_renderer()
 
-    def _pdf_processor(self) -> tuple[PDFMetadata, EPUBProcessor]:
+    def _pdf_renderer(self) -> tuple[PDFMetadata, ReaderPageRenderer]:
         payload = self._read_json(self.pdf_dir / "metadata.json")
         for key in ("title", "authors", "tags"):
             if key in self.metadata_overrides:
@@ -183,7 +171,7 @@ class ServerPageRenderer:
                 has_extractable_text=bool(payload["has_extractable_text"]),
                 cover=None,
             )
-            processor = EPUBProcessor.from_pdf_metadata(
+            renderer = ReaderPageRenderer.from_pdf_metadata(
                 book_id=self.book_id,
                 metadata=metadata,
                 cover_path=payload.get("cover"),
@@ -193,8 +181,7 @@ class ServerPageRenderer:
             )
         except (KeyError, TypeError, ValueError) as error:
             raise ServerPageError("PDF metadata cache is invalid") from error
-        processor.ai_reading_enabled = self.ai_reading_enabled
-        return metadata, processor
+        return metadata, renderer
 
     def _asset_manifest(self) -> dict[str, str]:
         manifest = self._read_json(self.public_dir / "assets" / "asset-manifest.json")

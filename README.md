@@ -1,7 +1,10 @@
 # EPUB Browser
 
-> Read EPUB and PDF in one polished web library—either as a self-contained
-> static site or as a private, multi-user reading service.
+> Publish EPUB and PDF books as a website readers can open in their browser.
+> Host the generated files on any static host, or run a private library with
+> accounts, synced progress, and annotations.
+
+[Explore the static library](https://epub-browser-test.yuhan.tech/) · [Try the private library](#live-demos)
 
 **README:** [English](README.md) | [简体中文](docs/readme/README.zh-CN.md) | [繁體中文](docs/readme/README.zh-TW.md) | [日本語](docs/readme/README.ja.md) | [한국어](docs/readme/README.ko.md) | [Español](docs/readme/README.es.md) | [Deutsch](docs/readme/README.de.md) | [Français](docs/readme/README.fr.md) | [Русский](docs/readme/README.ru.md) | [Italiano](docs/readme/README.it.md) | [Português (Brasil)](docs/readme/README.pt-BR.md) | [العربية](docs/readme/README.ar.md) | [Bahasa Indonesia](docs/readme/README.id.md) | [हिन्दी](docs/readme/README.hi.md) | [Tiếng Việt](docs/readme/README.vi.md) | [ไทย](docs/readme/README.th.md) | [Bahasa Melayu](docs/readme/README.ms.md)
 

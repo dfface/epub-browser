@@ -15,7 +15,7 @@ setup(
     author="dfface",   # 作者名
     author_email="dfface@sina.com",  # 作者邮箱
     keywords="epub reader ai reading ai assistant mind map annotations html export browser convert calibre-web calibre kindle web server local",
-    description="A private EPUB reader with AI-native learning layers and a self-contained static-site generator.",  # 简短描述
+    description="Publish EPUB and PDF books as a static website or run a private, self-hosted library.",  # 简短描述
     long_description=long_description,  # 详细描述，从README.md读取
     long_description_content_type="text/markdown",  # 详细描述格式
     url="https://github.com/dfface/epub-browser",  # 项目主页，如GitHub仓库地址

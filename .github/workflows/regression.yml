@@ -1,0 +1,32 @@
+name: Regression tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.9', '3.14']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: python -m pip install build setuptools wheel
+      - run: python tools/sync_vendor_assets.py fetch
+      - run: python tools/sync_vendor_assets.py verify
+      - run: python -m pip install -e .
+      - run: python -W ignore::ResourceWarning -m unittest discover -s tests
+      - run: node --test tests/*.js
+        if: ${{ !cancelled() && matrix.python == '3.14' }}

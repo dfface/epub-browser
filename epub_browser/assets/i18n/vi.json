@@ -275,6 +275,7 @@
   "admin.books.uploading": "Đang tải lên…",
   "admin.books.uploadMany": "Tải lên {count} cuốn sách",
   "admin.books.uploadRetry": "Thử tải lại {count} cuốn sách",
+  "admin.books.uploadClear": "Xóa",
   "admin.books.uploadBatchResult": "Đã tải lên {success} cuốn sách; {failed} cuốn thất bại.",
   "admin.books.fileRemove": "Xóa {filename}",
   "admin.books.uploadSuccess": "Đã tải lên {filename}. Quá trình chuyển đổi sẽ bắt đầu trong giây lát.",

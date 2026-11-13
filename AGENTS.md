@@ -19,14 +19,15 @@ Server 专属功能必须由服务端配置、权限或 API 显式保护，不�
 
 - EPUB 解析位于 `epub_browser/epub_parsing.py`（统一的 lxml 管线：严格优先、
   失败才恢复、最后回退到 HTML 解析器；禁用外部实体与 DTD，执行结构校验）；
-  EPUB 清洗与页面模板位于 `epub_browser/processor.py`；PDF 检查、页元数据和封面
+  EPUB 清洗位于 `epub_browser/epub_sanitization.py`；PDF 检查、页元数据和封面
   提取位于 `epub_browser/pdf_processor.py`。`epub_identity.py` 是唯一例外，它用
   Expat 的 `CurrentByteIndex` 精确定位 OPF 字节，保持独立实现。
 - `epub_browser/source_format.py` 是格式识别入口；不要在各调用方重复以扩展名判断格式。
-- Library、Book、目录和章节页面模板仍由 `epub_browser/processor.py` 统一提供。
+- Library 页面由 `epub_browser/site.py` 提供，Book、目录和章节页面由
+  `epub_browser/reader_pages.py` 共用。
 - SSG 直接调用这些模板并写入 HTML 文件。
 - Server 由 `epub_browser/server_pages.py` 读取 EPUB 或 PDF 内容缓存，再调用同一组
-  `EPUBProcessor` 模板动态返回 HTML。
+  `ReaderPageRenderer` 模板动态返回 HTML。
 - 不要为 Server 复制一套 `index.html`、章节页或目录页模板。模式差异应在共享模板内以小范围的 `deployment_mode` 分支表达。
 - PDF 也不是第二套 viewer UI：每一页映射为 `chapter_<n>.html`，复用 EPUB 的导航、
   阅读设置、标注、查词、百科和阅读时段组件；不支持的 AI、打印、下载等能力应显式降级或隐藏。
@@ -113,7 +114,9 @@ PDF 修订；CSS、PDF.js 交互、缩放、主题、loading 或工具栏变化�
 
 - `epub_browser/source_format.py`：EPUB/PDF 格式识别与能力常量。
 - `epub_browser/epub_parsing.py`：统一 lxml 解析（container/OPF/NCX/nav/XHTML/SVG）。
-- `epub_browser/processor.py`：EPUB 内容处理、共享页面模板、EPUB Server 内容缓存写入。
+- `epub_browser/processor.py`：EPUB 内容处理、SSG 输出及 EPUB Server 内容缓存写入。
+- `epub_browser/reader_pages.py`：EPUB/PDF 共用的书籍、章节与 Kindle 模板。
+- `epub_browser/epub_sanitization.py`：EPUB HTML、CSS、SVG 与资源路径清洗。
 - `epub_browser/pdf_processor.py`：PDF 元数据、页尺寸、outline、文本层能力和封面提取。
 - `epub_browser/pdf_delivery.py`：Server PDF 文档鉴权、Range 与响应安全边界。
 - `epub_browser/ssg.py`：EPUB/PDF 静态输出协调与原子发布。

@@ -1,7 +1,9 @@
 # EPUB Browser
 
-> 用同一套精致的 Web 阅读体验阅读 EPUB 和 PDF：既可以生成完全自包含的
-> 静态站点，也可以运行带账户和同步能力的私有阅读服务。
+> 把 EPUB 和 PDF 发布成可直接在浏览器阅读的网站。生成的文件可以放到静态托管平台，
+> 也可以运行自己的私有书库，让读者用账户同步进度和标注。
+
+[浏览静态书库](https://epub-browser-test.yuhan.tech/) · [体验私有书库](#演示站点)
 
 **README：** [English](../../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Deutsch](README.de.md) | [Français](README.fr.md) | [Русский](README.ru.md) | [Italiano](README.it.md) | [Português (Brasil)](README.pt-BR.md) | [العربية](README.ar.md) | [Bahasa Indonesia](README.id.md) | [हिन्दी](README.hi.md) | [Tiếng Việt](README.vi.md) | [ไทย](README.th.md) | [Bahasa Melayu](README.ms.md)
 

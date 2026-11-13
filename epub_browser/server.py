@@ -5607,7 +5607,7 @@ window.location.assign(payload.redirect||'/');
             metadata_overrides=store.managed_book_metadata(book_id),
         )
         if book.source_format == PDF_FORMAT:
-            _metadata, processor = renderer._pdf_processor()
+            _metadata, processor = renderer._pdf_renderer()
             if chapter_index >= len(processor.chapters):
                 raise ValueError('chapter index is outside the book')
             chapter_label = processor.chapters[chapter_index].get('title')

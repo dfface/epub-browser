@@ -307,6 +307,8 @@ class ServerBootstrapTests(unittest.TestCase):
         class SetupLibrary:
             def __init__(library, *, server_dir, **kwargs):
                 library.public_dir = Path(server_dir) / "cache" / "public"
+                library.managed_sources_dir = Path(server_dir) / "data" / "sources"
+                library.book_cache = None
                 library.on_reconcile_started = None
                 library.on_reconciled = None
 
@@ -727,12 +729,9 @@ class ServerRuntimeTests(unittest.TestCase):
     def test_setup_watcher_does_not_start_when_admin_probe_fails(self):
         poll_failed = threading.Event()
         watcher_started = threading.Event()
-        probe_count = 0
 
         def has_administrator(_store):
-            nonlocal probe_count
-            probe_count += 1
-            if probe_count == 1:
+            if threading.current_thread().name != "EPUBInitialReconcile":
                 return False
             poll_failed.set()
             raise sqlite3.OperationalError("admin probe failed")
@@ -906,6 +905,8 @@ class ServerRuntimeTests(unittest.TestCase):
             def __init__(self, *, server_dir, progress_broker, **kwargs):
                 captured["library_broker"] = progress_broker
                 self.public_dir = Path(server_dir) / "cache" / "public"
+                self.managed_sources_dir = Path(server_dir) / "data" / "sources"
+                self.book_cache = None
                 self.on_reconcile_started = None
                 self.on_reconciled = None
 
@@ -957,6 +958,8 @@ class ServerRuntimeTests(unittest.TestCase):
             def __init__(self, *, server_dir, book_id_storage, **kwargs):
                 captured["book_id_storage"] = book_id_storage
                 self.public_dir = Path(server_dir) / "cache" / "public"
+                self.managed_sources_dir = Path(server_dir) / "data" / "sources"
+                self.book_cache = None
                 self.on_reconcile_started = None
                 self.on_reconciled = None
 
@@ -1059,6 +1062,8 @@ class _BlockingLibrary:
 
     def __init__(self, *, server_dir, **kwargs):
         self.public_dir = Path(server_dir) / "cache" / "public"
+        self.managed_sources_dir = Path(server_dir) / "data" / "sources"
+        self.book_cache = None
         self.on_reconcile_started = None
         self.on_reconciled = None
 

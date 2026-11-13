@@ -40,6 +40,7 @@ from epub_browser.server_library import (
 from epub_browser.reporting import Reporter
 from epub_browser.server import create_app
 from epub_browser.server_library import ServerLibraryManager
+from epub_browser.reader_pages import ReaderPageRenderer
 from epub_browser.server_pages import ServerPageRenderer
 from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.state import StateStore
@@ -330,7 +331,7 @@ class ServerLibraryManagerTests(unittest.TestCase):
         manager = self._manager()
         record = manager.reconcile().active_books[0]
         with mock.patch.object(
-            EPUBProcessor,
+            ReaderPageRenderer,
             "create_pdf_chapter_template",
             return_value="<html>fresh-pdf-ui</html>",
         ):

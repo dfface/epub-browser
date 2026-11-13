@@ -24,6 +24,7 @@ KNOWN_TRANSLATION_KEYS = EN_KEYS
 FIRST_PARTY = [
     Path('epub_browser/library.py'),
     Path('epub_browser/processor.py'),
+    Path('epub_browser/reader_pages.py'),
     Path('epub_browser/server_chrome.py'),
     Path('epub_browser/version.py'),
     *[

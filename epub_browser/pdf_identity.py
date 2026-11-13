@@ -1,5 +1,7 @@
 """Store an EPUB Browser ID in the PDF document information dictionary."""
 
+from __future__ import annotations
+
 import os
 import shutil
 import stat

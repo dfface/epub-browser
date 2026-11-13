@@ -67,7 +67,7 @@ test('applies RTL only for Arabic and restores LTR for other locales', () => {
   const root = fakeRoot('en');
   root.EpubBrowserDisableManifest = true;
   root.document = {
-    documentElement: {},
+    documentElement: { classList: { add() {}, remove() {} } },
     addEventListener() {},
     querySelectorAll() { return []; }
   };
@@ -138,7 +138,7 @@ test('rich i18n parameters preserve locale word order and use safe strong text n
   };
   const children = [];
   const document = {
-    documentElement: {},
+    documentElement: { classList: { add() {}, remove() {} } },
     createTextNode(value) { return { nodeType: 3, textContent: String(value) }; },
     createElement(tagName) {
       return { tagName: String(tagName).toUpperCase(), textContent: '' };
@@ -202,7 +202,7 @@ test('user deletion warnings are complete in every supported locale', () => {
 test('initializes locale document direction before any fetch resolves', () => {
   const root = fakeRoot('ar');
   root.EpubBrowserDisableManifest = true;
-  root.document = { documentElement: {}, addEventListener() {}, querySelectorAll() { return []; } };
+  root.document = { documentElement: { classList: { add() {}, remove() {} } }, addEventListener() {}, querySelectorAll() { return []; } };
   const i18n = createRuntime(root, bundles);
   i18n.init();
   assert.equal(i18n.getLocale(), 'ar');

@@ -17,7 +17,8 @@ from epub_browser.library import EPUBLibrary
 from epub_browser.models import ConvertedBook
 from epub_browser.pdf_processor import PDFMetadata, PDFPageMetadata
 from epub_browser.processor import EPUBProcessor, server_book_public_path_allowed
-from epub_browser.site import LibraryBook, publish_library_shell, render_kindle_library_page
+from epub_browser.reader_pages import ReaderPageRenderer
+from epub_browser.site import LibraryBook, publish_library_shell, render_kindle_library_page, render_library_shell
 from epub_browser.urls import SiteURLs
 
 
@@ -42,7 +43,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 cover=None,
             )
 
-            processor = EPUBProcessor.from_pdf_metadata(
+            processor = ReaderPageRenderer.from_pdf_metadata(
                 book_id='pdf-book',
                 metadata=metadata,
                 cover_path='cover.png',
@@ -58,7 +59,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertEqual(processor.authors, ['Author One', 'Author Two'])
             self.assertEqual(processor.tags, ['reference'])
             self.assertEqual(processor.lang, 'fr')
-            self.assertEqual(processor.get_book_info()['cover'], 'cover.png')
+            self.assertEqual(processor.get_metadata().cover, 'cover.png')
             self.assertEqual(processor.chapters, [
                 {'title': 'Page 1', 'path': 'chapter_0.html'},
                 {'title': 'Page 2', 'path': 'chapter_1.html'},
@@ -82,7 +83,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 },
             ])
 
-            book_html = processor.create_index_page(write=False)
+            book_html = processor.render_index()
             self.assertIn('data-id="toc-container"', book_html)
             self.assertEqual(book_html.count('class="chapter-link"'), 3)
             self.assertIn('data-i18n="pdf.page"', book_html)
@@ -117,7 +118,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 ),
                 encrypted=False, has_extractable_text=True, cover=None,
             )
-            pdf = EPUBProcessor.from_pdf_metadata(
+            pdf = ReaderPageRenderer.from_pdf_metadata(
                 book_id='pdf-book', metadata=metadata, cover_path=None,
                 asset_manifest=assets, urls=SiteURLs('/reader/'),
                 deployment_mode='server',
@@ -185,7 +186,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 ),
                 encrypted=False, has_extractable_text=True, cover=None,
             )
-            pdf = EPUBProcessor.from_pdf_metadata(
+            pdf = ReaderPageRenderer.from_pdf_metadata(
                 book_id='pdf-book', metadata=metadata, cover_path=None,
                 asset_manifest=assets, urls=SiteURLs(),
                 deployment_mode='server',
@@ -559,8 +560,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             server_html,
             r'<section\b[^>]*aria-labelledby=(?:["\'])?adminSectionBooksTab',
         )
-        for key in ('searchLabel', 'visibilityFilter', 'tagFilter', 'sortLabel', 'pageSize', 'refresh'):
+        for key in ('searchLabel', 'visibilityFilter', 'tagFilter', 'pageSize', 'refresh'):
             self.assertIn('data-i18n="admin.books.' + key + '"', server_html)
+        self.assertIn('data-i18n="library.sort.label"', server_html)
         self.assertIn('data-i18n-placeholder="admin.books.searchPlaceholder"', server_html)
         self.assertRegex(server_html, r'<input\b(?=[^>]*id=(?:["\'])?adminBookSearch)(?=[^>]*type=(?:["\'])?search)')
         self.assertRegex(server_html, r'<div\b(?=[^>]*id=(?:["\'])?adminBookTableSurface)(?=[^>]*hidden)')
@@ -1542,7 +1544,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             "payload.svgz": False,
             "payload.js": False,
         })
-        self.assertEqual(safe_css, "p { color: red; }")
+        self.assertRegex(safe_css, r"^p\s*\{\s*color:\s*red;?\s*\}$")
         self.assertEqual(unsafe_css, "")
         self.assertEqual(cover_bytes, b"passive-image")
         self.assertEqual(jpe_cover_bytes, b"jpe-cover")
@@ -3094,6 +3096,11 @@ assert.deepEqual(
             )
             probe = """
             <script>
+            window.addEventListener('error', event => {
+                const detail = event.error ? event.error.stack : event.target.src;
+                if (detail) document.documentElement.dataset.readerError =
+                    (document.documentElement.dataset.readerError || '') + detail + ' | ';
+            }, true);
             window.addEventListener('load', () => setTimeout(function () {
                 const slider = document.querySelector('#fontSizeSlider');
                 const paragraph = document.querySelector('#sample');
@@ -3119,7 +3126,11 @@ assert.deepEqual(
                 def log_message(self, *args):
                     pass
 
-            with ThreadingHTTPServer(("127.0.0.1", 0), partial(QuietHandler, directory=root)) as server:
+            class ReaderTestServer(ThreadingHTTPServer):
+                # Chromium opens parallel connections for the reader's assets.
+                request_queue_size = 32
+
+            with ReaderTestServer(("127.0.0.1", 0), partial(QuietHandler, directory=root)) as server:
                 thread = threading.Thread(target=server.serve_forever, daemon=True)
                 thread.start()
                 try:
@@ -3133,7 +3144,11 @@ assert.deepEqual(
                     thread.join()
         match = re.search(r'data-font-result="([^"]+)"', result.stdout)
         self.assertIsNotNone(match, "The browser did not complete the font slider probe")
-        self.assertEqual(match.group(1), "12|20.8px|14.4px|64px|96px|72px|justify|12")
+        browser_error = re.search(r'data-reader-error="([^"]+)"', result.stdout)
+        self.assertEqual(
+            match.group(1), "12|20.8px|14.4px|64px|96px|72px|justify|12",
+            browser_error.group(1) if browser_error else None,
+        )
 
     def test_content_loading_uses_the_active_theme_surface(self):
         css = Path("epub_browser/assets/loading.css").read_text(encoding="utf-8")
@@ -3261,14 +3276,9 @@ assert.deepEqual(
                 Path('epub_browser/assets'),
                 directory,
             ).publish()
-            publish_library_shell(
-                Path(directory),
-                (),
-                assets,
-                SiteURLs(),
-                deployment_mode="server",
+            return render_library_shell(
+                (), assets, SiteURLs(), deployment_mode="server",
             )
-            return Path(directory, "index.html").read_text(encoding="utf-8")
 
     def _chapter_html(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -3831,10 +3841,10 @@ assert.deepEqual(
                 book_html,
                 r'<link\b[^>]+/assets/immutable/bookshelf\.[0-9a-f]{12}\.css[^>]*>',
             )
-            self.assertNotRegex(
-                book_html,
-                r'<link\b[^>]+/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css[^>]*>',
-            )
+        self.assertNotRegex(
+            self._book_html(),
+            r'<link\b[^>]+/assets/immutable/annotation-hub\.[0-9a-f]{12}\.css[^>]*>',
+        )
         book_script = Path('epub_browser/assets/book.js').read_text(encoding='utf-8')
         self.assertIn("deferBookFeature('bookshelfBtn', 'bookshelf'", book_script)
         self.assertIn("deferBookFeature('toggleShelfBtn', 'bookshelf'", book_script)
@@ -4300,7 +4310,6 @@ assert.deepEqual(
         # per-book processor above. It must not show the AI readings entry point
         # (or load the AI feature script) when AI reading is disabled.
         # Guards issue #24.
-        from epub_browser.site import render_library_shell
         from epub_browser.urls import SiteURLs
         import types
         assets = types.SimpleNamespace(

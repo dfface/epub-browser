@@ -189,7 +189,7 @@ class ReadmeDocumentationTests(unittest.TestCase):
                 "normalized TOC",
                 "outline markers",
                 "--book-id-storage embedded",
-                "cannot write an ID into its bytes",
+                "saves the same ID in an adjacent sidecar",
                 "no usable text layer exists",
                 "selection spanning pages",
                 "complete, byte-identical source",

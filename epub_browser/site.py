@@ -31,12 +31,8 @@ from .source_format import EPUB_FORMAT
 # The Kindle minimal reader CSS/JS live in processor.py as the single source
 # of truth shared by the book-level kindle.html pages and the minimal library
 # page below; both surfaces must stay dependency-free and ES5.
-from .processor import (
-    _KINDLE_READER_CSS,
-    _KINDLE_READER_JS,
-    kindle_cover,
-    metadata_text,
-)
+from .epub_sanitization import metadata_text
+from .reader_pages import _KINDLE_READER_CSS, _KINDLE_READER_JS, kindle_cover
 
 
 @dataclass(frozen=True)
@@ -1129,7 +1125,7 @@ def render_library_shell(
     library_html = library_html.replace("{SERVER_LOCALE_SCRIPT}", SERVER_LOCALE_SCRIPT)
     library_html = library_html.replace(
         "{I18N_RUNTIME_BOOTSTRAP}",
-        render_i18n_runtime_and_inline(urls.base_path, deployment_mode=deployment_mode),
+        render_i18n_runtime_and_inline(deployment_mode=deployment_mode),
     )
     library_html = rewrite_asset_urls(library_html, self.asset_manifest)
     library_html = rewrite_root_urls(library_html, urls)
