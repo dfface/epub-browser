@@ -60,6 +60,7 @@ def library_metadata(
         state_store.book_review_ratings(owner_user_id, [record.book_id for record in records])
         if state_store is not None and owner_user_id is not None else {}
     )
+    tag_names = state_store.library_tag_names([record.book_id for record in records]) if state_store else {}
     for record in records:
         book_root = public_root / "book" / record.book_id
         if record.source_format == PDF_FORMAT:
@@ -72,13 +73,17 @@ def library_metadata(
         if not available:
             continue
         try:
-            metadata = (
-                state_store.managed_book_metadata(record.book_id)
-                if state_store is not None
-                else json.loads(record.metadata_json)
-            )
-        except (KeyError, json.JSONDecodeError):
-            continue
+            metadata = json.loads(record.metadata_json)
+        except (TypeError, ValueError):
+            metadata = {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        if state_store is not None:
+            metadata.update({
+                "title": record.title,
+                "authors": state_store._managed_authors(record.authors_json),
+                "tags": tag_names.get(record.book_id, []),
+            })
         cover = metadata.get("cover")
         books.append(
             {

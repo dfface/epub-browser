@@ -108,6 +108,7 @@ from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import EPUB_FORMAT, PDF_FORMAT, is_supported_source
 from .kindle import KINDLE_WIDGETS, kindle_timezone_offset, kindle_timezones, valid_kindle_memo
 from .kindle_calendar import CALENDAR_REFRESH_SECONDS, calendar_url, load_calendar_events
+from .book_sort import library_sort, sort_catalog
 from .site import LibraryBook, render_kindle_library_page, render_library_shell
 from .urls import SiteURLs
 from .version import ReleaseLookup, render_footer
@@ -4228,16 +4229,35 @@ window.location.assign(payload.redirect||'/');
             return ai_error_response(error)
         return response({'chat': turn}, 202)
 
+    def sort_visible_catalog(principal, records, sort):
+        return sort_catalog(
+            records, sort, store.library_order(principal.user_id) if sort == "manual" else (),
+        )
+
     async def filtered_library_metadata(request):
         principal = require_principal(request)
+        sort = library_sort(request.query_params.get("sort"))
 
         def _library_metadata():
-            return library_metadata(
-                store.visible_books(principal), base_directory, state_store=store,
-                owner_user_id=principal.user_id,
-            )
+            records = sort_visible_catalog(principal, store.visible_books(principal), sort)
+            return library_metadata(records, base_directory, state_store=store, owner_user_id=principal.user_id)
 
         return response(await run_db(_library_metadata))
+
+    async def save_library_order(request):
+        principal = require_principal(request)
+        payload, error = await bounded_public_json_object(request, maximum_size=2 * 1024 * 1024)
+        ids = payload.get("ids") if payload is not None else None
+        if error or not isinstance(ids, list) or any(not isinstance(book_id, str) for book_id in ids):
+            return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
+
+        def save():
+            visible = {record.book_id for record in store.visible_books(principal)}
+            order = tuple(dict.fromkeys(book_id for book_id in ids if book_id in visible))
+            store.save_library_order(principal.user_id, order, import_legacy=payload.get("legacy") is True)
+
+        await run_db(save)
+        return Response(status_code=204)
 
     async def library_index(request):
         # Server's library is an authenticated SPA shell.  Render it from the
@@ -4266,15 +4286,16 @@ window.location.assign(payload.redirect||'/');
         response.headers['Cache-Control'] = 'no-cache'
         return await apply_security_headers(response, index_path)
 
-    def kindle_library_books(principal):
+    def kindle_library_books(principal, sort):
         """Project visible book records onto the read-only minimal shelf."""
         books = []
-        for record in store.visible_books(principal):
-            if record.source_format != EPUB_FORMAT:
-                continue
+        records = [record for record in store.visible_books(principal) if record.source_format == EPUB_FORMAT]
+        for record in sort_visible_catalog(principal, records, sort):
             try:
                 metadata = json.loads(record.metadata_json)
             except (TypeError, json.JSONDecodeError):
+                metadata = {}
+            if not isinstance(metadata, dict):
                 metadata = {}
             try:
                 authors = tuple(json.loads(record.authors_json))
@@ -4301,8 +4322,10 @@ window.location.assign(payload.redirect||'/');
             value = request.query_params.get(key, "")
             return int(value) if re.fullmatch(r"[0-9]{1,9}", value) else 1
 
+        sort = library_sort(request.query_params.get("sort"))
+
         def load_shelf():
-            books = kindle_library_books(principal)
+            books = kindle_library_books(principal, sort)
             visible = {book.book_id for book in books}
             limit = store.get_general_settings()["recent_reading_limit"]
             recent = []
@@ -4329,7 +4352,7 @@ window.location.assign(payload.redirect||'/');
             render_kindle_library_page, books, SiteURLs(), shelf=shelf, recent=recent,
             locale=resolve_request_locale(request), dashboard=dashboard, show_dashboard=show_dashboard,
             catalog_page=page_number("catalog_page"), shelf_page=page_number("shelf_page"),
-            query=request.query_params.get("q", ""),
+            query=request.query_params.get("q", ""), sort=sort,
         )
         target = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
         return await apply_security_headers(target, markup=markup, inline_scripts=True)
@@ -5779,6 +5802,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/bookshelf/{book_hash}/membership', bookshelf_membership, methods=['GET']),
         Route('/api/bookshelf', bookshelf, methods=['GET', 'PUT']),
         Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
+        Route('/api/library-order', save_library_order, methods=['PUT']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/reading-progress', recent_reading, methods=['GET']),
         Route('/api/book-reviews/{book_id}', book_review, methods=['GET', 'PUT', 'DELETE']),

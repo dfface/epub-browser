@@ -39,6 +39,42 @@ function initScript() {
         return i18n ? i18n.t(key, params) : key;
     }
 
+    var sortControl = document.getElementById('libraryBookSort');
+    var bookSort = window.EpubBrowserBookSort;
+    var serverMode = window.EpubBrowserMode === 'server';
+    var bookDrag;
+    var bookDragEnabled = false;
+    var manualSave = Promise.resolve();
+    var manualOrderKey = 'book-grid-sortable-order';
+
+    function selectedSort() {
+        return sortControl ? sortControl.value : 'manual';
+    }
+
+    function setBookDragEnabled(enabled) {
+        bookDragEnabled = enabled;
+        if (bookDrag) bookDrag.option('disabled', !enabled);
+    }
+
+    function saveServerOrder(ids, legacy) {
+        return window.EpubBrowserAuth.fetch('/api/library-order', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ids: ids, legacy: legacy })
+        }).then(function(response) {
+            if (!response || !response.ok) throw new Error('library_order_save_failed');
+        });
+    }
+
+    function importLegacyOrder() {
+        if (!serverMode || !bookSort || !window.EpubBrowserAuth) return null;
+        var ids = bookSort.manualOrder();
+        if (!ids.length) return null;
+        return saveServerOrder(ids, true).then(function() {
+            try { localStorage.removeItem(manualOrderKey); } catch (error) {}
+        }, function() {});
+    }
+
     function loadLibraryFeature(name) {
         var features = window.EpubBrowserLibraryFeatures;
         if (!features || typeof features.load !== 'function') {
@@ -47,9 +83,10 @@ function initScript() {
         return features.load(name);
     }
 
-    function loadBookMetadata(callback, failureCallback) {
+    function loadBookMetadata(sort, callback, failureCallback) {
         var basePath = window.EpubBrowserBasePath || "/";
         var metadataUrl = basePath + "book-metadata.json?" + Date.now();
+        if (serverMode && sort !== 'manual') metadataUrl += '&sort=' + encodeURIComponent(sort);
         
         var xhr = new XMLHttpRequest();
         xhr.open('GET', metadataUrl, true);
@@ -98,8 +135,9 @@ function initScript() {
     function startMetadataRefresh(revision) {
         metadataActiveRevision = revision;
         if (metadataQueuedRevision === revision) metadataQueuedRevision = null;
-        loadBookMetadata(function(books) {
-            replaceBookCards(books);
+        var sort = selectedSort();
+        loadBookMetadata(sort, function(books) {
+            if (!serverMode || sort === selectedSort()) replaceBookCards(books);
             // The continue-reading rail joins server progress against this same
             // catalogue, so it has to re-render whenever the catalogue changes:
             // a conversion can rename a book, replace its cover, or remove it.
@@ -412,6 +450,10 @@ function initScript() {
         var activeTag = document.querySelector('.tag-cloud-item.active');
         var activeTagId = activeTag ? activeTag.getAttribute('data-id') : 'All';
         books = uniqueBooksById(books);
+        if (!serverMode && bookSort) {
+            books = bookSort.sortBooks(books, selectedSort(), i18n && i18n.getLocale());
+        }
+        setBookDragEnabled(false);
         var cards = books.map(createBookCard);
         var tagNames = collectTagNames(books);
         var generation = ++bookCardRenderGeneration;
@@ -430,7 +472,6 @@ function initScript() {
                     : 'library.emptySsgDescription',
                 'empty'
             );
-            restoreOrder(storageKeySortableBook, 'book-grid');
             restoreTagCloudOrder();
             updateTagCloudCollapse();
             applyLibraryFilters();
@@ -438,7 +479,7 @@ function initScript() {
         }
 
         appendBookCardsInBatches(bookGrid, cards, generation, function() {
-            restoreOrder(storageKeySortableBook, 'book-grid');
+            setBookDragEnabled(selectedSort() === 'manual');
             restoreTagCloudOrder();
             updateTagCloudCollapse();
             applyLibraryFilters();
@@ -533,7 +574,6 @@ function initScript() {
         });
     }
 
-    var storageKeySortableBook = 'book-grid-sortable-order';
     var storageKeySortableTag = 'tag-cloud-sortable-order';
 
     function initSortable() {
@@ -541,14 +581,26 @@ function initScript() {
         window.__epubBrowserLibrarySortable = true;
         var elBook = document.querySelector('.book-grid');
         var elTag = document.querySelector('.tag-cloud');
-        Sortable.create(elBook, {
+        bookDrag = Sortable.create(elBook, {
             delay: 300,
             delayOnTouchOnly: true,
+            disabled: !bookDragEnabled,
+            draggable: '.book-card',
             onEnd: function(evt) {
-                var itemIds = Array.from(evt.from.children).map(function(child) {
-                    return child.dataset.id;
+                if (evt.oldIndex === evt.newIndex) return;
+                var itemIds = Array.prototype.map.call(evt.from.querySelectorAll('.book-card'), function(card) {
+                    return card.getAttribute('data-id');
                 });
-                localStorage.setItem(storageKeySortableBook, JSON.stringify(itemIds));
+                if (serverMode) {
+                    manualSave = manualSave.then(function() {
+                        return saveServerOrder(itemIds, false);
+                    }).catch(function() {
+                        showNotification(t('library.loadError'), 'error');
+                        return requestMetadataRefresh().catch(function() {});
+                    });
+                } else {
+                    try { localStorage.setItem(manualOrderKey, JSON.stringify(itemIds)); } catch (error) {}
+                }
             }
         });
         if (elTag) {
@@ -578,14 +630,13 @@ function initScript() {
     }
 
     function enableSortableOnInteraction() {
-        var targets = [
-            document.querySelector('.book-grid'),
-            document.querySelector('.tag-cloud')
-        ];
-        targets.forEach(function(target) {
+        var grid = document.querySelector('.book-grid');
+        [grid, document.querySelector('.tag-cloud')].forEach(function(target) {
             if (!target || target.getAttribute('data-library-sortable-loader') === 'true') return;
             target.setAttribute('data-library-sortable-loader', 'true');
-            target.addEventListener('pointerdown', requestSortable);
+            target.addEventListener('pointerdown', function() {
+                if (target !== grid || bookDragEnabled) requestSortable();
+            });
         });
     }
 
@@ -738,12 +789,50 @@ function initScript() {
         return requestMetadataRefresh(catalogRevision);
     };
 
-    requestMetadataRefresh(0).then(function() {
+    if (sortControl) {
+        var url = new URL(window.location.href);
+        var savedSort = url.searchParams.get('sort');
+        if (savedSort) sortControl.value = savedSort;
+        if (!sortControl.value) sortControl.value = 'manual';
+        sortControl.addEventListener('change', function() {
+            var location = new URL(window.location.href);
+            location.searchParams.set('sort', selectedSort());
+            window.history.replaceState(window.history.state, '', location.href);
+            setBookDragEnabled(false);
+            if (serverMode) {
+                var choice = selectedSort();
+                manualSave.then(function() {
+                    if (choice === selectedSort()) return requestMetadataRefresh();
+                }).catch(function() {
+                    showNotification(t('library.loadError'), 'error');
+                });
+            } else {
+                replaceBookCards(lastMetadataBooks);
+            }
+        });
+        if (i18n && !serverMode) {
+            i18n.onLocaleChange(function() {
+                if (selectedSort() !== 'manual' && lastMetadataBooks.length) replaceBookCards(lastMetadataBooks);
+            });
+        }
+    }
+
+    function catalogueReady() {
+        if (sortControl) sortControl.disabled = false;
         if (window.onBookCardsLoaded) window.onBookCardsLoaded();
-    }, function() {
+    }
+
+    function initialLoadFailed() {
+        if (sortControl && serverMode) sortControl.disabled = false;
         hideBookGridLoading();
         showLibraryState('library.loadError');
-    });
+    }
+
+    var legacyImport = importLegacyOrder();
+    var initialLoad = legacyImport
+        ? legacyImport.then(function() { return requestMetadataRefresh(0); })
+        : requestMetadataRefresh(0);
+    initialLoad.then(catalogueReady, initialLoadFailed);
 
     var scrollToTopBtn = document.getElementById('scrollToTopBtn');
 

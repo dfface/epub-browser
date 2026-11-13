@@ -4255,10 +4255,7 @@
         renderAdminBooks();
       });
       if (bookSort) bookSort.addEventListener('change', function() {
-        var sort = String(bookSort.value || 'title_asc');
-        adminBooksState.sort = ['title_asc', 'title_desc', 'created_desc', 'updated_desc']
-          .indexOf(sort) !== -1 ? sort : 'title_asc';
-        bookSort.value = adminBooksState.sort;
+        adminBooksState.sort = bookSort.value || 'title_asc';
         adminBooksState.page = 1;
         renderAdminBooks();
       });

@@ -11,7 +11,8 @@ from types import SimpleNamespace
 from urllib.parse import urlencode
 
 from .asset_publisher import PublishedAssets, rewrite_asset_urls
-from .i18n_bundles import render_i18n_runtime_and_inline
+from .book_sort import BOOK_SORT_LABEL, LIBRARY_SORT_OPTIONS, book_sort_options, library_sort
+from .i18n_bundles import get_bundle, render_i18n_runtime_and_inline
 from .kindle import _KINDLE_DASHBOARD_CSS, kindle_locale_script, kindle_message, render_kindle_dashboard_widgets, render_kindle_dock
 from .locales import LOCALE_NATIVE_NAMES
 from .server_chrome import (
@@ -45,6 +46,8 @@ class LibraryBook:
     cover: Optional[str]
     source_format: str = EPUB_FORMAT
     chapter_count: Optional[int] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
 
 def _kindle_book_row(book: LibraryBook, urls: SiteURLs, chapter=None) -> str:
@@ -136,6 +139,9 @@ _KINDLE_LOCAL_CATALOG_JS = r"""
   var pager = document.getElementById('kCatalogPager');
   var form = document.getElementById('kBookSearch');
   var input = document.getElementById('kFindBooks');
+  var sort = document.getElementById('kBookSort');
+  var submittedSort;
+  var requestGeneration = 0;
   var originalCatalog = catalog.innerHTML;
   var originalPager = pager.innerHTML;
   var results = [];
@@ -286,40 +292,58 @@ _KINDLE_LOCAL_CATALOG_JS = r"""
     kLocalize(pager);
   }
 
-  form.style.display = 'block';
-  form.onsubmit = function () {
-    query = input.value.replace(/^\s+|\s+$/g, '').toLowerCase();
-    if (!query) {
+  function renderCatalog() {
+    var generation = ++requestGeneration;
+    if (!query && submittedSort === 'manual' && !window.EpubBrowserBookSort.manualOrder().length) {
       catalog.innerHTML = originalCatalog;
       pager.innerHTML = originalPager;
       kLocalize(catalog);
       kLocalize(pager);
-      return false;
+      return;
     }
-    var submitted = query;
     loadBooks(function (books) {
-      if (submitted !== query) return;
+      if (generation !== requestGeneration) return;
       if (!books) {
-        // Some file:// browsers block XMLHttpRequest; keep the static pages usable.
+        // File browsers may block XHR. Keep the generated catalogue and pager usable.
+        catalog.innerHTML = originalCatalog;
+        pager.innerHTML = originalPager;
         var rows = catalog.children;
         for (var i = 0; i < rows.length; i++) {
           var text = rows[i].getAttribute('data-search') || '';
           rows[i].style.display = text.toLowerCase().indexOf(query) >= 0 ? '' : 'none';
         }
+        kLocalize(catalog);
+        kLocalize(pager);
         return;
       }
-      results = [];
-      resultPage = 1;
-      for (var j = 0; j < books.length; j++) {
-        var book = books[j];
-        if (book.format !== 'epub') continue;
+      var matches = books.filter(function(book) {
+        if (book.format !== 'epub') return false;
         var haystack = [book.title].concat(book.authors, book.tags).join(' ').toLowerCase();
-        if (haystack.indexOf(query) >= 0) results.push(book);
-      }
+        return haystack.indexOf(query) >= 0;
+      });
+      results = window.EpubBrowserBookSort.sortBooks(matches, submittedSort, document.documentElement.lang);
       drawResults();
     });
+  }
+
+  form.style.display = 'block';
+  var preferenceKey = kHistoryKey() + '_sort';
+  var savedSort = getCookie(preferenceKey);
+  if (savedSort) sort.value = savedSort;
+  if (!sort.value) sort.value = 'manual';
+  submittedSort = sort.value;
+  form.onsubmit = function () {
+    query = input.value.replace(/^\s+|\s+$/g, '').toLowerCase();
+    submittedSort = sort.value;
+    setCookie(preferenceKey, submittedSort, 365);
+    resultPage = 1;
+    renderCatalog();
     return false;
   };
+  if (submittedSort !== 'manual' || window.EpubBrowserBookSort.manualOrder().length) renderCatalog();
+  window.kOnLocaleChange(function () {
+    if (submittedSort !== 'manual') renderCatalog();
+  });
   renderRecent();
   var previousPageShow = window.onpageshow;
   window.onpageshow = function (event) {
@@ -415,7 +439,7 @@ _KINDLE_DOCK_JS = """
 def _kindle_library_locale_script(server_mode):
     keys = (
         "library", "continue", "allBooks", "emptyRecent", "emptyLibrary", "fullLibrary", "theme",
-        "search", "searchAction", "noResults", "settings", "fontFamily", "language", "light",
+        "search", "noResults", "settings", "fontFamily", "language", "light",
         "sepia", "dark", "bookDefault", "serif", "sans", "pageMode", "tapTurn", "previousPage",
         "nextPage", "pageOf",
     )
@@ -426,7 +450,11 @@ def _kindle_library_locale_script(server_mode):
             "pomoFocus", "pomoBreak", "pomoComplete", "pomoFocusMinutes", "pomoBreakMinutes", "pomoRounds",
         )
     return kindle_locale_script(
-        lambda locale: {key: kindle_message(locale, key) for key in keys},
+        lambda locale: {
+            **{key: kindle_message(locale, key) for key in keys},
+            **{key: get_bundle(locale).get(key) or get_bundle("en")[key]
+               for key in (BOOK_SORT_LABEL, "library.sort.apply", *LIBRARY_SORT_OPTIONS.values())},
+        },
         use_initial_locale=server_mode,
     )
 
@@ -464,6 +492,7 @@ def render_kindle_library_page(
     shelf_page=1,
     query="",
     static_catalog_total=None,
+    sort="manual",
 ) -> str:
     """Render the shared Kindle bookshelf with local or account progress."""
     books_by_id = {book.book_id: book for book in books if book.source_format == EPUB_FORMAT}
@@ -472,6 +501,10 @@ def render_kindle_library_page(
         return html.escape(kindle_message(locale, key))
 
     server_mode = recent is not None
+    sort = library_sort(sort)
+    catalogue_books = books_by_id.values()
+    if not server_mode and static_catalog_total is None:
+        catalogue_books = sorted(catalogue_books, key=lambda book: book.book_id)
     shelf_entries, shelf_page, shelf_total = _kindle_page(
         list(_kindle_shelf_entries(shelf, books_by_id)), shelf_page,
     )
@@ -479,7 +512,7 @@ def render_kindle_library_page(
     query = query.strip()[:200]
     needle = query.casefold()
     catalog = [
-        book for book in sorted(books_by_id.values(), key=lambda book: book.book_id)
+        book for book in catalogue_books
         if not needle or needle in " ".join((book.title, *book.authors, *book.tags)).casefold()
     ]
     if static_catalog_total is None:
@@ -502,6 +535,8 @@ def render_kindle_library_page(
             "catalog_page": page if section == "kAllBooks" else catalog_page,
             "shelf_page": page if section == "kBookshelf" else shelf_page,
         }
+        if sort != "manual":
+            params["sort"] = sort
         if query:
             params["q"] = query
         return library_url + "?" + urlencode(params) + "#" + section
@@ -536,7 +571,12 @@ def render_kindle_library_page(
     no_recent = "" if recent_rows else f'<p id="kRecentEmpty" data-i18n="emptyRecent">{copy("emptyRecent")}</p>'
     empty_key = "noResults" if query else "emptyLibrary"
     empty_library = f'<li data-i18n="{empty_key}">{copy(empty_key)}</li>'
-    local_scripts = "" if server_mode else _KINDLE_LOCAL_CATALOG_JS % KINDLE_PAGE_SIZE
+    local_scripts = ""
+    if not server_mode:
+        sort_script = (Path(__file__).parent / "assets" / "book-sort.js").read_text(encoding="utf-8")
+        local_scripts = sort_script + (_KINDLE_LOCAL_CATALOG_JS % KINDLE_PAGE_SIZE)
+    sort_label = html.escape(get_bundle(locale).get(BOOK_SORT_LABEL) or get_bundle("en")[BOOK_SORT_LABEL])
+    sort_options = book_sort_options(LIBRARY_SORT_OPTIONS, sort, locale)
     dashboard_css = _KINDLE_DASHBOARD_CSS if dashboard is not None else ""
     return f"""<!DOCTYPE html>
 <html lang="{locale}">
@@ -568,7 +608,15 @@ body.dark .k-library-tabs a[aria-current]{{background:#eee;color:#111}}
 #kRecent li:first-child .k-cover{{width:75px;height:104px;margin-right:16px}}
 #kRecent li:first-child .k-lib-title{{font:700 1.3em/1.3 Georgia,serif}}
 #kBookSearch{{margin-bottom:14px}}
-#kBookSearch button{{margin-top:6px}}
+.k-catalog-sort{{display:table;width:100%;margin-top:8px}}
+.k-catalog-sort label,.k-catalog-sort-action{{display:table-cell;vertical-align:middle}}
+.k-catalog-sort label{{width:100%}}
+.k-catalog-sort label span{{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}}
+.k-catalog-sort-action{{padding-left:8px}}
+.k-catalog-sort-action button{{white-space:nowrap}}
+#kBookSort{{width:100%;max-width:100%;min-height:44px}}
+body.dark #kBookSort option{{background:#161616;color:#eee}}
+body.sepia #kBookSort option{{background:#f3e9d2;color:#3c2f1a}}
 .k-pager{{display:table;width:100%;table-layout:fixed;margin:8px 0;text-align:center}}
 .k-pager .k-control{{display:inline-block;width:60px;padding:6px 12px;font-size:1.3em}}
 .k-pager>span[data-page]{{display:inline-block;min-width:94px;padding:0 10px}}
@@ -619,7 +667,14 @@ body.sepia #kLanguage option{{background:#f3e9d2;color:#3c2f1a}}
          value="{html.escape(query, quote=True)}" data-i18n-aria-label="search" data-i18n-placeholder="search"
          aria-label="{copy("search")}" placeholder="{copy("search")}">
   <input type="hidden" name="shelf_page" value="{shelf_page}">
-  <button class="k-control" type="submit" data-i18n="searchAction">{copy("searchAction")}</button>
+  <div class="k-catalog-sort">
+    <label for="kBookSort"><span data-i18n="{BOOK_SORT_LABEL}">{sort_label}</span>
+      <select id="kBookSort" name="sort" class="k-control">{sort_options}</select>
+    </label>
+    <div class="k-catalog-sort-action">
+      <button class="k-control" type="submit" data-i18n="library.sort.apply">{html.escape(get_bundle(locale).get("library.sort.apply") or get_bundle("en")["library.sort.apply"])}</button>
+    </div>
+  </div>
 </form>
 <ul id="kCatalog">{all_rows or empty_library}</ul>
 <div id="kCatalogPager">{catalog_pager}</div>
@@ -917,11 +972,20 @@ htmlElement.classList.add(theme + "-mode");
 {recent_reading_panel}
 {server_progress_panel}
     <div class="controls" data-id="controls">
-        <div class="search-container">
-            <input type="text" class="search-box" placeholder="Search by book title, author, or tag..." data-i18n-placeholder="library.searchPlaceholder">
-            <i class="fas fa-search search-icon"></i>
+        <div class="library-toolbar">
+            <div class="search-container">
+                <input type="search" class="search-box" placeholder="Search by book title, author, or tag..."
+                    aria-label="Search by book title, author, or tag"
+                    data-i18n-placeholder="library.searchPlaceholder" data-i18n-aria-label="library.searchPlaceholder">
+                <i class="fas fa-search search-icon" aria-hidden="true"></i>
+            </div>
+            <div class="library-sort-control">
+                <label class="sr-only" for="libraryBookSort" data-i18n="{BOOK_SORT_LABEL}">Sort by</label>
+                <i class="fas fa-sort library-sort-icon" aria-hidden="true"></i>
+                <select id="libraryBookSort" disabled>{book_sort_options(LIBRARY_SORT_OPTIONS, "manual")}</select>
+                <i class="fas fa-chevron-down library-sort-chevron" aria-hidden="true"></i>
+            </div>
         </div>
-        <br/>
         <div class="tag-cloud">
             <div class="tag-cloud-item active" data-id="All" data-i18n="library.all">All</div>
             <div class="tag-cloud-item" data-id="NoTag" data-i18n="library.noTag">No tag</div>
@@ -1032,6 +1096,7 @@ htmlElement.classList.add(theme + "-mode");
     <script src="/assets/version-check.js" defer></script>
     <script>window.EpubBrowserLibraryFeatureAssets={library_feature_assets};</script>
     <script src="/assets/library-feature-loader.js" defer></script>
+    <script src="/assets/book-sort.js" defer></script>
     <script src="/assets/library.js?v=13" defer></script>
 {ai_reading_script}
 {server_progress_script}
@@ -1129,6 +1194,8 @@ def publish_library_shell(
             "tags": list(book.tags),
             "cover": urls.public(book.cover) if book.cover else None,
             "format": book.source_format,
+            "created_at": book.created_at,
+            "updated_at": book.updated_at,
         }
         for book in ordered_books
     ]
