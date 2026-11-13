@@ -175,10 +175,14 @@
   "library.loadError": "라이브러리를 불러올 수 없습니다. 새로고침 후 다시 시도해 주세요.",
   "library.progress.scanning": "라이브러리 스캔 중",
   "library.progress.processing": "라이브러리 업데이트 중",
+  "library.progress.extracting": "책 정보를 추출하는 중",
+  "library.progress.converting": "읽기 캐시 구축 중",
   "library.progress.complete": "라이브러리 업데이트 완료",
   "library.progress.degraded": "라이브러리 업데이트에 일부 실패가 발생했습니다.",
   "library.progress.reconnecting": "라이브러리 업데이트 재연결 중…",
   "library.progress.summary": "{total}권 중 {completed}권 처리 완료",
+  "library.progress.extractingSummary": "{total}권 중 {completed}권의 정보를 확인함",
+  "library.progress.convertingSummary": "{total}권 중 {completed}권을 캐시함",
   "library.progress.removed": {
     "one": "책 {count}권 삭제됨",
     "other": "책 {count}권 삭제됨"

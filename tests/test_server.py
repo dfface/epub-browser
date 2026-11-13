@@ -4976,7 +4976,7 @@ class ServerCacheTests(unittest.TestCase):
         self.assertEqual(headers["x-accel-buffering"], "no")
         self.assertEqual(lines[0], "event: progress")
         payload = json.loads(lines[1].removeprefix("data: "))
-        self.assertEqual(payload["phase"], "processing")
+        self.assertEqual(payload["phase"], "extracting")
         self.assertEqual(payload["total"], 2)
 
         self.assertEqual(broker.subscriber_count, 0)

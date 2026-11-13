@@ -175,10 +175,14 @@
   "library.loadError": "Unable to load your library. Please refresh and try again.",
   "library.progress.scanning": "Scanning library",
   "library.progress.processing": "Updating library",
+  "library.progress.extracting": "Extracting book information",
+  "library.progress.converting": "Building reading cache",
   "library.progress.complete": "Library updated",
   "library.progress.degraded": "Library updated with failures",
   "library.progress.reconnecting": "Reconnecting to library updates…",
   "library.progress.summary": "Processed {completed} of {total} books",
+  "library.progress.extractingSummary": "Examined {completed} of {total} books",
+  "library.progress.convertingSummary": "Cached {completed} of {total} books",
   "library.progress.removed": {
     "one": "Removed {count} book",
     "other": "Removed {count} books"

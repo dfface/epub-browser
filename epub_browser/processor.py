@@ -117,6 +117,7 @@ class EPUBProcessor(ReaderPageRenderer):
         self.toc = []  # 存储目录结构
         self.resources_base = "resources"  # 资源文件的基础路径
         self._server_chapter_payloads = {}
+        self._prepared_opf_path = None
         if asset_manifest is not None:
             self.asset_manifest = asset_manifest
         else:
@@ -293,8 +294,10 @@ class EPUBProcessor(ReaderPageRenderer):
         except (OSError, zipfile.BadZipFile):
             return False
 
-    def convert(self):
-        """Convert one EPUB into its caller-owned staging directory."""
+    def prepare(self):
+        """解压并解析一次，供元数据读取和后续转换共用。"""
+        if self._prepared_opf_path is not None:
+            return self._prepared_opf_path
         if not self.extract_epub():
             raise ValueError(f"Unable to extract EPUB file: {self.epub_path}")
         opf_path = self.parse_container()
@@ -302,6 +305,19 @@ class EPUBProcessor(ReaderPageRenderer):
             raise ValueError(f"Unable to parse EPUB container file: {self.epub_path}")
         if not self.parse_opf(opf_path):
             raise ValueError(f"Unable to parse EPUB package file: {self.epub_path}")
+        self._prepared_opf_path = opf_path
+        return opf_path
+
+    def bind_book_id(self, book_id):
+        """在生成页面前绑定 Server 已解析的稳定书籍 ID。"""
+        if self._server_chapter_payloads:
+            raise RuntimeError("Cannot change the book ID after chapter conversion")
+        self.book_hash = book_id
+        self._caller_supplied_book_id = True
+
+    def convert(self):
+        """Convert one EPUB into its caller-owned staging directory."""
+        self.prepare()
         self.generate_hash()
         self.create_web_interface()
         if self.deployment_mode == "server":
@@ -975,13 +991,8 @@ class EPUBProcessor(ReaderPageRenderer):
 
 
 
-    def _write_server_content_cache(self):
-        """Persist only immutable EPUB-derived data for Server mode.
-
-        HTML shells, application navigation, i18n attributes, and app assets
-        intentionally stay out of this cache. They are rendered from current
-        code for every authenticated reader-page request.
-        """
+    def _write_server_book_metadata(self):
+        """写入完整缓存与冷缓存共用的书籍元数据和目录。"""
         content_dir = Path(self.web_dir, "content")
         content_dir.mkdir(parents=True, exist_ok=True)
         book_payload = {
@@ -1004,8 +1015,57 @@ class EPUBProcessor(ReaderPageRenderer):
             json.dumps(self._build_toc_data(), ensure_ascii=False, separators=(",", ":")),
             encoding="utf-8",
         )
+
+    def _copy_shelf_cover(self):
+        if not self.cover_info or not self.cover_info.get("full_path"):
+            return
+        cover = self.get_metadata().cover
+        source = self._internal_file(self.cover_info["full_path"])
+        if not cover or not source.is_file():
+            return
+        web_root = Path(self.web_dir).resolve()
+        target = web_root.joinpath(*Path(cover).parts).resolve()
+        try:
+            target.relative_to(web_root)
+        except ValueError as error:
+            raise ValueError("Unsafe EPUB cover path") from error
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if source.suffix.casefold() == ".svg":
+            target.write_text(
+                sanitize_svg_content(source.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+        else:
+            shutil.copy2(source, target)
+
+    def create_shelf_cache(self):
+        """只生成书库元数据、目录与封面，不转换章节正文。"""
+        if self.deployment_mode != "server":
+            raise ValueError("Shelf-only caches are only available in Server mode")
+        self.prepare()
+        self.generate_hash()
+        Path(self.web_dir).mkdir(parents=True, exist_ok=True)
+        self._write_server_book_metadata()
+        self._copy_shelf_cover()
+        return ConvertedBook(
+            book_id=self.book_hash,
+            source_path=Path(self.epub_path),
+            output_dir=Path(self.web_dir),
+            metadata=self.get_metadata(),
+            chapter_count=len(self.chapters),
+        )
+
+    def _write_server_content_cache(self):
+        """Persist only immutable EPUB-derived data for Server mode.
+
+        HTML shells, application navigation, i18n attributes, and app assets
+        intentionally stay out of this cache. They are rendered from current
+        code for every authenticated reader-page request.
+        """
+        self._write_server_book_metadata()
         if len(self._server_chapter_payloads) != len(self.chapters):
             raise ValueError("Server content cache is missing one or more chapters")
+        content_dir = Path(self.web_dir, "content")
         for index, payload in self._server_chapter_payloads.items():
             (content_dir / f"chapter_{index}.json").write_text(
                 json.dumps(payload, ensure_ascii=False, separators=(",", ":")),

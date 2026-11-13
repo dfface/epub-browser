@@ -175,10 +175,14 @@
   "library.loadError": "Perpustakaan tidak dapat dimuat. Muat ulang halaman lalu coba lagi.",
   "library.progress.scanning": "Memindai perpustakaan",
   "library.progress.processing": "Memperbarui perpustakaan",
+  "library.progress.extracting": "Mengekstrak informasi buku",
+  "library.progress.converting": "Membangun cache bacaan",
   "library.progress.complete": "Perpustakaan diperbarui",
   "library.progress.degraded": "Perpustakaan diperbarui dengan kegagalan",
   "library.progress.reconnecting": "Menghubungkan kembali pembaruan perpustakaan…",
   "library.progress.summary": "{completed} dari {total} buku diproses",
+  "library.progress.extractingSummary": "{completed} dari {total} buku telah diperiksa",
+  "library.progress.convertingSummary": "{completed} dari {total} buku telah di-cache",
   "library.progress.removed": {
     "one": "{count} buku dihapus",
     "other": "{count} buku dihapus"

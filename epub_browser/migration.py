@@ -332,6 +332,8 @@ class MigrationManager:
     ) -> dict[Path, str]:
         state = self._require_state()
         known_ids = set(state.get("legacy_book_ids", ()))
+        if not known_ids:
+            return {}
         aliases = source_aliases or {}
         matches = {}
         for source in sorted(

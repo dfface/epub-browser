@@ -7,6 +7,7 @@ function snapshot(values) {
     generation: 1, revision: 1, trigger: 'startup', phase: 'processing',
     total: 2, completed: 0, converted: 0, reused: 0, failed: 0,
     removed: 0, in_flight: 1, active_books: 0, catalog_revision: 0,
+    examined: 0, indexed: 0, cache_total: 0, cache_completed: 0,
     latest_book: null, failures: []
   }, values || {});
 }
@@ -43,6 +44,31 @@ function progressMount() {
   mount.querySelector = (selector) => nodes[selector] || null;
   return { mount, nodes, createElement: node };
 }
+
+test('renders metadata and cache stages with their own counters', () => {
+  const harness = progressMount();
+  const root = {
+    document: { createElement: harness.createElement },
+    EpubBrowserI18n: { t(key) { return key; } },
+  };
+  const controller = Progress.createController(Progress.createDomOptions(root, harness.mount));
+  const track = harness.nodes['[data-progress-track]'];
+
+  controller.accept(snapshot({ phase: 'extracting', total: 5, examined: 1 }));
+  assert.equal(harness.nodes['[data-progress-title]'].textContent, 'library.progress.extracting');
+  assert.equal(harness.nodes['[data-progress-summary]'].textContent, 'library.progress.extractingSummary');
+  assert.equal(track.getAttribute('aria-valuemax'), '5');
+  assert.equal(track.getAttribute('aria-valuenow'), '1');
+
+  controller.accept(snapshot({
+    revision: 2, phase: 'converting', total: 5, examined: 5,
+    cache_total: 2, cache_completed: 1,
+  }));
+  assert.equal(harness.nodes['[data-progress-title]'].textContent, 'library.progress.converting');
+  assert.equal(harness.nodes['[data-progress-summary]'].textContent, 'library.progress.convertingSummary');
+  assert.equal(track.getAttribute('aria-valuemax'), '2');
+  assert.equal(track.getAttribute('aria-valuenow'), '1');
+});
 
 test('rejects stale snapshots and deduplicates catalog refresh', async () => {
   let refreshes = 0;

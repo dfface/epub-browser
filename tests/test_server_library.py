@@ -35,6 +35,7 @@ from epub_browser.processor import (
 from epub_browser.server_library import (
     PDF_OUTPUT_REVISION,
     PDF_OUTPUT_REVISION_FILE,
+    _EVICTED,
     library_metadata,
 )
 from epub_browser.reporting import Reporter
@@ -240,6 +241,151 @@ class ServerLibraryManagerTests(unittest.TestCase):
             self.assertEqual(second.status_code, 200, second.text)
             self.assertEqual(second.json()["results"][0]["match"], "Original")
             self.assertFalse(chapter_file.exists())
+
+    def test_new_epub_metadata_and_content_cache_share_one_extraction(self):
+        manager = self._manager()
+        original_extract = EPUBProcessor.extract_epub
+        extractions = []
+
+        def counted_extract(processor):
+            extractions.append(processor.epub_path)
+            return original_extract(processor)
+
+        with mock.patch.object(EPUBProcessor, "extract_epub", new=counted_extract):
+            summary = manager.reconcile()
+
+        self.assertEqual(summary.converted, 1)
+        self.assertEqual(len(extractions), 1)
+        self.assertEqual(Path(extractions[0]).resolve(), self.source.resolve())
+
+    def test_cold_reconcile_prioritizes_recent_reading_and_stops_at_cache_limit(self):
+        second = self.source_dir / "second.epub"
+        third = self.source_dir / "third.epub"
+        for source in (self.source, second, third):
+            self._write_epub(source, source.stem, include_cover=True)
+        manager = self._manager()
+        records = manager.reconcile().active_books
+        recent = next(record for record in records if Path(record.source_path) == third.resolve())
+        reader = self.store.create_user("cache-reader", None)
+        self.store.set_reading_progress(reader.user_id, recent.book_id, 0)
+        self.store.set_general_settings(book_cache_limit=1)
+        shutil.rmtree(manager.public_dir / "book")
+
+        summary = manager.reconcile()
+
+        self.assertEqual(summary.converted, 1)
+        self.assertEqual(len(summary.active_books), 3)
+        recent_dir = manager.public_dir / "book" / recent.book_id
+        self.assertTrue((recent_dir / SERVER_OUTPUT_REVISION_FILE).is_file())
+        self.assertTrue((recent_dir / "content" / "chapter_0.json").is_file())
+        for record in records:
+            book_dir = manager.public_dir / "book" / record.book_id
+            self.assertTrue((book_dir / "resources" / "OEBPS" / "cover.jpg").is_file())
+            if record.book_id != recent.book_id:
+                self.assertTrue((book_dir / _EVICTED).is_file())
+                self.assertFalse((book_dir / "content" / "chapter_0.json").exists())
+
+    def test_lru_cold_pdf_keeps_shelf_metadata_and_can_restore(self):
+        self.source.unlink()
+        first = self.source_dir / "first.pdf"
+        second = self.source_dir / "second.pdf"
+        self._write_pdf(first, title="First")
+        self._write_pdf(second, title="Second")
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        records = manager.reconcile().active_books
+        recent = next(
+            record for record in records
+            if Path(record.source_path) == second.resolve()
+        )
+        cold = next(record for record in records if record.book_id != recent.book_id)
+        reader = self.store.create_user("pdf-cache-reader", None)
+        self.store.set_reading_progress(reader.user_id, recent.book_id, 0)
+        self.store.set_general_settings(book_cache_limit=1)
+        shutil.rmtree(manager.public_dir / "book")
+
+        summary = manager.reconcile()
+
+        self.assertEqual(summary.converted, 1)
+        self.assertEqual(len(summary.active_books), 2)
+        cold_dir = manager.public_dir / "book" / cold.book_id
+        self.assertTrue((cold_dir / _EVICTED).is_file())
+        self.assertTrue((cold_dir / "pdf" / "metadata.json").is_file())
+        self.assertFalse((cold_dir / "pdf" / "document.pdf").exists())
+        with manager.book_cache(cold.book_id):
+            self.assertEqual(
+                (cold_dir / "pdf" / "document.pdf").read_bytes(),
+                first.read_bytes(),
+            )
+
+    def test_cancelled_reconcile_cleans_prepared_epub_staging(self):
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        original_outcomes = manager._conversion_outcomes
+
+        def cancel_before_conversion(plans):
+            manager.request_stop()
+            return original_outcomes(plans)
+
+        manager._conversion_outcomes = cancel_before_conversion
+
+        summary = manager.reconcile()
+
+        self.assertTrue(summary.cancelled)
+        self.assertEqual(
+            list(manager.staging_dir.glob("epub-browser-server-prepare-*")),
+            [],
+        )
+
+    def test_stop_after_planning_cleans_prepared_epub_staging(self):
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        original_record = manager.progress_broker.record_conversion_planned
+
+        def stop_after_planning(source):
+            original_record(source)
+            manager.request_stop()
+
+        manager.progress_broker.record_conversion_planned = stop_after_planning
+
+        summary = manager.reconcile()
+
+        self.assertTrue(summary.cancelled)
+        self.assertEqual(
+            list(manager.staging_dir.glob("epub-browser-server-prepare-*")),
+            [],
+        )
+
+    def test_reconcile_reports_metadata_and_cache_stages(self):
+        manager = self._manager()
+        snapshots = []
+        original_probe = manager._probe_metadata
+
+        def record_probe(source, **kwargs):
+            snapshots.append(("metadata", manager.progress_broker.snapshot()))
+            return original_probe(source, **kwargs)
+
+        original_convert = EPUBProcessor.convert
+
+        def record_convert(processor):
+            snapshots.append(("cache", manager.progress_broker.snapshot()))
+            return original_convert(processor)
+
+        with (
+            mock.patch.object(manager, "_probe_metadata", new=record_probe),
+            mock.patch.object(EPUBProcessor, "convert", new=record_convert),
+        ):
+            manager.reconcile()
+
+        metadata_snapshot = next(snapshot for kind, snapshot in snapshots if kind == "metadata")
+        cache_snapshot = next(snapshot for kind, snapshot in snapshots if kind == "cache")
+        self.assertEqual(metadata_snapshot.phase, "extracting")
+        self.assertEqual(metadata_snapshot.examined, 0)
+        self.assertEqual(metadata_snapshot.total, 1)
+        self.assertEqual(metadata_snapshot.latest_book, self.source.name)
+        self.assertEqual(cache_snapshot.phase, "converting")
+        self.assertEqual(cache_snapshot.cache_total, 1)
+        self.assertEqual(cache_snapshot.cache_completed, 0)
 
     def test_first_reconcile_creates_sidecar_without_modifying_epub(self):
         before = self.source.read_bytes()

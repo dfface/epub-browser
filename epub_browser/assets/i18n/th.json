@@ -175,10 +175,14 @@
   "library.loadError": "โหลดห้องสมุดไม่ได้ โปรดรีเฟรชหน้าแล้วลองอีกครั้ง",
   "library.progress.scanning": "กำลังสแกนห้องสมุด",
   "library.progress.processing": "กำลังอัปเดตห้องสมุด",
+  "library.progress.extracting": "กำลังดึงข้อมูลหนังสือ",
+  "library.progress.converting": "กำลังสร้างแคชสำหรับอ่าน",
   "library.progress.complete": "อัปเดตห้องสมุดแล้ว",
   "library.progress.degraded": "อัปเดตห้องสมุดแล้วแต่มีข้อผิดพลาด",
   "library.progress.reconnecting": "กำลังเชื่อมต่อกับการอัปเดตห้องสมุดอีกครั้ง…",
   "library.progress.summary": "ประมวลผลแล้ว {completed} จาก {total} เล่ม",
+  "library.progress.extractingSummary": "ตรวจสอบแล้ว {completed} จาก {total} เล่ม",
+  "library.progress.convertingSummary": "แคชแล้ว {completed} จาก {total} เล่ม",
   "library.progress.removed": {
     "one": "นำหนังสือออกแล้ว {count} เล่ม",
     "other": "นำหนังสือออกแล้ว {count} เล่ม"

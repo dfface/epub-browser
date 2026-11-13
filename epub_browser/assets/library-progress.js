@@ -137,10 +137,14 @@
     var fallback = {
       'library.progress.scanning': 'Scanning library',
       'library.progress.processing': 'Updating library',
+      'library.progress.extracting': 'Extracting book information',
+      'library.progress.converting': 'Building reading cache',
       'library.progress.complete': 'Library updated',
       'library.progress.degraded': 'Library updated with failures',
       'library.progress.reconnecting': 'Reconnecting to library updates…',
       'library.progress.summary': 'Processed {completed} of {total} books',
+      'library.progress.extractingSummary': 'Examined {completed} of {total} books',
+      'library.progress.convertingSummary': 'Cached {completed} of {total} books',
       'library.progress.removed': 'Removed {count} books',
       'library.progress.latest': 'Latest: {book}'
     }[key] || key;
@@ -150,16 +154,29 @@
   function phaseTitleKey(phase) {
     if (phase === 'discovering') return 'library.progress.scanning';
     if (phase === 'processing') return 'library.progress.processing';
+    if (phase === 'extracting') return 'library.progress.extracting';
+    if (phase === 'converting') return 'library.progress.converting';
     if (phase === 'complete') return 'library.progress.complete';
     return 'library.progress.degraded';
   }
 
   function summaryText(root, snapshot) {
     var parts = [];
-    if (snapshot.total) {
-      parts.push(translate(root, 'library.progress.summary', {
-        completed: snapshot.completed,
-        total: snapshot.total
+    var summaryKey = 'library.progress.summary';
+    var completed = snapshot.completed;
+    var total = snapshot.total;
+    if (snapshot.phase === 'extracting') {
+      summaryKey = 'library.progress.extractingSummary';
+      completed = snapshot.examined;
+    } else if (snapshot.phase === 'converting') {
+      summaryKey = 'library.progress.convertingSummary';
+      completed = snapshot.cache_completed;
+      total = snapshot.cache_total;
+    }
+    if (total) {
+      parts.push(translate(root, summaryKey, {
+        completed: completed,
+        total: total
       }));
     }
     if (snapshot.removed) {
@@ -183,7 +200,7 @@
     }
 
     function setPhase(phase) {
-      var phases = ['discovering', 'processing', 'complete', 'degraded'];
+      var phases = ['discovering', 'processing', 'extracting', 'converting', 'complete', 'degraded'];
       phases.forEach(function(name) { mount.classList.remove('library-progress--' + name); });
       mount.classList.add('library-progress--' + phase);
     }
@@ -212,6 +229,14 @@
         summary.textContent = summaryText(root, snapshot);
       }
 
+      var progressCompleted = snapshot.completed;
+      var progressTotal = snapshot.total;
+      if (snapshot.phase === 'extracting') {
+        progressCompleted = snapshot.examined;
+      } else if (snapshot.phase === 'converting') {
+        progressCompleted = snapshot.cache_completed;
+        progressTotal = snapshot.cache_total;
+      }
       if (snapshot.phase === 'discovering') {
         track.classList.add('library-progress-track--indeterminate');
         track.setAttribute('role', 'progressbar');
@@ -225,9 +250,9 @@
         track.setAttribute('role', 'progressbar');
         track.setAttribute('aria-labelledby', 'libraryProgressTitle');
         track.setAttribute('aria-valuemin', '0');
-        track.setAttribute('aria-valuemax', String(snapshot.total));
-        track.setAttribute('aria-valuenow', String(snapshot.completed));
-        bar.style.width = snapshot.total ? Math.min(100, Math.round((snapshot.completed / snapshot.total) * 100)) + '%' : '100%';
+        track.setAttribute('aria-valuemax', String(progressTotal));
+        track.setAttribute('aria-valuenow', String(progressCompleted));
+        bar.style.width = progressTotal ? Math.min(100, Math.round((progressCompleted / progressTotal) * 100)) + '%' : '100%';
       }
 
       latest.textContent = snapshot.latest_book ? t('library.progress.latest', { book: snapshot.latest_book }) : '';

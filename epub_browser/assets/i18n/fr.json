@@ -175,10 +175,14 @@
   "library.loadError": "Impossible de charger votre bibliothèque. Actualisez la page et réessayez.",
   "library.progress.scanning": "Analyse de la bibliothèque",
   "library.progress.processing": "Mise à jour de la bibliothèque",
+  "library.progress.extracting": "Extraction des informations des livres",
+  "library.progress.converting": "Création du cache de lecture",
   "library.progress.complete": "Bibliothèque mise à jour",
   "library.progress.degraded": "Bibliothèque mise à jour avec des erreurs",
   "library.progress.reconnecting": "Reconnexion aux mises à jour de la bibliothèque…",
   "library.progress.summary": "{completed} livres traités sur {total}",
+  "library.progress.extractingSummary": "{completed} livres examinés sur {total}",
+  "library.progress.convertingSummary": "{completed} livres mis en cache sur {total}",
   "library.progress.removed": {
     "one": "{count} livre supprimé",
     "other": "{count} livres supprimés"
