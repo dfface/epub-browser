@@ -1,9 +1,9 @@
 # EPUB Browser
 
-> **把書變成網站，擁有自己的書庫。**
+> **把書變成網站，打造自己的書庫。**
 >
-> 把 EPUB 和 PDF 書籍發布成靜態網站，或架設私人、自行託管的書庫，
-> 使用帳號、進度同步、標註和可選的 AI 原生閱讀。
+> 把 EPUB 和 PDF 書籍發布成靜態網站，也可以自行架設私人書庫，
+> 支援帳號、進度同步、標註和可選的 AI 原生閱讀。
 
 [瀏覽靜態書庫](https://epub-browser-test.yuhan.tech/) · [體驗私人書庫](#線上示範)
 
@@ -21,8 +21,8 @@
 
 EPUB Browser 不只是書籍轉換工具，更是一套可以發布到任何地方、也能自行託管的
 完整閱讀平台。EPUB 與 PDF 共用書庫、書籍頁、目錄、閱讀模式、主題、閱讀進度和
-標註流程。PDF 的每一頁都會成為閱讀器中的一個章節，由本機 PDF.js 在同一套閱讀
-體驗中呈現——不需要獨立檢視器，也不依賴執行期 CDN。
+標註流程。PDF 的每一頁都會對應閱讀器中的一個章節，由本機 PDF.js 在同一個閱讀
+介面呈現 - 不需要獨立檢視器，也不依賴執行期 CDN。
 
 ## 目錄
 
@@ -31,13 +31,13 @@ EPUB Browser 不只是書籍轉換工具，更是一套可以發布到任何地�
   - [技術棧](#技術棧)
   - [選擇 SSG 或 Server](#選擇-ssg-或-server)
   - [線上示範](#線上示範)
-  - [AI 原生閱讀](#ai-原生閱讀僅-server-模式)
+  - [AI 原生閱讀（僅 Server 模式）](#ai-原生閱讀僅-server-模式)
   - [Kindle 極簡模式](#kindle-極簡模式)
 - [開始使用](#開始使用)
   - [選擇安裝方式](#選擇安裝方式)
   - [快速開始](#快速開始)
 - [格式與閱讀體驗](#格式與閱讀體驗)
-  - [來源與穩定書籍身分](#來源與穩定書籍身分)
+  - [來源與穩定的書籍 ID](#來源與穩定的書籍-id)
   - [PDF：一頁就是一個章節](#pdf一頁就是一個章節)
 - [部署](#部署)
   - [SSG](#ssg)
@@ -55,24 +55,24 @@ EPUB Browser 不只是書籍轉換工具，更是一套可以發布到任何地�
 
 ### 為什麼選擇 EPUB Browser
 
-- **發布到哪裡，都由你掌控。** 一道命令即可為 Pages、物件儲存或 Nginx 產生完整
-  靜態網站，也可以執行持久化 Server，使用帳號、書籍權限和 OIDC。應用程式資源、
-  字型、PDF.js 和轉譯器全部由本機提供，閱讀不必依賴 CDN。
-- **EPUB 與 PDF，共用一套真正的閱讀器。** 兩種格式共用書庫、書籍頁、目錄、回應式
-  版面、三種閱讀模式、主題、全螢幕和閱讀進度。PDF 每頁都留在閱讀區中，支援縮放、
+- **發布到哪裡，都由你掌控。** 只要一個指令，就能為 Pages、物件儲存或 Nginx 產生
+  完整靜態網站，也可以執行持久化 Server，使用帳號、書籍權限和 OIDC。應用程式資源、
+  字型、PDF.js 和呈現器全部由本機提供，閱讀不必依賴 CDN。
+- **EPUB 和 PDF，用的是同一套閱讀器。** 兩種格式共用書庫、書籍頁、目錄、回應式
+  版面、三種閱讀模式、主題、全螢幕和閱讀進度。PDF 的每一頁都顯示在閱讀區中，支援縮放、
   文字層選取與標註，不必另外使用一套預覽工具。
 - **既能找到那本書，也能找到那段話。** 書庫搜尋涵蓋中繼資料、標籤和拼音，並提供排序
-  與分頁。Server 的 EPUB 全書搜尋會按章節分組傳回完整結果，可直接跳至高亮顯示的原文
-  段落。穩定的書籍 ID 讓續讀位置、標註和閱讀歷史始終關聯同一本書。
+  與分頁。Server 的 EPUB 全書搜尋會按章節分組傳回完整結果，可直接跳至反白顯示的原文
+  段落。穩定的書籍 ID 讓續讀位置、標註和閱讀歷史始終與同一本書對應。
 - **不只讀過，還要讀懂。** Server 模式下，EPUB 章節導讀、附證據連結的解說、心智圖
-  和私人 Ask AI 都留在原文旁。高亮、筆記、字典和百科適用於 EPUB 與具有文字層的
-  PDF；Server 生字本還會記錄每個單字的出處與熟悉程度。
-- **把閱讀累積成值得保留的歷史。** 巢狀書架、評分、書評、標註匯出、活動日曆、趨勢、
+  和私人 Ask AI 都留在原文旁。反白、筆記、字典和百科適用於 EPUB 與具有文字層的
+  PDF；Server 生字本還會記錄每個單字的出處與掌握狀態。
+- **把閱讀累積成值得保留的記錄。** 巢狀書架、評分、書評、標註匯出、活動日曆、趨勢、
   單書統計和閱讀時間排行共同構成一份相互關聯的記錄。Server 會依帳號私密保存閱讀資料，
   並跨裝置同步。
-- **經營的是閱讀服務，不只是檢視器。** Server 模式下，管理員可透過 Web 上傳書籍，
+- **提供的是閱讀服務，不只是檢視器。** Server 模式下，管理員可透過 Web 上傳書籍，
   也可使用監看目錄；透過可設定的 LRU 快取淘汰機制限制磁碟用量，管理成員與 AI 權限，
-  並透過 OpenAPI、PAT 和 WebHook 整合。Kindle 極簡閱讀支援能力受限的裝置；Server
+  還可透過 OpenAPI、PAT 和 WebHooks 整合。Kindle 極簡閱讀支援能力受限的裝置；Server
   也提供個人 Kindle 螢幕保護儀表板，內含時鐘、日曆、行程、備忘錄和番茄鐘。
 
 ![貼著 EPUB 原文產生的章節導讀，以及私人 Ask AI 抽屜。](assets/ai-native-reading.png)
@@ -85,7 +85,7 @@ EPUB Browser 不只是書籍轉換工具，更是一套可以發布到任何地�
 
 ### 技術棧
 
-EPUB Browser 刻意採用精簡的伺服器端轉譯 Web 技術棧。安裝後的應用程式不使用 SPA
+EPUB Browser 刻意採用精簡的伺服器端呈現 Web 技術棧。安裝後的應用程式不使用 SPA
 框架，也不需要 Node.js 執行環境：
 
 | 層次 | 技術 | 職責 |
@@ -94,9 +94,9 @@ EPUB Browser 刻意採用精簡的伺服器端轉譯 Web 技術棧。安裝後�
 | CLI 與 Server | Python 3.9+、Starlette、Uvicorn | 轉換命令、需驗證身分的頁面、API 與背景工作 |
 | 資料 | SQLite 與可重建的 JSON 內容快取 | 使用者狀態與 EPUB/PDF 衍生內容彼此分離 |
 | 書籍格式 | lxml、pypdf、pypdfium2、PDF.js | 統一採嚴格解析優先的 EPUB 解析/清理、PDF 中繼資料/封面和瀏覽器本機呈現 |
-| 離線與資源 | Service Worker、附雜湊值的不可變資源、鎖定版本的 vendor 相依套件 | 不依賴執行期 CDN 的自包含交付 |
+| 離線與資源 | Service Worker、附雜湊值的不可變資源、鎖定版本的第三方相依套件 | 不依賴執行期 CDN 的自包含交付 |
 | 發布 | PyPI、Docker、一般靜態託管 | 同一份程式碼可產生 SSG，也可執行持久化 Server |
-| 可選 AI | OpenAI-compatible API，以及在本機呈現的 Markdown、KaTeX、Mermaid | 僅限 Server 模式的 EPUB 學習層 |
+| 可選 AI | OpenAI 相容 API，以及在本機呈現的 Markdown、KaTeX、Mermaid | 僅限 Server 模式的 EPUB 學習層 |
 
 Node.js 只供維護者執行瀏覽器端測試，不屬於讀者端的正式執行環境。
 
@@ -114,17 +114,17 @@ Node.js 只供維護者執行瀏覽器端測試，不屬於讀者端的正式執
 | 進度、標註、書架 | 儲存在目前瀏覽器 | 依已登入帳號同步至 SQLite |
 | 評分、書評、閱讀時段 | 不產生 | 各帳號私密保存，並提供閱讀洞察 |
 | 來源更新 | 再次執行 `ssg` | 重新啟動、重新掃描或使用 `--watch` |
-| 管理後台、標籤、OpenAPI、WebHook | 不包含 | 包含 |
+| 管理後台、標籤、OpenAPI、WebHooks | 不包含 | 包含 |
 | AI 閱讀與 Ask AI | 不包含 | 完成設定並明確授權後可用於 EPUB；PDF 中隱藏 |
 | 執行期資料庫 | 無 | 持久化模式必需 |
-| 適用情境 | 公開/靜態託管、離線套件、簡單的個人發布 | 私人書庫、多裝置或多人閱讀、自動化與存取治理 |
+| 適用情境 | 公開/靜態託管、離線套件、簡單的個人發布 | 私人書庫、多裝置或多人閱讀、自動化與存取管理 |
 
 如果產物必須是一般靜態檔案，請使用 `ssg`；如果讀者需要帳號、跨裝置資料、存取控制或自動處理來源異動，請使用 `server`。
 
 ### 線上示範
 
 - **SSG 模式**：[epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
-- **Server 模式**：[epub.yuhan.tech](https://epub.yuhan.tech/)——使用者名稱 `demo`，密碼 `demo`。
+- **Server 模式**：[epub.yuhan.tech](https://epub.yuhan.tech/) - 使用者名稱 `demo`，密碼 `demo`。
 
 ### AI 原生閱讀（僅 Server 模式）
 
@@ -134,17 +134,17 @@ Node.js 只供維護者執行瀏覽器端測試，不屬於讀者端的正式執
 AI 閱讀與 Ask AI。
 
 完整互動模型請見 [AI 原生閱讀指南](../ai-native-reading.md)，呈現與網路安全邊界請見
-[本機富文字轉譯器說明](../third-party-ai-renderers.md)。
+[本機富文字呈現器說明](../third-party-ai-renderers.md)。
 
 ### Kindle 極簡模式
 
-舊款 e-Ink Kindle（以及任何受限瀏覽器）都能使用一套零相依的極簡閱讀介面。透過
+舊款 e-Ink Kindle（以及任何功能受限的瀏覽器）都能使用一套零相依的極簡閱讀介面。透過
 `--kindle` 啟用：
 
 - SSG：`epub-browser ssg --kindle -o output/ SOURCE...`
 - Server：`epub-browser server --kindle --server-dir data SOURCE...`
 
-每本 EPUB 書籍（不含 PDF）會額外獲得三個頁面：
+每本 EPUB 書籍（不含 PDF）都會增加三個頁面：
 
 - 極簡書架 `/kindle-library.html`
 - 書籍頁 `/book/<id>/kindle.html`
@@ -155,11 +155,11 @@ Worker、無框架。即使完全不執行 JavaScript 也能閱讀；主題切�
 字級調整（A- / A+）與介面本地化，都是以純 HTML 為基礎，再疊加輕量內嵌指令碼。
 
 每個頁面都提供主題與字級控制項（頁首以及章節頁尾各一組）、目錄導覽、上一章/下一章，
-以及從已儲存進度恢復的「繼續閱讀」連結。
+以及從已儲存進度恢復的“繼續閱讀”連結。
 
 閱讀進度會因模式而異：
 
-- **SSG：** 進度儲存在目前瀏覽器的 Cookie 中——僅限本機，不需帳號。
+- **SSG：** 進度儲存在目前瀏覽器的 Cookie 中 - 僅限本機，不需帳號。
 - **Server：** 進度與閱讀心跳會依已登入帳號同步至 SQLite。Kindle 介面只負責讀取和回報：
   記錄目前章節、回報心跳並呈現唯讀書架，絕不提供閱讀洞察或內容管理。
 
@@ -167,7 +167,7 @@ Worker、無框架。即使完全不執行 JavaScript 也能閱讀；主題切�
 看不到該書，存取書籍頁、章節頁和進度 API 時會收到 403。
 
 支援的瀏覽器（UA 包含 `Kindle/`、`Arora/` 等）會從完整閱讀器自動重新導向至極簡頁面；
-上述 URL 也可直接開啟。這讓極簡模式成為低效能或 JavaScript 受限裝置的優雅降級方案。
+上述 URL 也可直接開啟。因此，效能較低或 JavaScript 功能受限的裝置也能透過極簡模式正常閱讀。
 
 ## 開始使用
 
@@ -245,10 +245,10 @@ epub-browser server /path/to/books \
 
 ## 格式與閱讀體驗
 
-### 來源與穩定書籍身分
+### 來源與穩定的書籍 ID
 
 每個位置參數 `SOURCE` 都可以是 EPUB 檔案、PDF 檔案或目錄；目錄會以遞迴方式搜尋。
-一道命令可傳入多個來源：
+同一個指令可以傳入多個來源：
 
 ```bash
 epub-browser server book.epub /srv/library /srv/periodicals \
@@ -285,15 +285,15 @@ Embedded 模式可能在轉換前重建 EPUB ZIP，或追加 PDF 中繼資料更
 | 第 1 頁 URL | `chapter_0.html` | `/book/<book-id>/chapter_0.html` |
 | 第 N 頁 URL | `chapter_{N-1}.html` | `/book/<book-id>/chapter_{N-1}.html` |
 | 頁碼標籤和目錄 | 在本機產生；列出每一頁 | 從 PDF 中繼資料快取呈現；列出每一頁 |
-| 內嵌 outline | 在目標頁的目錄項目顯示 marker | 同樣顯示 marker，不會刪除或重排頁面項目 |
+| 內嵌大綱 | 在目標頁的目錄項目顯示大綱標記 | 同樣顯示大綱標記，不會刪除或重排頁面項目 |
 | 捲動與分頁/翻頁 | 靜態章節頁面框架和本機 PDF.js | 動態共用章節頁面框架和本機 PDF.js |
-| 高亮、筆記、字典、百科 | 有文字層時使用共用的瀏覽器本機元件 | 有文字層時使用共用且需驗證身分的元件 |
+| 反白、筆記、字典、百科 | 有文字層時使用共用的瀏覽器本機元件 | 有文字層時使用共用且需驗證身分的元件 |
 | 原始 PDF 位元組 | 靜態書籍產物中只有一個 `document.pdf` | 僅限 Session 存取、支援 Range 的快取文件路由 |
 
 可見標籤和 PDF.js 中的頁碼從 1 開始；URL、狀態、API 和 SQLite 中的章節索引從 0
 開始。因此 PDF 第 1 頁始終是 `chapter_0.html`。正規化目錄會為每一頁保留一個 `Page N`
-項目；PDF 內嵌 outline 標題會作為 outline marker 附加到目標項目，同一頁的多個
-marker 也都會保留。
+項目；PDF 內嵌大綱的標題會作為大綱標記附加到目標項目，同一頁有多個
+大綱標記時也都會保留。
 
 SSG 會寫出一個 `document.pdf`，並為每頁寫出一個 `chapter_<index>.html` 頁面框架。
 SSG 產物不含 Session 指令碼、`/api/*` 呼叫、同步標註資料或 Server 相依項目。Server
@@ -307,12 +307,11 @@ Server 的原始文件端點僅接受 Session：
 private 快取、`nosniff` 和 inline PDF disposition。端點不會公開絕對路徑，不接受 PAT
 驗證，也不列入 PAT/OpenAPI 介面範圍。SSG 只有本機 `document.pdf`，沒有原始文件 API。
 
-具有可用 PDF.js 文字層的 PDF 會原樣沿用現有的選取彈出選單與標註元件，提供 Highlight
-和 Note，以及 Dictionary 和 Encyclopedia。標註儲存、擁有者、匯出、列表和深層連結
-繼續共用；不會新增 PDF 專用標註資料表或設定 UI。掃描版或純圖片 PDF 仍可閱讀，但沒有
-可用文字層時，以選取範圍為基礎的 Highlight、Note、Dictionary、Encyclopedia 和文件
-搜尋會明確標示為無法使用。跨頁選取的內容仍可複製，但標註和查詢動作會顯示已本地化的
-不支援訊息；單頁內的選取功能則繼續正常運作。
+具有可用 PDF.js 文字層的 PDF 會原樣沿用現有的文字選取彈出選單與標註元件，提供反白、
+筆記、字典和百科。標註儲存、擁有者、匯出、列表和深層連結繼續共用；不會新增 PDF 專用
+標註資料表或設定 UI。掃描版或純圖片 PDF 仍可閱讀，但沒有可用文字層時，以選取範圍為基礎的
+反白、筆記、字典、百科和文件搜尋會明確標示為無法使用。跨頁選取的內容仍可複製，但標註和
+查詢動作會顯示已本地化的不支援訊息；單頁內的選取功能則繼續正常運作。
 
 PDF.js 不是第二套檢視器外殼。建置或發布前，請先補齊並驗證鎖定版本的第三方資源：
 
@@ -321,8 +320,8 @@ python3 tools/sync_vendor_assets.py fetch
 python3 tools/sync_vendor_assets.py verify
 ```
 
-接著，應用程式會在執行期提供本機附雜湊值的 PDF.js module 和 worker 資源，絕不從
-CDN 取得。圖片 lightbox 使用鎖定版本的 GLightbox 相依套件；Fancyapps/Fancybox 不是
+接著，應用程式會在執行期提供本機附雜湊值的 PDF.js 模組和 Worker 資源，絕不從
+CDN 取得。圖片燈箱使用鎖定版本的 GLightbox 相依套件；Fancyapps/Fancybox 不是
 執行期相依套件，也不會隨專案重新散布。鎖定資源與發布流程請見
 [third_party/README.md](../../third_party/README.md)。
 
@@ -335,12 +334,12 @@ SSG 會先在相鄰的 staging 目錄建置完整快照並驗證，然後替換�
 SSG 刻意保持本機化且不包含帳號體系：
 
 - 閱讀進度和標註使用目前來源的瀏覽器儲存空間。
-- 書架支援本機 JSON 匯入和匯出，沒有雲端 Sync 動作。
+- 書架支援本機 JSON 匯入和匯出，沒有雲端同步動作。
 - 不包含登入、帳號設定、Server API 或依使用者身分而異的控制項。
 - 儲存位置固定為瀏覽器本機，不會顯示為設定選項。
 - 靜態產物包含讓資源可離線使用所需的 Service Worker。
 
-應用程式所需的全部 JavaScript、CSS、字型、圖示都會包含在產物中。唯一的可選網路請求請見[自包含與網路行為](#自包含與網路行為)。
+應用程式所需的全部 JavaScript、CSS、字型、圖示都會包含在產物中。唯一的可選網路請求請見 [自包含與網路行為](#自包含與網路行為)。
 
 ### Server
 
@@ -366,7 +365,7 @@ Keycloak、Authentik 和其他相容服務。在 **管理後台 → OIDC 登入*
 Provider 名稱、Issuer URL、用戶端 ID、用戶端密鑰、完全一致的重新導向 URI、Scopes
 和使用者名稱 Claim。EPUB Browser 使用 Discovery 和採用 S256 PKCE 的 Authorization
 Code 流程，驗證已簽署的 ID Token，並且只以 `(issuer, sub)` 識別外部帳號；電子郵件和
-使用者名稱 Claim 只是顯示/建立帳號的提示，絕不作為身分鍵。
+使用者名稱 Claim 只是顯示或建立帳號時的參考資訊，絕不作為帳號的身分識別依據。
 
 請在 Provider 中註冊這個完全一致的回呼網址，包含通訊協定和主機名稱：
 
@@ -374,12 +373,12 @@ Code 流程，驗證已簽署的 ID Token，並且只以 `(issuer, sub)` 識別�
 https://reader.example.com/auth/oidc/callback
 ```
 
-現有使用者可先以本機帳號登入，再從「帳號設定」連結 Provider。若是未知的外部身分，
-系統則會要求一次性輸入現有本機使用者名稱和密碼。可選的自動建立功能會產生沒有密碼的
-成員帳號，絕不會匯入管理員角色。請先讓現有使用者完成連結：過早啟用自動建立可能產生
-**重複的本機帳號**。即使停用本機成員密碼登入，**本機管理員**密碼登入仍始終可用。
-請定期驗證並妥善保護這組復原憑證。系統不會執行 Provider 登出，也不會儲存 Provider
-的 access/refresh token。
+現有使用者可先以本機帳號登入，再從“帳號設定”連結 Provider。如果外部身分尚未關聯
+本機帳號，系統會要求使用者輸入一次現有本機帳號的使用者名稱和密碼。可選的自動建立功能
+會產生沒有密碼的成員帳號，絕不會匯入管理員角色。請先讓現有使用者完成連結：過早啟用
+自動建立可能產生**重複的本機帳號**。即使停用本機成員密碼登入，**本機管理員**密碼登入
+仍始終可用。請確認這組復原憑證可用，並妥善保護。系統不會執行 Provider 登出，也不會
+儲存 Provider 的 access/refresh token。
 
 Authelia 需要在其 OIDC Provider 區段設定 confidential client。下列片段使用刻意
 虛構的值，並假設 Authelia 必要的 Provider 金鑰和原則已設定完成。請在 Authelia 中
@@ -408,14 +407,14 @@ identity_providers:
 Scopes `openid profile email` 和使用者名稱 Claim `preferred_username`。儲存時會即時
 執行 Discovery 與能力驗證；失敗時，先前的設定仍然有效。
 
-#### 設定與治理 AI 閱讀
+#### 設定與管理 AI 閱讀
 
 管理員在 **管理後台** 設定 AI 閱讀，該頁面緊接使用者管理，位於書籍管理之前。頁面會把
-OpenAI-compatible Base URL、API Key、模型、逾時、脈絡預算、並行上限和預設每日
+OpenAI 相容 Base URL、API Key、模型、逾時、脈絡預算、並行上限和預設每日
 Provider 呼叫額度儲存到 Server 的 SQLite 資料庫。AI 預設對成員關閉；管理員必須逐一
 授予成員存取權，並可設定個人每日額度（`0` 表示無限制）。
 
-章節學習層與整書評讀會依適用語言共用，後續對話則由各帳號私有。結果、工作狀態、
+章節學習層與整書點評會依適用語言共用，後續對話則由各帳號私有。結果、工作狀態、
 自訂標籤、書籍閱讀分類和私人追問都儲存在 SQLite。模型設定改變後，舊結果仍然可用，
 直到管理員明確重新產生。
 
@@ -441,7 +440,7 @@ epub-browser server /path/to/books \
 
 預設情況下，Server 會在 HTTP 接聽器啟動後，嘗試開啟作業系統的預設瀏覽器。`--no-browser` 會阻止這項本機啟動動作，**不會關閉 Web 介面，也不會禁止瀏覽器存取**；它只會抑制本機的 `webbrowser.open(...)` 呼叫。Docker、systemd、SSH 工作階段、無顯示介面的主機和指令碼都應使用此選項。
 
-預設使用 `--log-level error`，CLI 只會輸出錯誤，避免例行訊息或警告打斷終端機進度顯示。互動式終端機會印出一次繫結 URL；非互動的 Docker 和服務執行則保持安靜。使用 `--log-level warning` 可包含警告，使用 `--log-level info` 可啟用維運記錄和 HTTP 存取記錄，使用 `--log-level debug` 可取得最詳細的資訊。`--log` 保留為 `--log-level info` 的相容別名。
+預設使用 `--log-level error`，CLI 只會輸出錯誤，避免例行訊息或警告打斷終端機進度顯示。互動式終端機會印出一次繫結 URL；以非互動方式執行 Docker 或服務時，則不輸出例行訊息。使用 `--log-level warning` 可包含警告，使用 `--log-level info` 可啟用維運記錄和 HTTP 存取記錄，使用 `--log-level debug` 可取得最詳細的資訊。`--log` 保留為 `--log-level info` 的相容別名。
 
 首次掃描和監看掃描的進度會顯示在 Web 介面，而不是終端機 `tqdm`。成功摘要會自動關閉；失敗資訊會保留到手動關閉為止。使用 `--watch` 時，修正或替換來源就會啟動另一次掃描，不需手動重試。
 
@@ -489,7 +488,7 @@ epub-browser server /path/to/books \
 
 請勿把內建 HTTP Server 直接公開到網際網路。請在反向代理終止 TLS、實施網路存取控制，並啟用安全 Cookie。
 
-若要讓使用中的工作階段和登入速率限制在反向代理後方記錄真實用戶端 IP，請設定反向代理的**直接 Socket 連線網段**（不是公開用戶端網段）：
+若要讓使用中的工作階段和登入速率限制在反向代理後方記錄真實用戶端 IP，請設定**與 Server 直接連線的代理網段**（不是公開用戶端網段）：
 
 ```bash
 epub-browser server /path/to/books \
@@ -502,7 +501,7 @@ epub-browser server /path/to/books \
   --no-browser
 ```
 
-每個直接連線的代理位址或網段都要重複傳入一次 `--trusted-proxy-cidr`。只有直接對等端屬於其中任一 CIDR 的請求才能提供 `X-Forwarded-For`；其他對等端只記錄直接位址。Uvicorn 的轉送位址處理已停用，因此 `Forwarded` 和 `FORWARDED_ALLOW_IPS` 都不能擴大這個信任邊界。只有瀏覽器透過 HTTPS 存取服務時，才使用 `--cookie-secure`。
+每個直接連線的代理位址或網段都要重複傳入一次 `--trusted-proxy-cidr`。只有直接對等端位於上述任一 CIDR 的請求，Server 才會採用其 `X-Forwarded-For`；其他對等端只記錄直接位址。Uvicorn 的轉送位址處理已停用，因此 `Forwarded` 和 `FORWARDED_ALLOW_IPS` 都不能擴大這個信任邊界。只有瀏覽器透過 HTTPS 存取服務時，才使用 `--cookie-secure`。
 
 ### Docker
 
@@ -560,7 +559,7 @@ docker run -d \
 -v /path/to/legacy-sync:/app/SyncData:ro
 ```
 
-範例中的 loopback 發布連接埠讓容器留在主機邊界之後。遠端存取時，請使用 TLS 反向代理，設定其實際容器網路 CIDR，並加入 `--cookie-secure`。
+範例將發布連接埠繫結到 loopback，使容器服務只能從主機本機存取。遠端存取時，請使用 TLS 反向代理，設定其實際容器網路 CIDR，並加入 `--cookie-secure`。
 
 ## 參考與維運
 
@@ -575,7 +574,7 @@ docker run -d \
 | `--book-id-storage sidecar\|embedded` | 每個所選來源的穩定身分載體，預設 `sidecar`。 |
 | `--kindle` | 為舊式 e-Ink Kindle 產生零相依極簡頁面，並把 Kindle WebKit 瀏覽器重新導向至這些頁面；預設關閉。 |
 | `--log` | `--log-level info` 的相容別名。 |
-| `--log-level debug\|info\|warning\|error` | 維運記錄的詳細程度；預設 `error`，例行轉換輸出和警告保持安靜。 |
+| `--log-level debug\|info\|warning\|error` | 維運記錄的詳細程度；預設 `error`，不輸出例行轉換訊息和警告。 |
 
 #### `epub-browser server SOURCE [SOURCE ...]`
 
@@ -585,7 +584,7 @@ docker run -d \
 | --- | --- |
 | `--server-dir DIR` | 持久化權威資料與可替換快取的根目錄。 |
 | `--ephemeral` | 使用一次性狀態；與 `--server-dir` 互斥。 |
-| `--watch`, `-w` | 監看來源並處理新增、更新、移動和刪除。 |
+| `--watch`, `-w` | 監看來源，並同步處理新增、更新、移動和刪除。 |
 | `--host ADDRESS` | 繫結位址，預設 `127.0.0.1`。 |
 | `--port PORT`, `-p PORT` | 繫結連接埠，預設 `8000`。 |
 | `--no-browser` | 不啟動本機預設瀏覽器；Web 介面仍可存取。 |
@@ -593,7 +592,7 @@ docker run -d \
 | `--log-level debug\|info\|warning\|error` | 維運記錄的詳細程度；預設 `error`。`info` 和 `debug` 會啟用 HTTP 存取記錄。 |
 | `--legacy-sync-dir DIR` | 啟動遷移時讀取舊版書架 JSON。 |
 | `--book-id-storage sidecar\|embedded` | 每個所選來源的穩定身分載體，預設 `sidecar`。 |
-| `--admin-username NAME` | 無人值守的初始管理員；後備為 `EPUB_BROWSER_ADMIN_USERNAME`。 |
+| `--admin-username NAME` | 無人值守設定所用的初始管理員名稱；後備為 `EPUB_BROWSER_ADMIN_USERNAME`。 |
 | `--admin-password-file FILE` | 優先使用的初始密鑰檔；後備為 `EPUB_BROWSER_ADMIN_PASSWORD_FILE`，未設定檔案時再使用 `EPUB_BROWSER_ADMIN_PASSWORD`。 |
 | `--trusted-proxy-cidr CIDR` | 可重複指定的直接代理網路信任邊界，用於安全剖析 `X-Forwarded-For` 中的用戶端 IP。 |
 | `--cookie-secure` | 僅透過瀏覽器端 HTTPS 傳送工作階段 Cookie。 |
@@ -617,33 +616,33 @@ docker run -d \
 - 遞迴探索 EPUB/PDF 和 Calibre 書庫、中繼資料標籤、搜尋與拼音搜尋
 - 回應式書庫、書籍詳情和章節閱讀介面
 - 捲動、翻頁、連續閱讀、可調內容寬度、字型、自訂 CSS、主題和純粹閱讀模式
-- 高亮、筆記、標註瀏覽、巢狀書架群組、標籤和 JSON 匯入/匯出
+- 反白、筆記、標註瀏覽、巢狀書架群組、標籤和 JSON 匯入/匯出
 - 介面支援英文、簡體中文、繁體中文、韓文、日文、西班牙文、德文、法文、俄文、
   義大利文、巴西葡萄牙文、阿拉伯文、印尼文、印地文、越南文、泰文和馬來文
-- 適合 Kindle/Silk 瀏覽器的電子閱讀器行為；高度依賴瀏覽器能力的功能可能精簡
+- 適合 Kindle/Silk 瀏覽器的電子閱讀器行為；需要較多瀏覽器功能支援的功能可能會簡化
 
 | 資料 | SSG | Server |
 | --- | --- | --- |
-| 閱讀進度 | 瀏覽器本機 | 已驗證身分使用者的 SQLite 記錄 |
-| 高亮與筆記 | 瀏覽器本機 | 已驗證身分使用者的 SQLite 記錄 |
-| 私人評分、書評與閱讀時段歷史 | 不存在 | 已驗證身分使用者的 SQLite 記錄 |
-| 書架 | 瀏覽器本機；匯入/匯出 | 已驗證身分使用者的版本化雲端文件；自動儲存 |
+| 閱讀進度 | 瀏覽器本機 | 已驗證身分的使用者的 SQLite 記錄 |
+| 反白與筆記 | 瀏覽器本機 | 已驗證身分的使用者的 SQLite 記錄 |
+| 私人評分、書評與閱讀時段歷史 | 不存在 | 已驗證身分的使用者的 SQLite 記錄 |
+| 書架 | 瀏覽器本機；匯入/匯出 | 已驗證身分的使用者的版本化雲端文件；自動儲存 |
 | 帳號與工作階段 | 不存在 | `<server-dir>/data` 下的 SQLite |
 | 書籍授權 | 不存在 | `<server-dir>/data` 下的 SQLite |
 
-Server 不提供「本機/雲端」儲存選擇器：已驗證身分的閱讀資料始終儲存在 Server。詳細的私人閱讀時段歷史絕不會輸出到 SSG。SSG 從不探測 Server API，始終使用目前瀏覽器來源的本機儲存空間。
+Server 不提供“本機/雲端”儲存選擇器：已驗證身分的閱讀資料始終儲存在 Server。詳細的私人閱讀時段歷史絕不會輸出到 SSG。SSG 從不探測 Server API，始終使用目前瀏覽器來源的本機儲存空間。
 
 ### 自包含與網路行為
 
 應用程式的閱讀功能是自包含的：所需 JavaScript、CSS、字型、圖示、資訊清單和轉換後的 EPUB 資源全部由本機提供，沒有 CDN 執行期相依項目。封鎖網際網路對外存取不會妨礙首次設定、登入、瀏覽、閱讀、標註、進度、書架使用、後台管理或來源轉換。
 
-頁尾可能向 GitHub Releases API 發出一個可選請求，用於探索是否有新版 EPUB Browser。請求失敗、被封鎖或離線使用只會隱藏更新提示。
+頁尾可能向 GitHub Releases API 發出一個可選請求，檢查是否有新版 EPUB Browser。請求失敗、被封鎖或離線使用只會隱藏更新提示。
 
 SSG 會發布靜態 Service Worker。Server 會刻意停用並清除整個來源範圍的 Service Worker，避免某個帳號收到另一個帳號快取過的受保護內容。
 
 ### Server API 與 WebHooks
 
-Server 帳號可在「帳號設定」中建立具範圍限制的個人存取權杖。外部用戶端透過 `Authorization: Bearer <PAT>` 使用版本化的 `/api/v1/*` API；瀏覽器 Cookie 無法驗證這些路由。API 涵蓋可見書籍與章節內容、權杖擁有者的書架、進度、標註和書評；具 `admin:data:read` 的管理員 PAT 還能唯讀存取跨使用者資料。
+Server 帳號可在“帳號設定”中建立具範圍限制的個人存取權杖。外部用戶端透過 `Authorization: Bearer <PAT>` 使用版本化的 `/api/v1/*` API；瀏覽器 Cookie 無法驗證這些路由。API 涵蓋可見書籍與章節內容、權杖擁有者的書架、進度、標註和書評；具 `admin:data:read` 的管理員 PAT 還能唯讀存取跨使用者資料。
 
 OpenAPI 3.1 文件位於 `/openapi.json`，已登入使用者可在 `/api-docs` 瀏覽本機 API 參考。例如：`curl -H 'Authorization: Bearer …' https://reader.example/api/v1/books`。章節詳情預設傳回已清理的 HTML，加入 `?format=text` 可傳回純文字。
 
@@ -651,17 +650,17 @@ OpenAPI 3.1 文件位於 `/openapi.json`，已登入使用者可在 `/api-docs` 
 
 生字表預設使用相同的列表格式。仍使用舊版 `words` 回應的用戶端可傳入 `page=1` 或 `page_size`，選擇舊版分頁格式。
 
-管理員可在「管理後台」管理 WebHook 端點。密鑰只會在建立或輪換時顯示；投遞會簽署、持久化，並在收到非 2xx 回應時重試。書評事件包含 ID 和動作時間戳記，絕不包含評分或書評正文。
+管理員可在“管理後台”管理 WebHook 端點。密鑰只會在建立或輪換時顯示；投遞會簽署、持久化，並在收到非 2xx 回應時重試。書評事件包含 ID 和動作時間戳記，絕不包含評分或書評正文。
 
 ### 資料安全與遷移
 
 升級持久化 Server 安裝前，請備份來源 EPUB/PDF 書籍和 `<server-dir>/data`。替換容器時，必須保留同一個持久化狀態磁碟區。
 
-啟動遷移會自動執行，且可安全重新啟動。它會驗證舊版資料庫、建立備份、升級副本、把符合條件的舊版書架/進度/標註資料匯入待建立的初始管理員帳號，並只在成功檢查點之後淘汰可替換的舊版公開產物。一般請求絕不會掃描舊版同步目錄。資料庫損毀、密碼雜湊無效、舊版資料庫意義不明確和 ID 衝突都會讓啟動安全地失敗，絕不猜測或覆寫。
+啟動遷移會自動執行，且可安全重新啟動。它會驗證舊版資料庫、建立備份、升級副本、把符合條件的舊版書架/進度/標註資料匯入待建立的初始管理員帳號，並只在成功檢查點之後淘汰可替換的舊版公開產物。一般請求絕不會掃描舊版同步目錄。遇到資料庫損毀、密碼雜湊無效、舊版資料庫狀態不明確或 ID 衝突時，啟動都會直接停止，不會嘗試猜測或覆寫。
 
 遷移後根目錄的 `epub-browser.db` 或 `annotations.db` 會保留為敏感的非權威復原副本；`data/epub-browser.db` 才是權威資料庫，Server 請求不會使用保留的根目錄檔案。請讓復原副本保持私密。只有在 Server 已停止、權威資料庫與記錄的備份均已驗證，且不再需要回復至 v1 時，才可手動刪除；EPUB Browser 絕不會自動刪除它。
 
-如果舊版根目錄同時包含 `epub-browser.db` 和 `annotations.db`，啟動會停止，且原檔案保持不變。備份、回復、快取重建和衝突復原請見[遷移至 v2](../migration-v2.md)。
+如果舊版根目錄同時包含 `epub-browser.db` 和 `annotations.db`，啟動會停止，且原檔案保持不變。備份、回復、快取重建和衝突復原請見 [遷移至 v2](../migration-v2.md)。
 
 ### 疑難排解
 
@@ -689,9 +688,9 @@ OpenAPI 3.1 文件位於 `/openapi.json`，已登入使用者可在 `/api-docs` 
 
 ### 參與貢獻
 
-歡迎在 [dfface/epub-browser](https://github.com/dfface/epub-browser) 提交 Issue 和 Pull Request。有用的問題回報應包含實際命令、瀏覽器/裝置、重現步驟、相關記錄，以及在可合法分享時附上的 EPUB 或 PDF。
+歡迎在 [dfface/epub-browser](https://github.com/dfface/epub-browser) 提交 Issue 和 Pull Request。有用的問題回報應包含實際執行的命令、瀏覽器/裝置、重現步驟、相關記錄，以及在可合法分享時附上的 EPUB 或 PDF。
 
-#### 維護者架構約定
+#### 維護者的架構約定
 
 修改內容處理、頁面範本、快取、權限、資源或部署行為之前，請先閱讀
 [AGENTS.md](../../AGENTS.md)。其中定義了 EPUB/PDF 格式邊界、SSG/Server 職責、
@@ -705,7 +704,7 @@ OpenAPI 3.1 文件位於 `/openapi.json`，已登入使用者可在 `/api-docs` 
 
 #### 從原始碼工作目錄開發
 
-第三方瀏覽器檔案是產生的建置輸入，不是專案原始碼，因此 Git 刻意不包含
+第三方瀏覽器檔案是產生的建置輸入，不是專案原始碼，因此 Git 儲存庫刻意不收錄
 `epub_browser/assets/vendor/`。開發或建置前，必須明確補齊鎖定版本的資源，再離線驗證：
 
 ```bash
@@ -715,13 +714,13 @@ python3 -m unittest tests.test_vendor_assets -v
 python3 -m build
 ```
 
-上述命令只有 `fetch` 會下載瀏覽器 vendor 資源。鎖定檔記錄不可變的 npm tarball、
+上述命令只有 `fetch` 會下載瀏覽器第三方資源。鎖定檔記錄不可變的 npm tarball、
 檔案摘要、允許清單和授權條款；`verify`、測試、在已補齊資源的原始碼工作目錄中建置，
 以及安裝後的閱讀器都不會下載瀏覽器資源。標準的隔離建置命令 `python3 -m build` 仍可能
 存取 Python 套件索引以取得建置需求。若要在完全停用網路的環境建置，請在離線前補齊
-vendor 目錄樹並預先安裝 `build`、`setuptools` 和 `wheel`，然後執行
+第三方資源目錄並預先安裝 `build`、`setuptools` 和 `wheel`，然後執行
 `PIP_NO_INDEX=1 python3 -m build --no-isolation`。wheel、原始碼發行套件、Docker 映像和
-產生的 SSG 網站都包含已驗證檔案，沒有執行期 CDN 相依項目。更新、發布和儲存庫整潔
+產生的 SSG 網站都包含已驗證檔案，沒有執行期 CDN 相依項目。更新、發布和儲存庫維護
 流程請見 [third_party/README.md](../../third_party/README.md)。
 
 ### 授權

@@ -4,7 +4,7 @@
 >
 > Publique livros EPUB e PDF como um site estático ou mantenha uma biblioteca privada
 > em seu próprio servidor, com contas, progresso sincronizado, anotações e, opcionalmente,
-> leitura nativa com IA.
+> leitura com IA integrada.
 
 [Conheça a biblioteca estática](https://epub-browser-test.yuhan.tech/) · [Experimente a biblioteca privada](#demonstrações-ao-vivo)
 
@@ -34,7 +34,7 @@ visualizador separado nem CDN em tempo de execução.
   - [Tecnologias](#tecnologias)
   - [Como escolher entre SSG e Server](#como-escolher-entre-ssg-e-server)
   - [Demonstrações ao vivo](#demonstrações-ao-vivo)
-  - [Leitura nativa com IA](#leitura-nativa-com-ia-somente-server)
+  - [Leitura com IA integrada](#leitura-com-ia-integrada-somente-server)
   - [Modo mínimo para Kindle](#modo-mínimo-para-kindle)
 - [Primeiros passos](#primeiros-passos)
   - [Escolha uma forma de instalação](#escolha-uma-forma-de-instalação)
@@ -65,8 +65,8 @@ visualizador separado nem CDN em tempo de execução.
   nunca dependa de um CDN.
 - **EPUB e PDF em um único leitor de verdade.** Os dois formatos compartilham biblioteca,
   página do livro, sumário, layout responsivo, três modos de leitura, temas, tela cheia
-  e progresso. Cada página do PDF permanece na área de leitura, com zoom, seleção da
-  camada de texto e anotações, em vez de abrir em um visualizador separado.
+  e progresso. Cada página do PDF permanece na área de leitura, com zoom, seleção de
+  texto na camada de texto e anotações, em vez de abrir em um visualizador separado.
 - **Encontre o livro e também o trecho.** A busca da biblioteca cobre metadados, tags e
   pinyin, com ordenação e paginação. A busca no livro inteiro para EPUB, feita no Server,
   retorna resultados completos agrupados por capítulo e leva ao trecho destacado. IDs
@@ -74,19 +74,19 @@ visualizador separado nem CDN em tempo de execução.
 - **Entenda o texto, não apenas role a página.** No modo Server, guias de capítulos EPUB,
   explicações ligadas a evidências, mapas mentais e o Ask AI privado ficam ao lado do
   texto original. Destaques, notas, dicionário e enciclopédia funcionam em EPUB e em PDFs
-  com camada de texto; as listas de vocabulário do Server registram a origem e o estado
+  com camada de texto; as listas de vocabulário do Server registram a origem e o grau
   de domínio de cada palavra.
 - **Transforme a leitura em um histórico que vale a pena guardar.** Estantes aninhadas,
   avaliações, resenhas, exportação de anotações, calendários de atividades, tendências,
   estatísticas por livro e rankings de tempo de leitura formam um registro conectado.
-  O Server mantém os dados de leitura privados em cada conta e sincronizados entre
+  O Server mantém os dados de leitura de cada conta privados e sincronizados entre
   dispositivos.
 - **Ofereça um serviço de leitura, não apenas um visualizador.** No modo Server, adicione
   livros por upload na interface do administrador ou por pastas monitoradas, limite o uso
-  de disco com descarte configurável de cache LRU, gerencie permissões de membros e de IA
+  de disco com remoção configurável de itens do cache por LRU, gerencie permissões de membros e de IA
   e integre outros sistemas por OpenAPI, PATs e WebHooks. A leitura mínima para Kindle
   atende dispositivos com recursos limitados; o Server também oferece um painel pessoal
-  de descanso de tela para Kindle com relógio, calendário, agenda, memorando e timer
+  de descanso de tela para Kindle com relógio, calendário, agenda, memorando e temporizador
   Pomodoro.
 
 ![Guia de capítulo ao lado do texto EPUB original, com uma gaveta privada do Ask AI.](assets/ai-native-reading.png)
@@ -99,7 +99,7 @@ visualizador separado nem CDN em tempo de execução.
 
 ### Tecnologias
 
-O EPUB Browser usa propositalmente uma stack web pequena, com renderização no servidor.
+O EPUB Browser usa propositalmente uma stack web enxuta, com renderização no servidor.
 O aplicativo instalado não tem framework SPA nem exige Node.js em tempo de execução:
 
 | Camada | Tecnologia | Função |
@@ -108,7 +108,7 @@ O aplicativo instalado não tem framework SPA nem exige Node.js em tempo de exec
 | CLI e Server | Python 3.9+, Starlette, Uvicorn | Comandos de conversão, páginas autenticadas, APIs e trabalhos em segundo plano |
 | Dados | SQLite e caches de conteúdo JSON reconstruíveis | O estado do usuário fica separado do conteúdo derivado de EPUB/PDF |
 | Formatos de livro | lxml, pypdf, pypdfium2, PDF.js | Análise e sanitização unificadas de EPUB com prioridade ao modo estrito, metadados e capas de PDF e renderização local no navegador |
-| Operação offline e recursos | Service Worker, recursos imutáveis com hash e dependências vendorizadas com versões fixadas | Entrega autocontida, sem CDN em tempo de execução |
+| Operação offline e recursos | Service Worker, recursos imutáveis com hash e dependências vendorizadas com versões fixadas | Entrega autossuficiente, sem CDN em tempo de execução |
 | Distribuição | PyPI, Docker e hospedagem estática comum | O mesmo código é distribuído como SSG ou como Server persistente |
 | IA opcional | APIs compatíveis com OpenAI, com Markdown, KaTeX e Mermaid renderizados localmente | Camadas de aprendizagem para EPUB somente no modo Server |
 
@@ -142,7 +142,7 @@ Use `ssg` quando o resultado precisar ser composto por arquivos estáticos comun
 - **Modo SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
 - **Modo Server**: [epub.yuhan.tech](https://epub.yuhan.tech/) — entre com o usuário `demo` e a senha `demo`.
 
-### Leitura nativa com IA (somente Server)
+### Leitura com IA integrada (somente Server)
 
 Para livros EPUB, o modo Server pode acrescentar guias de capítulo, explicações ligadas
 a evidências, mapas mentais, perguntas para reflexão e uma gaveta privada do Ask AI sem
@@ -151,7 +151,7 @@ livro; os membros precisam de autorização explícita, e o SSG não contém con
 tarefas, dados de conta nem configuração do provedor. Para PDF, a leitura com IA e o
 Ask AI ficam intencionalmente ocultos.
 
-Consulte o [guia de leitura nativa com IA](../ai-native-reading.md) para ver o modelo
+Consulte o [guia de leitura com IA integrada](../ai-native-reading.md) para ver o modelo
 completo de interação e as [notas sobre os renderizadores locais de rich text](../third-party-ai-renderers.md)
 para conhecer os limites de renderização e segurança de rede.
 
@@ -192,7 +192,7 @@ mínima, e as páginas do livro e dos capítulos e a API de progresso negam o ac
 
 Navegadores compatíveis (com `Kindle/`, `Arora/` etc. no UA) são redirecionados
 automaticamente do leitor completo para as páginas mínimas; as URLs acima também podem
-ser acessadas diretamente. Assim, o modo mínimo funciona como alternativa gradual para
+ser acessadas diretamente. Assim, o modo mínimo funciona como alternativa viável para
 dispositivos de baixa potência ou com suporte limitado a JavaScript.
 
 ## Primeiros passos
@@ -301,7 +301,7 @@ Para colocar o ID nos metadados OPF do EPUB ou no dicionário de informações d
 
 O modo incorporado pode reconstruir o ZIP do EPUB ou acrescentar uma atualização de metadados ao PDF antes da conversão. Se o PDF não puder ser atualizado e sua fonte não tiver mudado, o EPUB Browser salva o mesmo ID em um sidecar adjacente. Isso inclui PDFs assinados, criptografados e somente leitura. O EPUB Browser interrompe a operação quando os IDs divergem, fontes ativas duplicam um ID, um local de armazenamento é inválido ou não é possível gravar no local necessário.
 
-Ao migrar entre modos de armazenamento, o EPUB Browser copia o ID existente para o novo local e mantém o outro local válido. Um ID incorporado existente desde a v2.0.4 é copiado para o sidecar padrão sem regravar o EPUB. Depois de qualquer atualização de metadados, tanto o SSG quanto o Server entregam uma cópia do PDF de origem byte por byte.
+Ao migrar entre modos de armazenamento, o EPUB Browser copia o ID existente para o novo local e mantém o outro local válido. Um ID incorporado existente desde a v2.0.4 é copiado para o sidecar padrão sem regravar o EPUB. Depois de qualquer atualização de metadados, tanto o SSG quanto o Server entregam uma cópia exata, byte a byte, do PDF de origem.
 
 ### PDF: uma página, um capítulo
 
@@ -329,7 +329,7 @@ entrada de destino, inclusive vários marcadores em uma mesma página.
 
 O SSG grava um único `document.pdf` e um shell `chapter_<index>.html` por página. A saída
 SSG não contém scripts de Session, chamadas a `/api/*`, dados de anotações sincronizados
-nem dependências do Server. O Server armazena a fonte completa e idêntica byte por byte
+nem dependências do Server. O Server armazena a fonte completa e idêntica byte a byte
 em `book/<book-id>/pdf/document.pdf`, sem nunca dividi-la ou regravá-la. O Server renderiza
 os mesmos shells de capítulo dinamicamente a partir dos metadados do PDF; uma fonte
 alterada invalida e atualiza totalmente o cache do PDF (documento, metadados e capa
@@ -337,10 +337,10 @@ derivada), em vez de misturar páginas antigas e novas.
 
 O endpoint do documento bruto no Server é exclusivo para Session:
 `GET`/`HEAD /api/books/<book-id>/document`. Ele verifica autenticação, visibilidade do
-livro, formato PDF e fingerprints da fonte e do cache. Em seguida, aceita respostas com
+livro, formato PDF e fingerprints da fonte e do cache. Em seguida, responde a solicitações de
 um único intervalo limitado, com `ETag`, `Accept-Ranges`, cache privado, `nosniff` e
-disposição inline do PDF. Não expõe caminho absoluto, não está disponível para
-autenticação por PAT e não aparece na superfície PAT/OpenAPI. O SSG tem apenas seu
+exibição inline do PDF. Não expõe caminho absoluto, não está disponível para
+autenticação por PAT e não aparece na interface PAT/OpenAPI. O SSG tem apenas seu
 `document.pdf` local e nenhuma API de documento bruto.
 
 PDFs com uma camada de texto utilizável pelo PDF.js reutilizam exatamente o mesmo popup
@@ -382,7 +382,7 @@ O comportamento do SSG é intencionalmente local e sem contas:
 - O destino de armazenamento é fixado no armazenamento local do navegador e não aparece como configuração.
 - A saída estática inclui o Service Worker necessário para os recursos funcionarem offline.
 
-Todos os JavaScript, CSS, fontes e ícones necessários ao aplicativo estão incluídos na saída. Consulte [Autocontenção e comportamento de rede](#autocontenção-e-comportamento-de-rede) para conhecer a única requisição de rede opcional.
+Todos os JavaScript, CSS, fontes e ícones necessários ao aplicativo estão incluídos na saída. Consulte [Autossuficiência e comportamento de rede](#autossuficiência-e-comportamento-de-rede) para conhecer a única requisição de rede opcional.
 
 ### Server
 
@@ -430,8 +430,8 @@ Provider não é executado, e seus tokens de acesso e atualização não são ar
 No Authelia, configure um cliente confidencial na seção do OIDC Provider. O trecho abaixo
 usa valores propositalmente fictícios e pressupõe que as chaves e políticas exigidas pelo
 provider do Authelia já estejam configuradas. Armazene no Authelia o hash de um client
-secret aleatório e forte; depois informe uma única vez o segredo bruto correspondente no
-EPUB Browser:
+secret aleatório e forte; depois informe uma única vez, no EPUB Browser, o segredo
+correspondente sem hash:
 
 ```yaml
 identity_providers:
@@ -489,7 +489,7 @@ epub-browser server /path/to/books \
   --no-browser
 ```
 
-O arquivo de senha deve ter modo `0600`. O EPUB Browser remove uma quebra de linha final, armazena um hash Argon2id e nunca imprime o segredo. Configuração incompleta, arquivo vazio ou arquivo ilegível interrompe a inicialização. Depois que a configuração é concluída, as inicializações seguintes não leem o segredo de bootstrap.
+O arquivo de senha deve ter permissões `0600`. O EPUB Browser remove uma quebra de linha final, armazena um hash Argon2id e nunca imprime o segredo. A inicialização é interrompida se a configuração estiver incompleta ou se o arquivo estiver vazio ou não puder ser lido. Depois que a configuração é concluída, as inicializações seguintes não leem o segredo de bootstrap.
 
 Os equivalentes em variáveis de ambiente são `EPUB_BROWSER_ADMIN_USERNAME` e `EPUB_BROWSER_ADMIN_PASSWORD_FILE`. `EPUB_BROWSER_ADMIN_PASSWORD` é uma alternativa em texto simples usada apenas quando nenhum arquivo de senha está configurado. O caminho do arquivo de senha na CLI tem prioridade sobre as fontes de senha do ambiente.
 
@@ -651,7 +651,7 @@ A porta publicada em loopback nos exemplos mantém o contêiner atrás do limite
 | `--book-id-storage sidecar\|embedded` | Local de armazenamento da identidade estável de cada fonte selecionada; padrão `sidecar`. |
 | `--admin-username NAME` | Administrador inicial para configuração sem intervenção; alternativa `EPUB_BROWSER_ADMIN_USERNAME`. |
 | `--admin-password-file FILE` | Arquivo preferencial do segredo inicial; alternativa `EPUB_BROWSER_ADMIN_PASSWORD_FILE` e, se nenhum arquivo for definido, `EPUB_BROWSER_ADMIN_PASSWORD`. |
-| `--trusted-proxy-cidr CIDR` | Limite de confiança repetível da rede do proxy direto para analisar com segurança o IP do cliente em `X-Forwarded-For`. |
+| `--trusted-proxy-cidr CIDR` | Pode ser repetido; define a rede do proxy direto como fronteira de confiança para analisar com segurança o IP do cliente em `X-Forwarded-For`. |
 | `--cookie-secure` | Envia o cookie de sessão somente por HTTPS entre o navegador e o serviço. |
 | `--kindle` | Serve páginas mínimas sem dependências para Kindles antigos com e-Ink e redireciona os navegadores Kindle WebKit para elas; desativado por padrão. |
 
@@ -688,11 +688,11 @@ O `--keep-files`, exclusivo da sintaxe legada, mantém um diretório temporário
 | Contas e sessões | Não presentes | SQLite em `<server-dir>/data` |
 | Concessões de livros | Não presentes | SQLite em `<server-dir>/data` |
 
-O Server não oferece seletor entre armazenamento local e na nuvem: os dados de leitura autenticados são sempre armazenados no Server. O histórico privado detalhado das sessões de leitura nunca é emitido pelo SSG. O SSG nunca sonda APIs do Server e sempre usa o armazenamento local da origem atual do navegador.
+O Server não oferece seletor entre armazenamento local e na nuvem: os dados de leitura do usuário autenticado são sempre armazenados no Server. O histórico privado detalhado das sessões de leitura nunca é emitido pelo SSG. O SSG nunca sonda APIs do Server e sempre usa o armazenamento local da origem atual do navegador.
 
-### Autocontenção e comportamento de rede
+### Autossuficiência e comportamento de rede
 
-O aplicativo é autocontido para leitura: JavaScript, CSS, fontes, ícones, manifestos e recursos EPUB convertidos necessários são servidos localmente. Não há dependências de CDN em tempo de execução. Bloquear o acesso de saída à internet não impede configuração, login, navegação, leitura, anotações, progresso, uso da estante, administração nem conversão das fontes.
+O aplicativo é autossuficiente para leitura: JavaScript, CSS, fontes, ícones, manifestos e recursos EPUB convertidos necessários são servidos localmente. Não há dependências de CDN em tempo de execução. Bloquear o acesso de saída à internet não impede configuração, login, navegação, leitura, anotações, progresso, uso da estante, administração nem conversão das fontes.
 
 O rodapé pode fazer uma requisição opcional à API de Releases do GitHub para descobrir uma versão mais recente do EPUB Browser. Falha, bloqueio ou uso offline apenas suprime esse aviso de atualização.
 
@@ -714,7 +714,7 @@ Os administradores gerenciam endpoints de WebHook em Administration. Os segredos
 
 Antes de atualizar instalações persistentes do Server, faça backup dos livros EPUB/PDF de origem e de `<server-dir>/data`. Mantenha o mesmo volume de estado persistente ao substituir o contêiner.
 
-A migração na inicialização é automática e segura contra reinícios. Ela verifica bancos de dados legados, cria um backup, atualiza uma cópia, importa para o administrador inicial pendente os dados elegíveis de estante, progresso e anotações legados e descontinua apenas artefatos públicos legados substituíveis depois de checkpoints bem-sucedidos. Requisições comuns nunca varrem diretórios de sincronização legados. Bancos de dados corrompidos, hashes de senha inválidos, bancos legados ambíguos e IDs conflitantes causam falha fechada, sem suposições nem sobrescrita.
+A migração na inicialização é automática e segura contra reinícios. Ela verifica bancos de dados legados, cria um backup, atualiza uma cópia, importa os dados elegíveis de estante, progresso e anotações legados para a conta do administrador inicial ainda não criado e descontinua apenas artefatos públicos legados substituíveis depois de checkpoints bem-sucedidos. Requisições comuns nunca varrem diretórios de sincronização legados. Bancos de dados corrompidos, hashes de senha inválidos, bancos legados ambíguos e IDs conflitantes fazem a inicialização falhar de forma segura, sem suposições nem sobrescrita.
 
 Um `epub-browser.db` ou `annotations.db` migrado na raiz é mantido como cópia de recuperação sensível e não autoritativa; `data/epub-browser.db` é a fonte autoritativa, e as requisições do Server não usam o arquivo mantido na raiz. Mantenha a cópia de recuperação privada. Remova-a manualmente somente com o Server parado, depois de verificar o banco autoritativo e o backup registrado e apenas quando o rollback para v1 não for mais necessário. O EPUB Browser nunca a exclui automaticamente.
 
@@ -761,7 +761,7 @@ em [CONTEXT.md](../../CONTEXT.md).
 Em resumo: mantenha uma única interface de leitura, não coloque dados exclusivos do
 Server no SSG, mantenha os caches derivados de EPUB e PDF separados dos dados de usuário
 no SQLite e nunca acrescente uma dependência de CDN em tempo de execução. Mudanças em
-uma superfície compartilhada devem ser testadas nos dois formatos e nos dois modos de
+um componente compartilhado devem ser testadas nos dois formatos e nos dois modos de
 implantação, quando aplicável.
 
 #### Desenvolvimento a partir de um checkout do código
@@ -779,7 +779,7 @@ python3 -m build
 ```
 
 `fetch` é o único comando acima que baixa recursos vendorizados para o navegador. O lock
-registra tarballs imutáveis do npm, resumos dos arquivos, listas de permissão e licenças;
+registra tarballs imutáveis do npm, resumos dos arquivos, listas de itens permitidos e licenças;
 `verify`, testes, builds a partir de um checkout preparado e o leitor instalado não baixam
 recursos para o navegador. O comando isolado padrão `python3 -m build` ainda pode consultar
 um índice de pacotes Python para obter requisitos de build. Para uma build totalmente sem

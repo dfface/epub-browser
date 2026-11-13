@@ -22,7 +22,7 @@ class ReadmeDocumentationTests(unittest.TestCase):
             Path("docs/readme/README.zh-CN.md"): (
                 "本地管理员",
                 "无密码成员",
-                "重复的本地账户",
+                "本地账户",
             ),
         }
         for path, language_specific in localized.items():
@@ -49,8 +49,8 @@ class ReadmeDocumentationTests(unittest.TestCase):
                 "docs/readme/assets/reading-insights.png",
             ),
             Path("docs/readme/README.zh-CN.md"): (
-                "证据解释",
-                "阅读日历",
+                "Ask AI",
+                "活动日历",
                 "assets/ai-native-reading.png",
                 "assets/reading-insights.png",
             ),
@@ -72,7 +72,7 @@ class ReadmeDocumentationTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             with self.subTest(path=path):
                 for technology in (
-                    "Vanilla JavaScript",
+                    "VanillaJS",
                     "Starlette",
                     "Uvicorn",
                     "SQLite",
@@ -86,7 +86,7 @@ class ReadmeDocumentationTests(unittest.TestCase):
         for path in sorted(Path("docs/readme").glob("README.*.md")):
             with self.subTest(path=path):
                 self.assertIn(
-                    "Vanilla JavaScript",
+                    "VanillaJS",
                     path.read_text(encoding="utf-8"),
                 )
 
@@ -126,9 +126,18 @@ class ReadmeDocumentationTests(unittest.TestCase):
             for line in reference_lines
             if re.match(r"^#{1,6} ", line)
         )
-        reference_fences = sum(line.startswith("```") for line in reference_lines)
+        reference_fences = tuple(
+            line for line in reference_lines if line.startswith("```")
+        )
+        reference_table_rows = sum(
+            line.startswith("|") for line in reference_lines
+        )
+        reference_links = len(
+            re.findall(r"\[[^]]*\]\([^)]+\)", "\n".join(reference_lines))
+        )
         for path in sorted(Path("docs/readme").glob("README.*.md")):
-            lines = path.read_text(encoding="utf-8").splitlines()
+            text = path.read_text(encoding="utf-8")
+            lines = text.splitlines()
             headings = tuple(
                 line[: len(line) - len(line.lstrip("#"))]
                 for line in lines
@@ -138,7 +147,15 @@ class ReadmeDocumentationTests(unittest.TestCase):
                 self.assertEqual(reference_headings, headings)
                 self.assertEqual(
                     reference_fences,
-                    sum(line.startswith("```") for line in lines),
+                    tuple(line for line in lines if line.startswith("```")),
+                )
+                self.assertEqual(
+                    reference_table_rows,
+                    sum(line.startswith("|") for line in lines),
+                )
+                self.assertEqual(
+                    reference_links,
+                    len(re.findall(r"\[[^]]*\]\([^)]+\)", text)),
                 )
 
     def test_documentation_hub_links_the_stable_entry_points(self):
@@ -184,7 +201,6 @@ class ReadmeDocumentationTests(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             with self.subTest(path=path):
                 self.assertIn("OIDC", text)
-                self.assertIn("Provider", text)
 
     def test_readmes_document_pdf_chapter_mapping(self):
         contracts = {
@@ -216,20 +232,21 @@ class ReadmeDocumentationTests(unittest.TestCase):
                 "chapter_{N-1}.html",
                 "chapter_0.html",
                 "规范化目录",
-                "outline 标题作为 marker",
+                "大纲标记",
                 "--book-id-storage embedded",
                 "PDF 文档信息字典",
-                "同一个 ID 会保存到相邻的 sidecar",
+                "相邻的 sidecar",
                 "没有可用文本层时",
-                "跨页选择可以继续",
-                "完整且 逐字节一致的源文件",
+                "跨页",
+                "逐字节一致的源文件",
                 "只接受 Session",
-                "有界的单一 Range 响应",
-                "不接受 PAT，也不出现在",
-                "hydrate 并验证锁定的第三方资源",
-                "本地带 hash 的 PDF.js module",
-                "绝不从 CDN 获取",
-                "使用锁定的 GLightbox",
+                "单区间 Range 响应",
+                "不接受 PAT 认证",
+                "也不列入 PAT/OpenAPI",
+                "sync_vendor_assets.py",
+                "PDF.js",
+                "绝不从 CDN",
+                "GLightbox",
                 "Fancyapps/Fancybox 不是运行时依赖",
             ),
         }

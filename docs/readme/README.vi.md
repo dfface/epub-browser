@@ -3,7 +3,7 @@
 > **Biến sách thành website. Sở hữu thư viện của riêng bạn.**
 >
 > Xuất bản sách EPUB và PDF thành website tĩnh, hoặc vận hành một thư viện riêng tư, tự lưu trữ
-> với tài khoản, đồng bộ tiến độ, chú thích và tính năng đọc tích hợp AI tùy chọn.
+> với tài khoản, tiến độ đọc được đồng bộ, chú thích và tính năng đọc tích hợp AI tùy chọn.
 
 [Khám phá thư viện tĩnh](https://epub-browser-test.yuhan.tech/) · [Dùng thử thư viện riêng tư](#bản-dùng-thử-trực-tuyến)
 
@@ -38,7 +38,7 @@ cần trình xem riêng, không phụ thuộc CDN khi chạy.
   - [Chọn cách cài đặt](#chọn-cách-cài-đặt)
   - [Bắt đầu nhanh](#bắt-đầu-nhanh)
 - [Định dạng và trải nghiệm đọc](#định-dạng-và-trải-nghiệm-đọc)
-  - [Nguồn sách và danh tính sách ổn định](#nguồn-sách-và-danh-tính-sách-ổn-định)
+  - [Nguồn sách và định danh sách ổn định](#nguồn-sách-và-định-danh-sách-ổn-định)
   - [PDF: mỗi trang là một chương](#pdf-mỗi-trang-là-một-chương)
 - [Triển khai](#triển-khai)
   - [SSG](#ssg)
@@ -60,25 +60,25 @@ cần trình xem riêng, không phụ thuộc CDN khi chạy.
   tĩnh hoàn chỉnh cho Pages, object storage hoặc Nginx; hoặc vận hành Server lâu dài với tài
   khoản, quyền truy cập sách và OIDC. Tài nguyên ứng dụng, phông chữ, PDF.js và các trình kết
   xuất đều được phục vụ cục bộ, nên việc đọc không bao giờ phụ thuộc vào CDN.
-- **EPUB và PDF dùng chung một trình đọc thực thụ.** Cả hai định dạng có chung Thư viện, trang
-  sách, mục lục, bố cục responsive, ba chế độ đọc, chủ đề, toàn màn hình và tiến độ. Mỗi trang
-  PDF vẫn nằm trong khu vực đọc, hỗ trợ thu phóng, chọn văn bản trên text layer và chú thích,
-  thay vì mở một trình xem trước riêng.
+- **EPUB và PDF cùng dùng một trình đọc đầy đủ tính năng.** Cả hai định dạng có chung Thư viện,
+  trang sách, mục lục, bố cục responsive, ba chế độ đọc, chủ đề, toàn màn hình và tiến độ. Mỗi
+  trang PDF vẫn nằm trong khu vực đọc, hỗ trợ thu phóng, chọn văn bản trên text layer và chú
+  thích, thay vì mở một trình xem trước riêng.
 - **Tìm được cả cuốn sách lẫn đoạn cần đọc.** Tìm kiếm trong Thư viện bao gồm metadata, thẻ và
   bính âm, đồng thời hỗ trợ sắp xếp và phân trang. Tìm kiếm toàn sách EPUB phía Server trả về
   kết quả đầy đủ được nhóm theo chương và chuyển thẳng đến đoạn được đánh dấu. ID sách ổn định
   giúp vị trí đọc tiếp, chú thích và lịch sử luôn gắn với đúng cuốn sách.
 - **Hiểu nội dung, không chỉ cuộn trang.** Ở chế độ Server, hướng dẫn chương EPUB, lời giải thích
-  có liên kết tới bằng chứng, sơ đồ tư duy và Ask AI riêng tư luôn nằm cạnh văn bản gốc. Đánh dấu,
+  có liên kết tới dẫn chứng, sơ đồ tư duy và Ask AI riêng tư luôn nằm cạnh văn bản gốc. Đánh dấu,
   ghi chú, Dictionary và Encyclopedia hoạt động trên cả EPUB lẫn PDF có text layer; danh sách từ
-  vựng trên Server ghi lại nguồn và trạng thái thành thạo của từng từ.
+  vựng trên Server ghi lại nguồn và mức độ thành thạo của từng từ.
 - **Biến việc đọc thành lịch sử đáng lưu giữ.** Giá sách lồng nhau, đánh giá, nhận xét, xuất chú
   thích, lịch hoạt động, xu hướng, thống kê theo sách và bảng xếp hạng thời gian đọc tạo thành
-  một hồ sơ liên kết với nhau. Server giữ dữ liệu đọc ở chế độ riêng tư cho từng tài khoản và
-  đồng bộ giữa các thiết bị.
+  một hồ sơ gắn kết. Server lưu dữ liệu đọc riêng tư theo từng tài khoản và đồng bộ giữa các
+  thiết bị.
 - **Vận hành một dịch vụ đọc, không chỉ một trình xem.** Ở chế độ Server, quản trị viên có thể
-  tải sách lên qua web hoặc thêm từ thư mục được theo dõi, giới hạn dung lượng đĩa bằng cơ chế
-  loại bỏ cache LRU có thể cấu hình, quản lý quyền của thành viên và AI, đồng thời tích hợp qua
+  tải sách lên qua web hoặc thêm sách từ thư mục được theo dõi, giới hạn dung lượng đĩa bằng cơ chế
+  loại bỏ mục khỏi cache theo LRU có thể cấu hình, quản lý quyền của thành viên và AI, đồng thời tích hợp qua
   OpenAPI, PAT và WebHooks. Chế độ đọc Kindle tối giản hỗ trợ thiết bị bị giới hạn; Server còn
   cung cấp bảng điều khiển màn hình chờ Kindle cá nhân với đồng hồ, lịch, lịch trình, ghi nhớ
   và đồng hồ Pomodoro.
@@ -89,7 +89,7 @@ cần trình xem riêng, không phụ thuộc CDN khi chạy.
 
 ![Chế độ xem thông tin chi tiết về việc đọc riêng tư, với lịch hoạt động và xu hướng thời gian đọc.](assets/reading-insights.png)
 
-*Thông tin chi tiết về việc đọc biến hoạt động đọc chủ động thành một lịch sử riêng tư mà bạn có thể hiểu được.*
+*Thông tin chi tiết về việc đọc biến quá trình đọc tích cực thành một lịch sử riêng tư mà bạn có thể hiểu được.*
 
 ### Công nghệ sử dụng
 
@@ -102,7 +102,7 @@ không có SPA framework và không yêu cầu Node.js runtime:
 | CLI và Server | Python 3.9+, Starlette, Uvicorn | Lệnh chuyển đổi, trang có xác thực, API và tác vụ nền |
 | Dữ liệu | SQLite cùng cache nội dung JSON có thể dựng lại | Trạng thái người dùng được tách khỏi nội dung EPUB/PDF phái sinh |
 | Định dạng sách | lxml, pypdf, pypdfium2, PDF.js | Phân tích/làm sạch EPUB thống nhất, ưu tiên chế độ nghiêm ngặt; metadata và bìa PDF; kết xuất cục bộ trong trình duyệt |
-| Ngoại tuyến và tài nguyên | Service Worker, tài nguyên bất biến có hash, dependency vendor được khóa phiên bản | Phân phối độc lập, không cần CDN khi chạy |
+| Ngoại tuyến và tài nguyên | Service Worker, tài nguyên bất biến có hash, các thư viện vendor được khóa phiên bản | Phân phối độc lập, không cần CDN khi chạy |
 | Phân phối | PyPI, Docker, static hosting thông thường | Cùng một codebase có thể tạo SSG hoặc chạy Server lâu dài |
 | AI tùy chọn | API tương thích OpenAI với Markdown, KaTeX và Mermaid được kết xuất cục bộ | Các lớp học tập EPUB chỉ trong chế độ Server |
 
@@ -111,8 +111,8 @@ của production runtime dành cho người đọc.
 
 ### Chọn SSG hay Server
 
-Cùng quy trình xử lý nguồn và page template cung cấp hai chế độ triển khai riêng biệt. Hãy chọn
-dựa trên nơi lưu dữ liệu đọc, không phải dựa trên định dạng sách:
+Cùng quy trình xử lý nguồn và các page template tạo nên hai chế độ triển khai riêng biệt. Hãy
+chọn dựa trên nơi lưu dữ liệu đọc, không phải dựa trên định dạng sách:
 
 | Khả năng | `ssg` | `server` |
 | --- | --- | --- |
@@ -120,7 +120,7 @@ dựa trên nơi lưu dữ liệu đọc, không phải dựa trên định dạ
 | Phân phối | HTML/tài nguyên tĩnh được tạo theo cơ chế nguyên tử cho Pages, object storage hoặc Nginx | Trang động có xác thực, dựa trên cache nội dung có thể thay thế |
 | Tài khoản và kiểm soát truy cập | Không có | Tài khoản administrator/member, cấp quyền sách bị hạn chế, session và bảo vệ CSRF |
 | Đăng nhập một lần OIDC | Không bao gồm | Provider chung, liên kết tài khoản hiện có và tùy chọn tự động tạo thành viên |
-| Tiến độ, chú thích, giá sách | Lưu trong trình duyệt hiện tại | Đồng bộ theo từng tài khoản đã xác thực trong SQLite |
+| Tiến độ, chú thích, giá sách | Lưu trong trình duyệt hiện tại | Đồng bộ trong SQLite theo từng tài khoản đã xác thực |
 | Đánh giá, nhận xét, phiên đọc | Không tạo | Bản ghi riêng tư theo tài khoản và thông tin chi tiết về việc đọc |
 | Cập nhật nguồn | Chạy lại `ssg` | Khởi động lại, quét lại hoặc dùng `--watch` |
 | Quản trị, thẻ, OpenAPI, WebHooks | Không bao gồm | Có |
@@ -138,7 +138,7 @@ dữ liệu xuyên thiết bị, kiểm soát truy cập hoặc tự động đ�
 
 ### Đọc sách tích hợp AI (chỉ Server)
 
-Với sách EPUB, chế độ Server có thể thêm hướng dẫn chương, lời giải thích liên kết tới bằng chứng,
+Với sách EPUB, chế độ Server có thể thêm hướng dẫn chương, lời giải thích liên kết tới dẫn chứng,
 sơ đồ tư duy, câu hỏi gợi suy ngẫm và ngăn kéo Ask AI riêng tư mà không khiến người đọc rời khỏi
 văn bản gốc. Kết quả vẫn tuân theo quyền truy cập sách; thành viên phải được cấp quyền rõ ràng,
 còn SSG không chứa bất kỳ điều khiển AI, tác vụ, dữ liệu tài khoản hay cấu hình provider nào.
@@ -177,8 +177,8 @@ Cách lưu tiến độ đọc khác nhau theo chế độ:
   Giao diện Kindle chỉ đọc/báo cáo: ghi lại chương hiện tại và gửi heartbeat, hiển thị giá sách
   chỉ đọc, đồng thời không bao giờ để lộ thông tin chi tiết về việc đọc hay chức năng quản lý nội dung.
 
-Kiểm soát truy cập được áp dụng trên mọi giao diện Kindle. Với sách bị hạn chế hiển thị, người dùng
-không được phép sẽ nhận 403 trên giá sách tối giản (sách bị ẩn), trang sách, trang chương và API tiến độ.
+Kiểm soát truy cập được áp dụng trên mọi giao diện Kindle. Với sách bị hạn chế quyền xem, người dùng
+không được phép sẽ nhận lỗi 403 trên giá sách tối giản (sách bị ẩn), trang sách, trang chương và API tiến độ.
 
 Các trình duyệt được hỗ trợ (UA chứa `Kindle/`, `Arora/`, v.v.) sẽ tự động được chuyển hướng từ
 trình đọc đầy đủ sang trang tối giản; các URL ở trên cũng có thể truy cập trực tiếp. Nhờ đó, chế độ
@@ -221,8 +221,8 @@ chế độ Server và không yêu cầu Python trên máy chủ:
 docker pull dfface/epub-browser:latest
 ```
 
-Dùng `latest` để đánh giá bản phát hành hiện tại; hãy ghim một tag phiên bản cụ thể để triển khai
-production có thể lặp lại. Xem [Docker](#docker) để biết các mount bắt buộc cho sách và trạng thái,
+Dùng `latest` để đánh giá bản phát hành hiện tại; hãy ghim một tag phiên bản được đánh số để việc
+triển khai production có thể lặp lại. Xem [Docker](#docker) để biết các mount bắt buộc cho sách và trạng thái,
 hướng dẫn nhanh Compose, thiết lập lần đầu và hướng dẫn mạng.
 
 ### Bắt đầu nhanh
@@ -265,7 +265,7 @@ Nếu bạn chọn Docker, hãy bỏ qua lệnh Python ở trên và tiếp tụ
 
 ## Định dạng và trải nghiệm đọc
 
-### Nguồn sách và danh tính sách ổn định
+### Nguồn sách và định danh sách ổn định
 
 Mỗi `SOURCE` theo vị trí có thể là một tệp EPUB, tệp PDF hoặc thư mục. Thư mục được tìm kiếm
 đệ quy. Một lệnh có thể nhận nhiều nguồn:
@@ -283,7 +283,7 @@ liệu trình duyệt được tạo. Mặc định chung của CLI là:
 --book-id-storage sidecar
 ```
 
-Chế độ sidecar ghi một tệp danh tính hiển thị cạnh nguồn, chẳng hạn `BOOK.epub.epub-browser.json`
+Chế độ sidecar ghi một tệp định danh hiển thị cạnh nguồn, chẳng hạn `BOOK.epub.epub-browser.json`
 hoặc `BOOK.pdf.epub-browser.json`, và giữ nguyên byte của nguồn. Sidecar chứa ID ổn định cùng
 dấu vân tay SHA-256 đã xác minh của nguồn.
 
@@ -296,18 +296,18 @@ embedded storage cho toàn bộ lần gọi lệnh:
 
 Chế độ embedded có thể dựng lại EPUB ZIP hoặc nối thêm bản cập nhật metadata PDF trước khi chuyển
 đổi. Nếu không thể cập nhật PDF và nguồn không thay đổi, EPUB Browser lưu cùng ID đó vào sidecar
-liền kề. Điều này áp dụng cả PDF đã ký, được mã hóa và chỉ đọc. EPUB Browser dừng lại khi các ID
+liền kề. Điều này áp dụng cả PDF đã ký, được mã hóa và chỉ đọc. EPUB Browser sẽ dừng khi các ID
 không khớp, nhiều nguồn đang hoạt động trùng một ID, carrier không hợp lệ hoặc không thể ghi carrier bắt buộc.
 
 Khi di chuyển giữa các chế độ lưu trữ, EPUB Browser sao chép ID hiện có sang carrier đã chọn và giữ
-lại carrier hợp lệ còn lại. ID embedded có sẵn từ v2.0.4 được sao chép sang sidecar mặc định mà
-không viết lại EPUB. Cả SSG và Server đều phân phối bản sao byte-for-byte của nguồn PDF sau mọi
+lại carrier hợp lệ còn lại. ID nhúng hiện có từ v2.0.4 được sao chép sang sidecar mặc định mà
+không viết lại EPUB. Cả SSG và Server đều phân phối bản sao giống từng byte của nguồn PDF sau mọi
 cập nhật metadata.
 
 ### PDF: mỗi trang là một chương
 
 Cả hai chế độ triển khai đều hỗ trợ PDF. Trình đọc xem mỗi trang PDF như một chương EPUB Browser
-thông thường, nhờ đó trang Book, điều hướng chương, mục lục, phân trang, đọc liên tục, tiến độ,
+thông thường, nhờ đó trang sách, điều hướng chương, mục lục, phân trang, đọc liên tục, tiến độ,
 phiên đọc, chú thích, Dictionary và Encyclopedia hiện có vẫn dùng chung một UI và mô hình dữ liệu:
 
 | Khái niệm PDF | SSG | Server |
@@ -316,9 +316,9 @@ phiên đọc, chú thích, Dictionary và Encyclopedia hiện có vẫn dùng c
 | URL trang N | `chapter_{N-1}.html` | `/book/<book-id>/chapter_{N-1}.html` |
 | Nhãn trang và mục lục | Tạo cục bộ; liệt kê mọi trang | Kết xuất từ cache metadata PDF; liệt kê mọi trang |
 | Outline nhúng | Một marker trên mục mục lục của trang đích | Cùng marker, không xóa hoặc sắp xếp lại các mục trang |
-| Cuộn và phân trang/lật trang | Chapter shell tĩnh và PDF.js cục bộ | Chapter shell dùng chung, động và PDF.js cục bộ |
-| Đánh dấu, ghi chú, Dictionary, Encyclopedia | Component dùng chung, lưu cục bộ trong trình duyệt khi có text layer | Component dùng chung có xác thực khi có text layer |
-| Byte PDF thô | Một `document.pdf` trong đầu ra sách tĩnh | Route chỉ dành cho Session, hỗ trợ range cho tài liệu được cache |
+| Cuộn và phân trang/lật trang | Chapter shell tĩnh và PDF.js cục bộ | Chapter shell dùng chung được kết xuất động và PDF.js cục bộ |
+| Đánh dấu, ghi chú, Dictionary, Encyclopedia | Component dùng chung, lưu cục bộ trong trình duyệt khi có text layer | Component dùng chung, yêu cầu xác thực khi có text layer |
+| Byte PDF thô | Một `document.pdf` trong đầu ra sách tĩnh | Route chỉ dành cho Session, hỗ trợ Range cho tài liệu trong cache |
 
 Số trang hiển thị và trong PDF.js bắt đầu từ 1; chỉ mục chương trong URL, trạng thái, API và SQLite
 bắt đầu từ 0. Do đó trang 1 của PDF luôn là `chapter_0.html`. Mục lục chuẩn hóa giữ một mục `Page N`
@@ -329,24 +329,24 @@ SSG ghi một `document.pdf` duy nhất và một chapter shell `chapter_<index>
 ra SSG không chứa script Session, lời gọi `/api/*`, dữ liệu chú thích đồng bộ hay dependency Server.
 Server lưu toàn bộ nguồn giống từng byte tại `book/<book-id>/pdf/document.pdf`, không bao giờ tách
 hoặc viết lại. Server kết xuất động cùng các chapter shell từ metadata PDF; khi nguồn thay đổi, cache
-PDF bị vô hiệu và được làm mới hoàn toàn (tài liệu, metadata và bìa phái sinh), thay vì trộn trang cũ với trang mới.
+PDF bị vô hiệu hóa và được làm mới hoàn toàn (tài liệu, metadata và bìa phái sinh), thay vì trộn trang cũ với trang mới.
 
 Endpoint tài liệu thô trên Server chỉ dành cho Session:
 `GET`/`HEAD /api/books/<book-id>/document`. Endpoint kiểm tra xác thực, khả năng hiển thị sách,
 định dạng PDF và dấu vân tay nguồn/cache, sau đó hỗ trợ phản hồi single-range có giới hạn với `ETag`,
 `Accept-Ranges`, private caching, `nosniff` và inline PDF disposition. Endpoint không để lộ đường dẫn
-tuyệt đối, không khả dụng với xác thực PAT và không nằm trong bề mặt PAT/OpenAPI. SSG chỉ có
+tuyệt đối, không khả dụng với xác thực PAT và không nằm trong phạm vi API PAT/OpenAPI. SSG chỉ có
 `document.pdf` cục bộ và không có API tài liệu thô.
 
 PDF có text layer mà PDF.js sử dụng được sẽ tái sử dụng chính popup chọn văn bản và component chú
 thích hiện có cho Highlight và Note, cùng Dictionary và Encyclopedia. Lưu trữ, quyền sở hữu, xuất,
-liệt kê và deep link của chú thích vẫn dùng chung; không có bảng chú thích hay UI cài đặt riêng cho PDF.
-PDF quét hoặc chỉ có hình ảnh vẫn đọc được, nhưng Highlight, Note, Dictionary, Encyclopedia dựa trên
-vùng chọn và tìm kiếm tài liệu được thông báo rõ là không khả dụng khi không có text layer sử dụng được.
-Vùng chọn trải nhiều trang vẫn có thể sao chép, còn thao tác chú thích và tra cứu hiển thị thông báo
+liệt kê và deep link của chú thích vẫn dùng chung; không có bảng dữ liệu chú thích hay UI cài đặt riêng cho PDF.
+PDF quét hoặc chỉ có hình ảnh vẫn đọc được, nhưng khi không có text layer sử dụng được, hệ thống sẽ
+thông báo rõ rằng Highlight, Note, Dictionary, Encyclopedia dựa trên vùng chọn và tìm kiếm tài liệu
+không khả dụng. Vùng chọn kéo dài qua nhiều trang vẫn có thể sao chép, còn thao tác chú thích và tra cứu hiển thị thông báo
 không hỗ trợ đã bản địa hóa; vùng chọn trong một trang vẫn hoạt động.
 
-PDF.js không phải một viewer shell thứ hai. Trước khi build hoặc xuất bản, hãy nạp và xác minh các
+PDF.js không phải một viewer shell thứ hai. Trước khi build hoặc xuất bản, hãy chuẩn bị và xác minh các
 tài nguyên bên thứ ba đã khóa phiên bản:
 
 ```bash
@@ -354,10 +354,10 @@ python3 tools/sync_vendor_assets.py fetch
 python3 tools/sync_vendor_assets.py verify
 ```
 
-Sau đó ứng dụng phục vụ module và worker PDF.js cục bộ có hash khi chạy; tuyệt đối không tải chúng
+Sau đó ứng dụng phục vụ cục bộ các module và worker PDF.js có hash khi chạy; tuyệt đối không tải chúng
 từ CDN. Image lightbox dùng dependency GLightbox đã khóa; Fancyapps/Fancybox không phải dependency
 khi chạy hay được phân phối lại. Xem [third_party/README.md](../../third_party/README.md) để biết quy
-trình tài nguyên khóa phiên bản và phát hành.
+trình quản lý tài nguyên đã khóa phiên bản và phát hành.
 
 ## Triển khai
 
@@ -372,7 +372,7 @@ Hoạt động của SSG cố ý hoàn toàn cục bộ và không có tài kho�
 - Tiến độ đọc và chú thích dùng browser storage trên origin hiện tại.
 - Giá sách hỗ trợ Import và Export JSON cục bộ; không có thao tác Sync lên cloud.
 - Không có đăng nhập, cài đặt tài khoản, Server API và các điều khiển phụ thuộc người dùng.
-- Đích lưu trữ cố định là local browser storage và không được hiển thị như một cài đặt.
+- Nơi lưu trữ luôn là local storage của trình duyệt và không được hiển thị như một tùy chọn cài đặt.
 - Đầu ra tĩnh bao gồm Service Worker cần thiết cho tài nguyên có thể dùng ngoại tuyến.
 
 Mọi JavaScript, CSS, phông chữ và biểu tượng ứng dụng cần thiết đều có trong đầu ra. Xem
@@ -385,7 +385,7 @@ Mọi JavaScript, CSS, phông chữ và biểu tượng ứng dụng cần thi�
 Với thư mục trạng thái lâu dài hoàn toàn mới, các trang thông thường chuyển hướng tới `/setup`. API,
 event stream, tài nguyên được tạo và sách trả về phản hồi yêu cầu thiết lập cho đến khi administrator
 ban đầu được tạo. Hãy hoàn tất thiết lập qua loopback hoặc một đường truyền riêng tư đáng tin cậy khác
-trước khi mở port: lần gửi thiết lập thành công đầu tiên sẽ chiếm tài khoản administrator.
+trước khi mở port: lần gửi thiết lập thành công đầu tiên sẽ xác lập tài khoản administrator.
 
 Sau khi thiết lập:
 
@@ -396,7 +396,7 @@ Sau khi thiết lập:
 - Mỗi người dùng sở hữu giá sách, tiến độ, chú thích và session đang hoạt động của mình.
 - Người dùng có thể đổi mật khẩu và thu hồi session của mình.
 - Administrator có thể quản lý người dùng, vai trò, mật khẩu, session và quyền truy cập sách.
-- Session dùng cookie HttpOnly, bảo vệ CSRF và thời hạn trượt 30 ngày.
+- Session dùng cookie HttpOnly, bảo vệ CSRF và thời hạn 30 ngày, tự gia hạn khi còn hoạt động.
 
 #### Đăng nhập một lần OIDC và liên kết tài khoản
 
@@ -404,8 +404,8 @@ Chế độ Server có thể dùng một OpenID Connect (OIDC) Provider chung, b
 Authentik và các dịch vụ tương thích. Trong **Administration → OIDC login**, nhập tên Provider hiển thị
 với người đọc, issuer URL, client ID, client secret, redirect URI chính xác, scope và username claim.
 EPUB Browser dùng discovery cùng Authorization Code flow với S256 PKCE, xác thực ID token có chữ ký
-và chỉ nhận diện tài khoản bên ngoài bằng `(issuer, sub)`; email và username claim chỉ là gợi ý hiển
-thị/provisioning, không bao giờ là khóa danh tính.
+và chỉ nhận diện tài khoản bên ngoài bằng `(issuer, sub)`; email và username claim chỉ là thông tin
+gợi ý cho hiển thị/provisioning, không bao giờ là khóa định danh.
 
 Đăng ký chính xác callback sau tại Provider, bao gồm scheme và host:
 
@@ -414,7 +414,7 @@ https://reader.example.com/auth/oidc/callback
 ```
 
 Người dùng hiện có có thể đăng nhập cục bộ rồi kết nối Provider từ Account settings. Nếu danh tính bên
-ngoài chưa được biết, hệ thống sẽ hỏi một lần tên người dùng và mật khẩu cục bộ hiện có. Tính năng
+ngoài chưa từng được liên kết, hệ thống sẽ hỏi một lần tên người dùng và mật khẩu cục bộ hiện có. Tính năng
 automatic provisioning tùy chọn tạo thành viên không có mật khẩu; tính năng này không bao giờ nhập
 vai trò administrator. Hãy để người dùng hiện có liên kết trước: bật automatic provisioning quá sớm
 có thể tạo **tài khoản cục bộ trùng lặp**. Đăng nhập bằng mật khẩu của **administrator cục bộ** luôn
@@ -446,20 +446,20 @@ identity_providers:
 
 Trong EPUB Browser, dùng issuer `https://auth.example.com`, client ID
 `epub-browser`, scope `openid profile email` và username claim
-`preferred_username`. Thao tác Save thực hiện live discovery và xác thực khả năng;
+`preferred_username`. Thao tác Save sẽ chạy discovery trực tiếp và kiểm tra khả năng tương thích;
 nếu thất bại, cấu hình trước đó vẫn có hiệu lực.
 
 #### Cấu hình và quản trị tính năng đọc bằng AI
 
 Administrator cấu hình tính năng đọc bằng AI trong **Administration**, ngay sau phần quản lý người dùng
-và trước phần quản lý sách. Trang này lưu Base URL tương thích OpenAI, API key, model, timeout, ngân
-sách context, giới hạn concurrency và giới hạn lượt gọi provider mặc định mỗi ngày trong cơ sở dữ liệu
-Server SQLite. AI ban đầu bị tắt với member; administrator phải cấp quyền cho từng member và có thể
+và trước phần quản lý sách. Trang này lưu Base URL tương thích OpenAI, API key, model, timeout, hạn
+mức ngữ cảnh, giới hạn concurrency và giới hạn số lần gọi provider mặc định mỗi ngày trong cơ sở dữ
+liệu Server SQLite. Theo mặc định, AI bị tắt đối với member; administrator phải cấp quyền cho từng member và có thể
 đặt giới hạn hằng ngày riêng (`0` nghĩa là không giới hạn).
 
-Các lớp học tập theo chương và bài đánh giá cấp sách được chia sẻ theo từng ngôn ngữ đủ điều kiện,
+Các lớp nội dung học tập theo chương và bài đánh giá ở cấp độ sách được dùng chung theo từng ngôn ngữ đủ điều kiện,
 trong khi hội thoại tiếp nối vẫn riêng tư với từng tài khoản. Kết quả, trạng thái tác vụ, thẻ tùy chỉnh,
-phân loại đọc sách và nội dung tiếp nối riêng tư được lưu trong SQLite. Kết quả cũ vẫn khả dụng sau
+phân loại tình trạng đọc sách và nội dung tiếp nối riêng tư được lưu trong SQLite. Kết quả cũ vẫn khả dụng sau
 khi thay đổi cấu hình model cho đến khi administrator chủ động tạo lại.
 
 Khi người đọc yêu cầu hướng dẫn AI hoặc đặt câu hỏi, phần văn bản EPUB được chọn và context hội thoại
@@ -477,8 +477,8 @@ epub-browser server /path/to/books \
   --no-browser
 ```
 
-Tệp mật khẩu nên có mode `0600`. EPUB Browser xóa một newline ở cuối, lưu hash Argon2id và không bao
-giờ in secret. Cấu hình thiếu, tệp rỗng hoặc tệp không đọc được sẽ làm dừng khởi động. Sau khi thiết
+Tệp mật khẩu nên có mode `0600`. EPUB Browser xóa một ký tự xuống dòng ở cuối, lưu hash Argon2id và
+không bao giờ in ra secret. Cấu hình thiếu, tệp rỗng hoặc tệp không đọc được sẽ làm dừng khởi động. Sau khi thiết
 lập hoàn tất, các lần khởi động sau không đọc bootstrap secret.
 
 Biến môi trường tương đương là `EPUB_BROWSER_ADMIN_USERNAME` và `EPUB_BROWSER_ADMIN_PASSWORD_FILE`.
@@ -494,7 +494,7 @@ máy headless và script.
 
 Theo mặc định (`--log-level error`), CLI chỉ xuất lỗi để hiển thị tiến độ trên terminal không bị thông
 điệp hoặc cảnh báo thường lệ làm gián đoạn. Terminal tương tác in URL đã bind một lần; các lần chạy
-Docker và service không tương tác nói chung vẫn yên lặng. Dùng `--log-level warning` để thêm cảnh báo,
+Docker và dịch vụ không tương tác thường không xuất thêm thông tin. Dùng `--log-level warning` để thêm cảnh báo,
 `--log-level info` cho log vận hành và truy cập HTTP, hoặc `--log-level debug` để có chi tiết nhất.
 `--log` vẫn là alias tương thích cho `--log-level info`.
 
@@ -528,11 +528,11 @@ Bố cục lâu dài:
     └── staging/                 # replaceable conversion work
 ```
 
-Chỉ `data/` là nguồn dữ liệu có thẩm quyền. Có thể xóa `cache/` và hệ thống sẽ dựng lại. Hãy giữ `data/`
-khi nâng cấp và thay container. Lock của hệ điều hành kiểm soát tính độc quyền; `.server.lock` có thể
+Chỉ `data/` là nguồn dữ liệu chính. Có thể xóa `cache/` và hệ thống sẽ dựng lại. Hãy giữ `data/`
+khi nâng cấp và thay container. Khóa của hệ điều hành kiểm soát tính độc quyền; `.server.lock` có thể
 còn lại sau khi tắt bình thường dưới dạng metadata chẩn đoán.
 
-Lưu `data/epub-browser.db` lâu dài trên filesystem cục bộ. Không hỗ trợ shared hoặc network filesystem
+Lưu `data/epub-browser.db` lâu dài trên filesystem cục bộ. Không hỗ trợ filesystem dùng chung hoặc qua mạng
 cho WAL concurrency. Các bản sao lưu đã xác minh nằm trong `data/backups/` và bao gồm toàn bộ dữ liệu WAL đã commit.
 
 #### LAN và reverse proxy
@@ -551,7 +551,7 @@ epub-browser server /path/to/books \
 Không đưa HTTP server tích hợp trực tiếp ra public internet. Hãy chấm dứt TLS tại reverse proxy,
 áp dụng kiểm soát mạng và bật secure cookie.
 
-Để ghi lại client IP thực trong active session và login-rate limit phía sau reverse proxy, hãy cấu hình
+Để ghi lại IP client thực trong active session và login-rate limit phía sau reverse proxy, hãy cấu hình
 **direct socket network** của proxy (không phải public client range):
 
 ```bash
@@ -565,8 +565,8 @@ epub-browser server /path/to/books \
   --no-browser
 ```
 
-Lặp `--trusted-proxy-cidr` một lần cho mỗi địa chỉ hoặc mạng proxy trực tiếp. Chỉ request có direct peer
-thuộc một trong các CIDR này mới được cung cấp `X-Forwarded-For`; mọi peer khác chỉ ghi địa chỉ trực tiếp.
+Lặp `--trusted-proxy-cidr` một lần cho mỗi địa chỉ hoặc mạng proxy trực tiếp. Chỉ những request có direct
+peer thuộc một trong các CIDR này mới được phép cung cấp `X-Forwarded-For`; mọi peer khác chỉ ghi lại địa chỉ kết nối trực tiếp.
 Xử lý forwarded address của Uvicorn bị tắt, nên `Forwarded` và `FORWARDED_ALLOW_IPS` không thể mở rộng
 ranh giới tin cậy này. Chỉ dùng `--cookie-secure` khi trình duyệt truy cập dịch vụ qua HTTPS.
 
@@ -597,8 +597,8 @@ Truy cập `http://127.0.0.1:8080/setup` trước khi thay đổi port binding h
 
 #### Docker Compose
 
-Repository có [docker-compose.yml](../../docker-compose.yml) cho người dùng thích Compose. Từ một
-checkout, tạo `Library/`, đặt sách EPUB hoặc PDF vào đó rồi chạy:
+Kho mã nguồn có [docker-compose.yml](../../docker-compose.yml) cho người dùng thích Compose. Trong một
+bản checkout mã nguồn, tạo `Library/`, đặt sách EPUB hoặc PDF vào đó rồi chạy:
 
 ```bash
 docker compose up -d --build
@@ -625,7 +625,7 @@ docker run -d \
 ```
 
 Sau lần khởi động thành công đầu tiên, có thể bỏ mount secret dùng một lần. Thư viện chỉ đọc chỉ hoạt
-động khi mọi EPUB đã chứa embedded ID hợp lệ và khớp. Sidecar hiện có được giữ lại khi ID của chúng được embed.
+động khi mọi EPUB đã chứa embedded ID hợp lệ và khớp. Sidecar hiện có được giữ lại khi ID trong đó được nhúng.
 
 Chỉ mount `/app/SyncData:ro` khi nhập bookshelf JSON cũ:
 
@@ -633,7 +633,7 @@ Chỉ mount `/app/SyncData:ro` khi nhập bookshelf JSON cũ:
 -v /path/to/legacy-sync:/app/SyncData:ro
 ```
 
-Loopback published port trong các ví dụ giữ container phía sau ranh giới máy chủ. Với truy cập từ xa,
+Việc publish cổng loopback trong các ví dụ giữ container phía sau ranh giới máy chủ. Với truy cập từ xa,
 hãy dùng reverse proxy TLS, cấu hình CIDR container-network thực tế của proxy và thêm `--cookie-secure`.
 
 ## Tham chiếu và vận hành
@@ -646,7 +646,7 @@ hãy dùng reverse proxy TLS, cấu hình CIDR container-network thực tế c�
 | --- | --- |
 | `--output-dir DIR`, `-o DIR` | Đích bắt buộc cho snapshot tĩnh được thay thế theo cơ chế nguyên tử. |
 | `--base-path PATH` | Public URL prefix; mặc định `/`. Phải bắt đầu và kết thúc bằng `/`. |
-| `--book-id-storage sidecar\|embedded` | Carrier danh tính ổn định cho mọi nguồn đã chọn; mặc định `sidecar`. |
+| `--book-id-storage sidecar\|embedded` | Carrier định danh ổn định cho mọi nguồn đã chọn; mặc định `sidecar`. |
 | `--kindle` | Tạo trang tối giản không dependency cho Kindle e-Ink đời cũ và chuyển hướng trình duyệt Kindle WebKit tới đó; mặc định tắt. |
 | `--log` | Alias tương thích cho `--log-level info`. |
 | `--log-level debug\|info\|warning\|error` | Mức chi tiết log vận hành; mặc định `error`, giữ đầu ra chuyển đổi và cảnh báo thường lệ ở chế độ yên lặng. |
@@ -657,19 +657,19 @@ Phải chỉ định đúng một trong hai tùy chọn `--server-dir` và `--ep
 
 | Tùy chọn | Ý nghĩa |
 | --- | --- |
-| `--server-dir DIR` | Thư mục gốc cho dữ liệu lâu dài có thẩm quyền và cache có thể thay thế. |
+| `--server-dir DIR` | Thư mục gốc của dữ liệu chính lâu dài và cache có thể thay thế. |
 | `--ephemeral` | Dùng trạng thái tạm; loại trừ lẫn nhau với `--server-dir`. |
-| `--watch`, `-w` | Theo dõi nguồn và đồng bộ thêm, cập nhật, di chuyển và xóa. |
+| `--watch`, `-w` | Theo dõi nguồn và đồng bộ các thao tác thêm, cập nhật, di chuyển và xóa. |
 | `--host ADDRESS` | Địa chỉ bind; mặc định `127.0.0.1`. |
 | `--port PORT`, `-p PORT` | Port bind; mặc định `8000`. |
 | `--no-browser` | Không khởi chạy trình duyệt mặc định cục bộ. Web UI vẫn khả dụng. |
 | `--log` | Alias tương thích cho `--log-level info`. |
 | `--log-level debug\|info\|warning\|error` | Mức chi tiết log vận hành; mặc định `error`. HTTP access log được bật ở `info` và `debug`. |
 | `--legacy-sync-dir DIR` | Đọc bookshelf JSON cũ trong quá trình migration khi khởi động. |
-| `--book-id-storage sidecar\|embedded` | Carrier danh tính ổn định cho mọi nguồn đã chọn; mặc định `sidecar`. |
+| `--book-id-storage sidecar\|embedded` | Carrier định danh ổn định cho mọi nguồn đã chọn; mặc định `sidecar`. |
 | `--admin-username NAME` | Administrator ban đầu khi chạy không tương tác; fallback `EPUB_BROWSER_ADMIN_USERNAME`. |
 | `--admin-password-file FILE` | Tệp secret ban đầu được ưu tiên; fallback `EPUB_BROWSER_ADMIN_PASSWORD_FILE`, rồi `EPUB_BROWSER_ADMIN_PASSWORD` khi không đặt tệp. |
-| `--trusted-proxy-cidr CIDR` | Ranh giới tin cậy mạng proxy trực tiếp có thể lặp lại để phân tích client IP từ `X-Forwarded-For` an toàn. |
+| `--trusted-proxy-cidr CIDR` | Ranh giới tin cậy cho mạng proxy trực tiếp; có thể lặp lại để phân tích IP client từ `X-Forwarded-For` một cách an toàn. |
 | `--cookie-secure` | Chỉ gửi session cookie qua HTTPS phía trình duyệt. |
 | `--kindle` | Phục vụ trang tối giản không dependency cho Kindle e-Ink đời cũ và chuyển hướng trình duyệt Kindle WebKit tới đó; mặc định tắt. |
 
@@ -696,7 +696,7 @@ Cú pháp cũ được hỗ trợ trong toàn bộ dòng major v2:
 - Giao diện hỗ trợ tiếng Anh, tiếng Trung giản thể, tiếng Trung phồn thể, tiếng Hàn, tiếng Nhật,
   tiếng Tây Ban Nha, tiếng Đức, tiếng Pháp, tiếng Nga, tiếng Ý, tiếng Bồ Đào Nha (Brasil),
   tiếng Ả Rập, tiếng Indonesia, tiếng Hindi, tiếng Việt, tiếng Thái và tiếng Mã Lai
-- Hoạt động phù hợp với e-reader trên trình duyệt Kindle/Silk; một số tính năng nặng về trình duyệt có thể được giảm bớt
+- Hoạt động phù hợp với e-reader trên trình duyệt Kindle/Silk; một số tính năng đòi hỏi nhiều tài nguyên trình duyệt có thể được đơn giản hóa
 
 | Dữ liệu | SSG | Server |
 | --- | --- | --- |
@@ -707,7 +707,7 @@ Cú pháp cũ được hỗ trợ trong toàn bộ dòng major v2:
 | Tài khoản và session | Không có | SQLite trong `<server-dir>/data` |
 | Quyền truy cập sách | Không có | SQLite trong `<server-dir>/data` |
 
-Server không cung cấp bộ chọn lưu trữ local/cloud: dữ liệu đọc đã xác thực luôn được lưu trên Server.
+Server không cung cấp bộ chọn lưu trữ local/cloud: dữ liệu đọc của tài khoản đã xác thực luôn được lưu trên Server.
 Lịch sử phiên đọc riêng tư chi tiết không bao giờ được SSG tạo ra. SSG không bao giờ thăm dò Server API
 và luôn dùng local storage của browser origin hiện tại.
 
@@ -726,26 +726,26 @@ khoản này không thể nhận nội dung được bảo vệ đã cache của
 
 ### Server API và WebHooks
 
-Tài khoản Server có thể tạo personal access token có scope trong Account settings. Client bên ngoài dùng
-`Authorization: Bearer <PAT>` với API `/api/v1/*` có phiên bản; browser cookie không xác thực các route
-này. API bao gồm sách và nội dung chương hiển thị, giá sách của chủ token, tiến độ, chú thích và nhận xét,
-cùng dữ liệu chỉ đọc xuyên người dùng cho administrator PAT có `admin:data:read`.
+Tài khoản Server có thể tạo personal access token có phạm vi quyền (scope) trong Account settings. Client bên ngoài dùng
+`Authorization: Bearer <PAT>` với API `/api/v1/*` được quản lý phiên bản; browser cookie không xác thực các route
+này. API bao gồm sách và nội dung chương có thể xem, giá sách của chủ token, tiến độ, chú thích và nhận xét,
+cùng dữ liệu chỉ đọc của nhiều người dùng cho administrator PAT có `admin:data:read`.
 
 Tài liệu OpenAPI 3.1 có tại `/openapi.json`; người dùng đã đăng nhập có thể duyệt tài liệu tham chiếu cục
 bộ tại `/api-docs`. Ví dụ: `curl -H 'Authorization: Bearer …' https://reader.example/api/v1/books`.
 Chi tiết chương mặc định trả về HTML đã làm sạch và trả về plain text với `?format=text`.
 
-List endpoint trả về `items` và `next_cursor`. `limit` mặc định là 24, tối đa 100. Truyền `next_cursor`
-làm `cursor` cùng các bộ lọc giữ nguyên để lấy trang tiếp theo. Cursor null đánh dấu trang cuối. Ví dụ,
+Các endpoint dạng danh sách trả về `items` và `next_cursor`. `limit` mặc định là 24, tối đa 100. Truyền `next_cursor`
+làm `cursor` cùng các bộ lọc giữ nguyên để lấy trang tiếp theo. Cursor có giá trị null đánh dấu trang cuối. Ví dụ,
 dùng `/api/v1/me/annotations?book_id=BOOK_ID&chapter_index=0&fields=id,text,note` để lấy các trường chú
 thích đã chọn từ một chương EPUB hoặc trang PDF. Query filter và trường được hỗ trợ nằm trong tài liệu OpenAPI.
 
-Vocabulary mặc định dùng cùng định dạng list. Client dùng phản hồi `words` cũ có thể gửi `page=1` hoặc
+Mục từ vựng cũng dùng định dạng danh sách này theo mặc định. Client dùng phản hồi `words` cũ có thể gửi `page=1` hoặc
 `page_size` để chọn định dạng phân trang cũ.
 
 Administrator quản lý WebHook endpoint trong Administration. Secret chỉ hiển thị khi tạo hoặc xoay vòng.
-Delivery được ký, bền bỉ, thử lại với phản hồi non-2xx; sự kiện book-review chứa ID và timestamp hành
-động nhưng không bao giờ chứa điểm đánh giá hoặc nội dung nhận xét.
+Các lượt gửi WebHook đều được ký, lưu lại bền vững và được thử lại khi nhận phản hồi non-2xx; sự kiện
+book-review chứa ID và timestamp của hành động nhưng không bao giờ chứa điểm đánh giá hoặc nội dung nhận xét.
 
 ### An toàn dữ liệu và di chuyển
 
@@ -754,14 +754,14 @@ Giữ nguyên volume trạng thái lâu dài khi thay container.
 
 Migration khi khởi động diễn ra tự động và an toàn khi khởi động lại. Quá trình này xác minh cơ sở dữ
 liệu cũ, tạo bản sao lưu, nâng cấp một bản sao, nhập dữ liệu bookshelf/tiến độ/chú thích cũ đủ điều kiện
-vào administrator ban đầu đang chờ, và chỉ loại bỏ artifact public cũ có thể thay thế sau các checkpoint
+vào tài khoản administrator ban đầu đang chờ tạo, và chỉ loại bỏ artifact public cũ có thể thay thế sau các checkpoint
 thành công. Request thông thường không bao giờ quét thư mục legacy sync. Cơ sở dữ liệu hỏng, password
-hash không hợp lệ, cơ sở dữ liệu cũ mơ hồ và ID xung đột đều fail closed thay vì bị đoán hoặc ghi đè.
+hash không hợp lệ, cơ sở dữ liệu cũ mơ hồ và ID xung đột đều khiến hệ thống fail closed thay vì đoán hoặc ghi đè dữ liệu.
 
 `epub-browser.db` hoặc `annotations.db` đã di chuyển ở thư mục gốc được giữ lại như bản sao khôi phục
-nhạy cảm, không có thẩm quyền; `data/epub-browser.db` mới là nguồn có thẩm quyền và Server request
-không dùng tệp gốc được giữ lại. Hãy giữ bản sao khôi phục ở chế độ riêng tư. Chỉ xóa thủ công khi
-Server đã dừng, sau khi xác minh cơ sở dữ liệu có thẩm quyền và bản sao lưu đã ghi, đồng thời chỉ khi
+nhạy cảm và không phải nguồn dữ liệu chính; `data/epub-browser.db` mới là nguồn dữ liệu chính và các
+request của Server không dùng tệp gốc được giữ lại. Hãy giữ bản sao khôi phục ở chế độ riêng tư. Chỉ xóa thủ công khi
+Server đã dừng, sau khi xác minh cơ sở dữ liệu chính và bản sao lưu đã được ghi nhận, đồng thời chỉ khi
 không còn cần rollback về v1. EPUB Browser không bao giờ tự động xóa tệp này.
 
 Nếu cả `epub-browser.db` và `annotations.db` cùng tồn tại ở legacy root, quá trình khởi động dừng và
@@ -773,7 +773,7 @@ cache và khôi phục xung đột.
 #### Lệnh đã khởi động nhưng trình duyệt không mở
 
 Bỏ `--no-browser` khi chạy trên máy cục bộ có giao diện đồ họa, hoặc tự mở URL được in/đã bind. Trong
-Docker, systemd, SSH và phiên không tương tác, bạn được kỳ vọng tự mở URL.
+Docker, systemd, SSH và phiên không tương tác, bạn cần tự mở URL.
 
 #### CLI có vẻ yên lặng
 
@@ -793,7 +793,7 @@ Tạo lại với `--base-path` đã chuẩn hóa, chẳng hạn `/reader/`, và
 
 Đọc lỗi migration hoặc validation đầu tiên được ghi log, giữ nguyên dữ liệu và tệp nguồn, rồi tham khảo
 [docs/migration-v2.md](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/migration-v2.md).
-Không xóa thư mục `data/` có thẩm quyền để vượt qua lỗi.
+Không xóa thư mục `data/`, vốn là nguồn dữ liệu chính, để tìm cách bỏ qua lỗi.
 
 ## Phát triển và giấy phép
 
@@ -803,22 +803,22 @@ Hoan nghênh Issues và pull requests tại [dfface/epub-browser](https://github
 Một báo cáo hữu ích bao gồm lệnh chính xác, trình duyệt/thiết bị, bước tái hiện, log liên quan và tệp
 EPUB hoặc PDF nếu được phép chia sẻ hợp pháp.
 
-#### Hợp đồng kiến trúc dành cho maintainer
+#### Quy ước kiến trúc dành cho maintainer
 
 Đọc [AGENTS.md](../../AGENTS.md) trước khi thay đổi xử lý nội dung, page template, cache, quyền, tài
-nguyên hoặc hành vi triển khai. Tệp này xác định ranh giới định dạng EPUB/PDF, quyền sở hữu giữa
-SSG/Server, cache revision độc lập, yêu cầu i18n khi chạy, kiểm tra bảo mật và xác minh bắt buộc.
+nguyên hoặc hành vi triển khai. Tệp này xác định ranh giới định dạng EPUB/PDF, phạm vi phụ trách giữa
+SSG và Server, revision cache độc lập, yêu cầu i18n khi chạy, kiểm tra bảo mật và xác minh bắt buộc.
 Các thuật ngữ sản phẩm dùng chung như *reader chapter*, *reading window*, *reading stage* và *content
 cache* được định nghĩa trong [CONTEXT.md](../../CONTEXT.md).
 
 Tóm lại: giữ một UI trình đọc, không đưa dữ liệu chỉ dành cho Server vào SSG, giữ cache phái sinh EPUB
 và PDF tách khỏi dữ liệu người dùng SQLite, và không bao giờ thêm CDN dependency khi chạy. Thay đổi ảnh
-hưởng tới bề mặt dùng chung phải được kiểm thử với cả hai định dạng và cả hai chế độ triển khai khi áp dụng.
+hưởng tới thành phần dùng chung phải được kiểm thử với cả hai định dạng và cả hai chế độ triển khai khi áp dụng.
 
 #### Phát triển từ source checkout
 
-Các tệp trình duyệt bên thứ ba là build input được tạo, không phải project source, nên
-`epub_browser/assets/vendor/` cố ý không có trong Git. Hãy nạp rõ ràng đúng phiên bản đã khóa trước khi
+Các tệp trình duyệt bên thứ ba là đầu vào build được tạo ra, không phải mã nguồn dự án, nên
+`epub_browser/assets/vendor/` cố ý không có trong Git. Hãy chủ động tải đúng các phiên bản đã khóa trước khi
 phát triển hoặc build, sau đó xác minh ngoại tuyến:
 
 ```bash
@@ -828,14 +828,14 @@ python3 -m unittest tests.test_vendor_assets -v
 python3 -m build
 ```
 
-`fetch` là lệnh duy nhất ở trên tải browser vendor asset. Lock ghi lại npm tarball bất biến, file digest,
+`fetch` là lệnh duy nhất ở trên tải tài nguyên vendor cho trình duyệt. Lockfile ghi lại npm tarball bất biến, file digest,
 allowlist và giấy phép; `verify`, kiểm thử, build từ checkout đã nạp và trình đọc đã cài đặt không tải
 browser asset. Lệnh `python3 -m build` isolated tiêu chuẩn vẫn có thể truy cập Python package index để
-lấy build requirement. Để build hoàn toàn không dùng mạng, hãy nạp vendor tree và cài trước `build`,
+lấy các gói cần thiết để build. Để build hoàn toàn không dùng mạng, hãy chuẩn bị vendor tree và cài trước `build`,
 `setuptools` và `wheel` trước khi ngắt kết nối, rồi chạy
 `PIP_NO_INDEX=1 python3 -m build --no-isolation`. Wheel, source distribution, Docker image và website
 SSG được tạo chứa các tệp đã xác minh và không có CDN dependency khi chạy. Xem
-[third_party/README.md](../../third_party/README.md) để biết quy trình cập nhật, phát hành và giữ repository sạch.
+[third_party/README.md](../../third_party/README.md) để biết quy trình cập nhật, phát hành và giữ kho mã nguồn sạch.
 
 ### Giấy phép
 

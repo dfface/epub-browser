@@ -20,11 +20,11 @@
 ![Ein PDF im gemeinsamen Reader von EPUB Browser mit Originalseite, Navigation, Designs und Lesewerkzeugen.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/releases/assets/v2.8.0-pdf-reader.png)
 
 EPUB Browser ist mehr als ein Buchkonverter. Es ist eine vollständige Leseplattform,
-die du überall veröffentlichen oder selbst betreiben kannst. EPUB und PDF nutzen
-dieselbe Bibliothek, Buchseite, Inhaltsverzeichnis, Lesemodi, Designs,
-Fortschrittsverfolgung und Anmerkungsfunktionen. Jede PDF-Seite wird zu einem
-Reader-Kapitel und lokal durch PDF.js in derselben Leseumgebung dargestellt –
-ohne separaten Viewer und ohne CDN zur Laufzeit.
+die du überall veröffentlichen oder selbst betreiben kannst. Bibliothek, Buchseite,
+Inhaltsverzeichnis, Lesemodi, Designs, Fortschrittsverfolgung und Anmerkungsfunktionen
+sind bei EPUB und PDF identisch. Jede PDF-Seite wird zu einem Kapitel im Reader und
+lokal durch PDF.js in derselben Leseumgebung dargestellt – ohne separaten Viewer
+und ohne CDN zur Laufzeit.
 
 ## Inhalt
 
@@ -62,15 +62,15 @@ ohne separaten Viewer und ohne CDN zur Laufzeit.
   betreibe einen dauerhaften Server mit Konten, Buchberechtigungen und OIDC.
   Anwendungsdateien, Schriftarten, PDF.js und Renderer werden lokal bereitgestellt,
   sodass das Lesen nie von einem CDN abhängt.
-- **EPUB und PDF in einem echten Reader.** Beide Formate nutzen Bibliothek,
-  Buchseite, Inhaltsverzeichnis, responsives Layout, drei Lesemodi, Designs,
-  Vollbild und Fortschrittsverfolgung gemeinsam. Jede PDF-Seite bleibt in der
-  Leseumgebung und bietet Zoom, Auswahl über die Textebene und Anmerkungen,
-  statt in einer separaten Vorschau zu erscheinen.
+- **EPUB und PDF im selben Reader.** Bibliothek, Buchseite, Inhaltsverzeichnis,
+  responsives Layout, drei Lesemodi, Designs, Vollbild und Fortschrittsverfolgung
+  sind bei beiden Formaten identisch. Jede PDF-Seite bleibt in der Leseumgebung
+  und bietet Zoom, Auswahl über die Textebene und Anmerkungen, anstatt einen
+  separaten Viewer zu öffnen.
 - **Das Buch und die gesuchte Passage finden.** Die Bibliothekssuche umfasst
   Metadaten, Tags und Pinyin sowie Sortierung und Seitennavigation. Die
-  serverseitige Volltextsuche in EPUB-Büchern liefert vollständige, nach Kapiteln
-  gruppierte Ergebnisse und springt zur hervorgehobenen Passage. Stabile Buch-IDs
+  serverseitige Volltextsuche in EPUB-Büchern liefert sämtliche Ergebnisse nach
+  Kapiteln gruppiert und springt zur hervorgehobenen Passage. Stabile Buch-IDs
   halten Fortschritt, Anmerkungen und Verlauf mit dem jeweiligen Buch verbunden.
 - **Verstehen statt nur scrollen.** Im Server-Modus bleiben EPUB-Kapitelführer,
   mit Belegen verknüpfte Erklärungen, Mindmaps und private Fragen an Ask AI direkt
@@ -80,15 +80,15 @@ ohne separaten Viewer und ohne CDN zur Laufzeit.
 - **Aus Lesen wird ein Verlauf, der es wert ist, aufbewahrt zu werden.**
   Verschachtelte Regale, Bewertungen, Rezensionen, Anmerkungsexport,
   Aktivitätskalender, Trends, Statistiken pro Buch und Lesezeit-Rankings bilden
-  eine zusammenhängende Aufzeichnung. Der Server hält Lesedaten für jedes Konto
-  privat und zwischen den Geräten synchronisiert.
+  eine zusammenhängende Aufzeichnung. Der Server speichert die Lesedaten jedes
+  Kontos privat und synchronisiert sie zwischen den Geräten.
 - **Einen Lesedienst betreiben, nicht nur einen Viewer.** Im Server-Modus kannst
   du Bücher per Web-Upload durch Administratoren oder überwachte Ordner hinzufügen,
   die Speicherbelegung mit konfigurierbarer LRU-Cache-Bereinigung begrenzen,
   Mitglieder- und KI-Berechtigungen verwalten und OpenAPI, PATs und WebHooks
   integrieren. Der minimalistische Kindle-Reader unterstützt eingeschränkte
-  Geräte; der Server bietet außerdem ein persönliches Kindle-Dashboard für den
-  Ruhezustandsbildschirm mit Uhr, Kalender, Agenda, Notiz und Pomodoro-Timer.
+  Geräte; der Server bietet außerdem ein persönliches Dashboard für den
+  Kindle-Bildschirmschoner mit Uhr, Kalender, Agenda, Notiz und Pomodoro-Timer.
 
 ![Ein Kapitelführer neben dem ursprünglichen EPUB-Text mit einer privaten Ask-AI-Seitenleiste.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/ai-native-reading.png)
 
@@ -109,8 +109,8 @@ Node.js-Laufzeit:
 | Frontend | Semantisches HTML, CSS, VanillaJS mit ES-Modulen und Browser-APIs | Eine gemeinsame responsive Oberfläche für SSG und Server |
 | CLI und Server | Python 3.9+, Starlette, Uvicorn | Konvertierungsbefehle, authentifizierte Seiten, APIs und Hintergrundaufgaben |
 | Daten | SQLite und neu erzeugbare JSON-Inhaltscaches | Benutzerzustände bleiben von abgeleiteten EPUB-/PDF-Inhalten getrennt |
-| Buchformate | lxml, pypdf, pypdfium2, PDF.js | Einheitliches, striktes EPUB-Parsing und Bereinigen mit Wiederherstellung bei Fehlern, PDF-Metadaten und -Cover, lokale Darstellung im Browser |
-| Offline und Assets | Service Worker, unveränderliche Assets mit Hash, festgelegte gebündelte Abhängigkeiten | Eigenständige Bereitstellung ohne CDN zur Laufzeit |
+| Buchformate | lxml, pypdf, pypdfium2, PDF.js | Einheitliches EPUB-Parsing und Bereinigen, zunächst streng und mit Wiederherstellung bei Fehlern, PDF-Metadaten und -Cover, lokale Darstellung im Browser |
+| Offline und Assets | Service Worker, unveränderliche Assets mit Hash, gebündelte Abhängigkeiten mit festgelegten Versionen | Eigenständige Bereitstellung ohne CDN zur Laufzeit |
 | Distribution | PyPI, Docker, gewöhnliches statisches Hosting | Dieselbe Codebasis wird als SSG oder dauerhafter Server ausgeliefert |
 | Optionale KI | OpenAI-kompatible APIs mit lokal gerendertem Markdown, KaTeX und Mermaid | EPUB-Lernebenen ausschließlich im Server-Modus |
 
@@ -126,18 +126,18 @@ Lesedaten liegen sollen, nicht nach dem Buchformat:
 | Fähigkeit | `ssg` | `server` |
 | --- | --- | --- |
 | EPUB und PDF | Ja | Ja |
-| Bereitstellung | Atomare statische HTML-Dateien und Assets für Pages, Objektspeicher oder Nginx | Dynamische authentifizierte Seiten auf Basis eines ersetzbaren Inhaltscaches |
+| Bereitstellung | Atomare Veröffentlichung statischer HTML-Dateien und Assets für Pages, Objektspeicher oder Nginx | Dynamische authentifizierte Seiten auf Basis eines ersetzbaren Inhaltscaches |
 | Konten und Zugriffskontrolle | Keine | Administrator- und Mitgliedskonten, Freigaben für eingeschränkte Bücher, Sitzungen und CSRF-Schutz |
-| OIDC-Single-Sign-on | Nicht enthalten | Generischer Provider, Verknüpfung vorhandener Konten und optionale Bereitstellung von Mitgliedern |
+| OIDC-Single-Sign-on | Nicht enthalten | Generischer Provider, Verknüpfung vorhandener Konten und optionale Erstellung von Mitgliedskonten |
 | Fortschritt, Anmerkungen, Bücherregal | Im aktuellen Browser gespeichert | Pro authentifiziertem Konto in SQLite synchronisiert |
 | Bewertungen, Rezensionen, Lesesitzungen | Nicht ausgegeben | Private Aufzeichnungen pro Konto und Leseeinblicke |
 | Quellen aktualisieren | `ssg` erneut ausführen | Neu starten, erneut einlesen oder `--watch` verwenden |
 | Verwaltung, Tags, OpenAPI, WebHooks | Nicht enthalten | Enthalten |
 | KI-Lesen und Ask AI | Nicht enthalten | Für EPUB verfügbar, sofern konfiguriert und ausdrücklich freigegeben; für PDF ausgeblendet |
 | Laufzeitdatenbank | Keine | Für den dauerhaften Modus erforderlich |
-| Geeignet für | Öffentliches/statisches Hosting, Offline-Pakete, einfache persönliche Veröffentlichung | Eine private Bibliothek, mehrere Geräte oder Leser, Automatisierung und verwalteter Zugriff |
+| Geeignet für | Öffentliches/statisches Hosting, Offline-Pakete, einfache persönliche Veröffentlichung | Private Bibliotheken, mehrere Geräte oder Leser, Automatisierung und Zugriffsverwaltung |
 
-Verwende `ssg`, wenn das Ergebnis aus gewöhnlichen statischen Dateien bestehen soll. Verwende `server`, wenn Leser Konten, geräteübergreifende Daten, Zugriffskontrolle oder automatische Abgleichung der Quellen benötigen.
+Verwende `ssg`, wenn das Ergebnis aus gewöhnlichen statischen Dateien bestehen soll. Verwende `server`, wenn Leser Konten, geräteübergreifende Daten, Zugriffskontrolle oder automatischen Abgleich der Quellen benötigen.
 
 ### Live-Demos
 
@@ -150,9 +150,9 @@ Für EPUB-Bücher kann der Server-Modus Kapitelführer, mit Belegen verknüpfte
 Erklärungen, Mindmaps, Reflexionsfragen und eine private Ask-AI-Seitenleiste
 hinzufügen, ohne den Leser aus dem Originaltext zu reißen. Die Ergebnisse
 unterliegen weiterhin den Buchberechtigungen; Mitglieder müssen ausdrücklich
-autorisiert werden, und SSG enthält weder KI-Steuerelemente oder Aufträge noch
-Kontodaten oder Anbieterkonfigurationen. PDF blendet KI-Lesen und Ask AI
-bewusst aus.
+autorisiert werden, und SSG enthält keine KI-Steuerelemente, Aufträge,
+Kontodaten oder Anbieterkonfigurationen. Bei PDF-Büchern werden KI-Lesen und
+Ask AI bewusst ausgeblendet.
 
 Das vollständige Interaktionsmodell beschreibt der [Leitfaden zum KI-nativen Lesen](../ai-native-reading.md).
 Die [Hinweise zu lokalen Rich-Text-Renderern](../third-party-ai-renderers.md)
@@ -178,7 +178,7 @@ funktioniert ganz ohne JavaScript. Der Wechsel des Designs (Hell / Sepia /
 Dunkel), die Schriftgröße (A- / A+) und die Lokalisierung der Oberfläche werden
 durch leichtgewichtige Inline-Skripte ergänzt, die auf dem einfachen HTML aufsetzen.
 
-Jede Seite bietet Design- und Schriftsteuerung (in der Kopfzeile und auf
+Jede Seite bietet Steuerelemente für Design und Schrift (in der Kopfzeile und auf
 Kapitelseiten zusätzlich in der Fußzeile), Navigation im Inhaltsverzeichnis,
 vorheriges/nächstes Kapitel und einen Link „Weiterlesen“, der beim gespeicherten
 Fortschritt fortsetzt.
@@ -348,7 +348,7 @@ Metadaten und abgeleitetes Cover), statt alte und neue Seiten zu mischen.
 Der Endpunkt für das Rohdokument auf dem Server ist sitzungsgebunden:
 `GET`/`HEAD /api/books/<book-id>/document`. Er prüft Authentifizierung,
 Sichtbarkeit des Buchs, PDF-Format und Fingerabdrücke von Quelle und Cache und
-unterstützt anschließend begrenzte Antworten mit jeweils einem Byte-Bereich sowie
+unterstützt anschließend Antworten auf einen einzelnen, begrenzten Byte-Bereich sowie
 `ETag`, `Accept-Ranges`, privates Caching, `nosniff` und Inline-Darstellung des
 PDF. Er gibt keinen absoluten Pfad preis, ist nicht für PAT-Authentifizierung
 verfügbar und gehört nicht zur PAT-/OpenAPI-Schnittstelle. SSG besitzt nur die
@@ -356,9 +356,9 @@ lokale `document.pdf` und keine API für Rohdokumente.
 
 PDFs mit einer nutzbaren PDF.js-Textebene verwenden genau das vorhandene
 Auswahl-Popup und dieselbe Anmerkungskomponente für Markierungen und Notizen
-sowie Wörterbuch und Enzyklopädie. Speicherung, Eigentümerschaft, Export,
-Auflistung und Deep Links von Anmerkungen bleiben gemeinsam; es gibt weder eine
-PDF-spezifische Anmerkungstabelle noch eine eigene Einstellungsoberfläche.
+sowie Wörterbuch und Enzyklopädie. Speicherung, Eigentümerzuordnung, Export,
+Auflistung und Deep Links der Anmerkungen verwenden dieselben Mechanismen wie bei EPUB; es gibt weder
+eine PDF-spezifische Anmerkungstabelle noch eine eigene Einstellungsoberfläche.
 Gescannte oder reine Bild-PDFs bleiben lesbar, aber auswahlbasierte Markierungen,
 Notizen, Wörterbuch, Enzyklopädie und Dokumentensuche sind ohne nutzbare
 Textebene ausdrücklich nicht verfügbar. Eine Auswahl über mehrere Seiten kann
@@ -367,7 +367,7 @@ lokalisierte Meldung über die fehlende Unterstützung. Die Auswahl innerhalb
 einer Seite funktioniert weiterhin.
 
 PDF.js ist kein zweites Viewer-Gerüst. Lade vor dem Erstellen oder Veröffentlichen
-die festgelegten Drittanbieter-Assets und überprüfe sie:
+die Drittanbieter-Assets in den festgelegten Versionen und überprüfe sie:
 
 ```bash
 python3 tools/sync_vendor_assets.py fetch
@@ -375,16 +375,16 @@ python3 tools/sync_vendor_assets.py verify
 ```
 
 Die Anwendung stellt zur Laufzeit lokale PDF.js-Modul- und Worker-Assets mit Hash
-bereit und lädt sie niemals von einem CDN. Bild-Lightboxes verwenden die
-festgelegte Abhängigkeit GLightbox; Fancyapps/Fancybox wird weder zur Laufzeit
-benötigt noch weiterverteilt. Der Ablauf für festgelegte Assets und
+bereit und lädt sie niemals von einem CDN. Lightboxes für Bilder verwenden die
+Abhängigkeit GLightbox in der festgelegten Version; Fancyapps/Fancybox wird weder zur Laufzeit
+benötigt noch weiterverteilt. Der Ablauf für Assets mit festgelegten Versionen und
 Releases ist in [third_party/README.md](../../third_party/README.md) beschrieben.
 
 ## Bereitstellung
 
 ### SSG
 
-SSG erstellt eine vollständige Momentaufnahme in einem benachbarten Staging-Verzeichnis, validiert sie und ersetzt anschließend das Ziel. Wenn eine Konvertierung fehlschlägt, bleibt das bisherige Ziel unverändert. Die erzeugte Ausgabe enthält keine Server-Datenbank, keinen Migrationszustand, keine Kontoseite und keine Metadaten des Laufzeitcaches.
+SSG erstellt eine vollständige Momentaufnahme in einem Staging-Verzeichnis neben dem Ziel, validiert sie und ersetzt anschließend das Ziel. Wenn eine Konvertierung fehlschlägt, bleibt das bisherige Ziel unverändert. Die erzeugte Ausgabe enthält keine Server-Datenbank, keinen Migrationszustand, keine Kontoseite und keine Metadaten des Laufzeitcaches.
 
 SSG ist bewusst lokal und kontofrei:
 
@@ -400,7 +400,7 @@ Alle erforderlichen JavaScript- und CSS-Dateien, Schriftarten und Symbole der An
 
 #### Ersteinrichtung, Konten und Berechtigungen
 
-In einem neuen dauerhaften Zustandsverzeichnis leiten normale Seiten zu `/setup` weiter. APIs, Ereignisströme, erzeugte Assets und Bücher liefern eine Antwort, die auf die erforderliche Einrichtung hinweist, bis der erste Administrator erstellt wurde. Schließe die Einrichtung über Loopback oder einen anderen vertrauenswürdigen privaten Pfad ab, bevor du den Port freigibst: Die erste erfolgreiche Einrichtung übernimmt das Administratorkonto.
+In einem neuen dauerhaften Zustandsverzeichnis leiten normale Seiten zu `/setup` weiter. APIs, Ereignisströme, erzeugte Assets und Bücher liefern eine Antwort, die auf die erforderliche Einrichtung hinweist, bis der erste Administrator erstellt wurde. Schließe die Einrichtung über Loopback oder einen anderen vertrauenswürdigen privaten Pfad ab, bevor du den Port freigibst: Die erste erfolgreiche Übermittlung des Einrichtungsformulars weist dem Absender das Administratorkonto zu.
 
 Nach der Einrichtung gilt:
 
@@ -408,22 +408,22 @@ Nach der Einrichtung gilt:
 - Konten haben entweder die Rolle `administrator` oder `member`.
 - Gewöhnliche Bücher sind für jedes authentifizierte Konto sichtbar.
 - Eingeschränkte Bücher sind nur für Administratoren und ausdrücklich ausgewählte Benutzer sichtbar.
-- Jedes Benutzerkonto besitzt sein Bücherregal, seinen Fortschritt, seine Anmerkungen und seine aktiven Sitzungen.
+- Jeder Benutzer hat ein eigenes Bücherregal, einen eigenen Fortschritt, eigene Anmerkungen und eigene aktive Sitzungen.
 - Benutzer können ihr Passwort ändern und ihre Sitzungen widerrufen.
 - Administratoren können Benutzer, Rollen, Passwörter, Sitzungen und Buchfreigaben verwalten.
-- Sitzungen verwenden ein HttpOnly-Cookie, CSRF-Schutz und eine gleitende Laufzeit von 30 Tagen.
+- Sitzungen verwenden ein HttpOnly-Cookie und CSRF-Schutz; ihre Laufzeit von 30 Tagen verlängert sich bei Aktivität.
 
 #### OIDC-Single-Sign-on und Kontoverknüpfung
 
 Der Server-Modus kann einen generischen OpenID-Connect-Provider (OIDC) verwenden,
 darunter Authelia, Keycloak, Authentik und kompatible Dienste. Gib unter
-**Administration → OIDC-Anmeldung** den den Lesern angezeigten Providernamen,
+**Administration → OIDC-Anmeldung** den für Leser sichtbaren Providernamen,
 die Issuer-URL, die Client-ID, das Client-Secret, die exakte Redirect-URI, die
 Scopes und den Username-Claim ein. EPUB Browser verwendet Discovery und den
 Authorization-Code-Flow mit S256-PKCE, validiert das signierte ID-Token und
 identifiziert ein externes Konto ausschließlich anhand von `(issuer, sub)`;
-E-Mail- und Benutzernamen-Claims sind Hinweise für Anzeige und Bereitstellung,
-niemals Identitätsschlüssel.
+E-Mail- und Benutzernamen-Claims sind Hinweise für die Anzeige und die optionale
+Kontoerstellung, niemals Identitätsschlüssel.
 
 Registriere beim Provider exakt diesen Callback einschließlich Schema und Host:
 
@@ -434,9 +434,9 @@ https://reader.example.com/auth/oidc/callback
 Vorhandene Benutzer können sich lokal anmelden und den Provider in den
 Kontoeinstellungen verknüpfen. Bei einer unbekannten externen Identität werden
 andernfalls einmalig der Benutzername und das Passwort eines vorhandenen lokalen
-Kontos abgefragt. Die optionale automatische Bereitstellung erstellt ein Mitglied
+Kontos abgefragt. Die optionale automatische Kontoerstellung erstellt ein Mitgliedskonto
 ohne Passwort und importiert niemals eine Administratorrolle. Lasse vorhandene
-Benutzer zuerst ihre Konten verknüpfen: Wird die automatische Bereitstellung zu
+Benutzer zuerst ihre Konten verknüpfen: Wird die automatische Kontoerstellung zu
 früh aktiviert, können **doppelte lokale Konten** entstehen. Die Passwortanmeldung
 des **lokalen Administrators** bleibt immer verfügbar, selbst wenn die lokale
 Passwortanmeldung für Mitglieder deaktiviert ist. Teste und schütze dieses
@@ -470,8 +470,8 @@ identity_providers:
 
 Verwende in EPUB Browser den Issuer `https://auth.example.com`, die Client-ID
 `epub-browser`, die Scopes `openid profile email` und den Username-Claim
-`preferred_username`. Beim Speichern werden Discovery und Fähigkeiten live geprüft;
-bei einem Fehler bleibt die bisherige Konfiguration aktiv.
+`preferred_username`. Beim Speichern werden Discovery und die unterstützten Funktionen
+unmittelbar geprüft; bei einem Fehler bleibt die bisherige Konfiguration aktiv.
 
 #### KI-Lesen konfigurieren und verwalten
 
@@ -497,7 +497,7 @@ an den Anbieter übermitteln dürfen. Der API-Schlüssel wird niemals an einen
 Browser zurückgegeben oder über eine API offengelegt; schütze das
 Server-Zustandsverzeichnis entsprechend.
 
-Für einen unbeaufsichtigten ersten Start gib eine Benutzernamen- und eine Passwortdatei an:
+Für einen unbeaufsichtigten ersten Start gib einen Benutzernamen und eine Passwortdatei an:
 
 ```bash
 epub-browser server /path/to/books \
@@ -513,11 +513,11 @@ Die Entsprechungen in der Umgebung sind `EPUB_BROWSER_ADMIN_USERNAME` und `EPUB_
 
 #### Browserstart und Protokollierung
 
-Standardmäßig versucht der Server nach dem Start des HTTP-Listeners den Standardbrowser des Betriebssystems zu öffnen. `--no-browser` verhindert diesen lokalen Start. Die Option **deaktiviert weder die Weboberfläche noch den Browserzugriff**; sie unterdrückt nur den lokalen Aufruf `webbrowser.open(...)`. Verwende sie für Docker, systemd, SSH-Sitzungen, Rechner ohne grafische Oberfläche und Skripte.
+Standardmäßig versucht der Server nach dem Start des HTTP-Servers den Standardbrowser des Betriebssystems zu öffnen. `--no-browser` verhindert diesen lokalen Start. Die Option **deaktiviert weder die Weboberfläche noch den Browserzugriff**; sie unterdrückt nur den lokalen Aufruf `webbrowser.open(...)`. Verwende sie für Docker, systemd, SSH-Sitzungen, Rechner ohne grafische Oberfläche und Skripte.
 
-Standardmäßig (`--log-level error`) gibt die CLI nur Fehler aus, damit Fortschrittsanzeigen im Terminal nicht durch routinemäßige Meldungen oder Warnungen unterbrochen werden. Ein interaktives Terminal zeigt die gebundene URL einmal an; nicht interaktive Docker- und Dienstläufe bleiben ansonsten still. Verwende `--log-level warning`, um Warnungen einzuschließen, `--log-level info` für Betriebs- und HTTP-Zugriffsprotokolle oder `--log-level debug` für die ausführlichsten Angaben. `--log` bleibt ein Kompatibilitätsalias für `--log-level info`.
+Standardmäßig (`--log-level error`) gibt die CLI nur Fehler aus, damit Fortschrittsanzeigen im Terminal nicht durch routinemäßige Meldungen oder Warnungen unterbrochen werden. Ein interaktives Terminal zeigt die Adresse des Servers einmal an; nicht interaktive Ausführungen in Docker und als Dienst bleiben ansonsten still. Verwende `--log-level warning`, um Warnungen einzuschließen, `--log-level info` für Betriebs- und HTTP-Zugriffsprotokolle oder `--log-level debug` für die ausführlichsten Angaben. `--log` bleibt ein Kompatibilitätsalias für `--log-level info`.
 
-Erste Scans und Scans durch die Überwachung erscheinen in der Weboberfläche statt als `tqdm` im Terminal. Eine erfolgreiche Zusammenfassung wird automatisch geschlossen; Fehler bleiben sichtbar, bis sie verworfen werden. Mit `--watch` startet das Korrigieren oder Ersetzen einer Quelle einen weiteren Scan, ohne dass ein manueller erneuter Versuch erforderlich ist.
+Die ersten Scans und die durch die Überwachung ausgelösten Scans erscheinen in der Weboberfläche statt als `tqdm` im Terminal. Die Zusammenfassung eines erfolgreichen Scans wird automatisch geschlossen; Fehler bleiben sichtbar, bis sie ausgeblendet werden. Mit `--watch` startet das Korrigieren oder Ersetzen einer Quelle einen weiteren Scan, ohne dass ein manueller erneuter Versuch erforderlich ist.
 
 #### Dauerhafter und flüchtiger Zustand
 
@@ -546,11 +546,11 @@ Dauerhafte Verzeichnisstruktur:
 
 Nur `data/` ist maßgeblich. `cache/` kann gelöscht und neu erstellt werden. Bewahre `data/` über Upgrades und den Austausch von Containern hinweg auf. Eine Betriebssystem-Sperre gewährleistet exklusiven Zugriff; `.server.lock` kann nach einem normalen Beenden als Diagnosemetadaten erhalten bleiben.
 
-Speichere die dauerhafte Datei `data/epub-browser.db` auf einem lokalen Dateisystem. Gemeinsam genutzte oder Netzwerkdateisysteme werden für WAL-Parallelität nicht unterstützt. Geprüfte Sicherungen bleiben unter `data/backups/` und enthalten alle committeten WAL-Daten.
+Speichere die dauerhafte Datei `data/epub-browser.db` auf einem lokalen Dateisystem. Gemeinsam genutzte oder Netzwerkdateisysteme werden für WAL-Parallelität nicht unterstützt. Geprüfte Sicherungen bleiben unter `data/backups/` und enthalten alle festgeschriebenen WAL-Daten.
 
 #### LAN und Reverse Proxy
 
-Der Server bindet standardmäßig an `127.0.0.1:8000`. Für ein vertrauenswürdiges LAN:
+Der Server lauscht standardmäßig auf `127.0.0.1:8000`. Für ein vertrauenswürdiges LAN:
 
 ```bash
 epub-browser server /path/to/books \
@@ -576,7 +576,7 @@ epub-browser server /path/to/books \
   --no-browser
 ```
 
-Wiederhole `--trusted-proxy-cidr` für jede direkte Proxy-Adresse oder jedes direkte Proxy-Netzwerk. Nur Anfragen, deren unmittelbarer Gegenpunkt zu einem dieser CIDRs gehört, dürfen `X-Forwarded-For` liefern; bei allen anderen Gegenpunkten wird nur deren direkte Adresse gespeichert. Die Verarbeitung weitergeleiteter Adressen durch Uvicorn ist deaktiviert, sodass `Forwarded` und `FORWARDED_ALLOW_IPS` diese Vertrauensgrenze nicht erweitern können. Verwende `--cookie-secure` nur, wenn der Browser den Dienst über HTTPS erreicht.
+Wiederhole `--trusted-proxy-cidr` für jede Adresse oder jedes Netzwerk eines direkt verbundenen Proxys. Nur Anfragen, deren direkter Peer zu einem dieser CIDRs gehört, dürfen `X-Forwarded-For` liefern; bei allen anderen Verbindungen wird nur die Adresse des direkten Peers gespeichert. Die Verarbeitung weitergeleiteter Adressen durch Uvicorn ist deaktiviert, sodass `Forwarded` und `FORWARDED_ALLOW_IPS` diese Vertrauensgrenze nicht erweitern können. Verwende `--cookie-secure` nur, wenn der Browser den Dienst über HTTPS erreicht.
 
 ### Docker
 
@@ -626,7 +626,7 @@ docker run -d \
   dfface/epub-browser:latest
 ```
 
-Nach dem ersten erfolgreichen Start kann die einmalige Secret-Einhängung entfernt werden. Eine schreibgeschützte Bibliothek funktioniert nur, wenn jedes EPUB bereits eine passende gültige eingebettete ID enthält. Vorhandene Sidecar-Dateien bleiben erhalten, wenn ihre IDs eingebettet werden.
+Nach dem ersten erfolgreichen Start kannst du die einmalig benötigte Secret-Datei wieder aushängen. Eine schreibgeschützte Bibliothek funktioniert nur, wenn jedes EPUB bereits eine passende gültige eingebettete ID enthält. Vorhandene Sidecar-Dateien bleiben erhalten, wenn ihre IDs eingebettet werden.
 
 Binde `/app/SyncData:ro` nur während des Imports älterer Bücherregal-JSON-Daten ein:
 
@@ -634,7 +634,7 @@ Binde `/app/SyncData:ro` nur während des Imports älterer Bücherregal-JSON-Dat
 -v /path/to/legacy-sync:/app/SyncData:ro
 ```
 
-Der in den Beispielen an Loopback veröffentlichte Port hält den Container innerhalb der Host-Grenze. Verwende für Fernzugriff einen TLS-Reverse-Proxy, konfiguriere den tatsächlichen CIDR des Container-Netzwerks und füge `--cookie-secure` hinzu.
+Durch die Veröffentlichung des Ports auf der Loopback-Adresse ist der Container in den Beispielen nur vom Host aus erreichbar. Verwende für Fernzugriff einen TLS-Reverse-Proxy, konfiguriere den tatsächlichen CIDR des Container-Netzwerks und füge `--cookie-secure` hinzu.
 
 ## Referenz und Betrieb
 
@@ -658,10 +658,10 @@ Genau eine der Optionen `--server-dir` und `--ephemeral` ist erforderlich.
 | Option | Bedeutung |
 | --- | --- |
 | `--server-dir DIR` | Wurzelverzeichnis für dauerhafte maßgebliche Daten und ersetzbare Caches. |
-| `--ephemeral` | Verwendet flüchtigen Zustand; schließt `--server-dir` gegenseitig aus. |
+| `--ephemeral` | Verwendet flüchtigen Zustand; kann nicht zusammen mit `--server-dir` verwendet werden. |
 | `--watch`, `-w` | Überwacht Quellen und gleicht Hinzufügungen, Aktualisierungen, Verschiebungen und Löschungen ab. |
-| `--host ADDRESS` | Bind-Adresse; Standard `127.0.0.1`. |
-| `--port PORT`, `-p PORT` | Bind-Port; Standard `8000`. |
+| `--host ADDRESS` | Adresse, auf der der Server lauscht; Standard `127.0.0.1`. |
+| `--port PORT`, `-p PORT` | Port, auf dem der Server lauscht; Standard `8000`. |
 | `--no-browser` | Startet den lokalen Standardbrowser nicht. Die Weboberfläche bleibt verfügbar. |
 | `--log` | Kompatibilitätsalias für `--log-level info`. |
 | `--log-level debug\|info\|warning\|error` | Ausführlichkeit der Betriebsprotokolle; Standard `error`. HTTP-Zugriffsprotokolle werden bei `info` und `debug` aktiviert. |
@@ -669,13 +669,13 @@ Genau eine der Optionen `--server-dir` und `--ephemeral` ist erforderlich.
 | `--book-id-storage sidecar\|embedded` | Träger der stabilen Identität für jede ausgewählte Quelle; Standard `sidecar`. |
 | `--admin-username NAME` | Erster Administrator für den unbeaufsichtigten Start; Fallback `EPUB_BROWSER_ADMIN_USERNAME`. |
 | `--admin-password-file FILE` | Bevorzugte Datei für das erste Secret; Fallback `EPUB_BROWSER_ADMIN_PASSWORD_FILE`, dann `EPUB_BROWSER_ADMIN_PASSWORD`, wenn keine Datei festgelegt ist. |
-| `--trusted-proxy-cidr CIDR` | Wiederholbare Vertrauensgrenze für unmittelbar verbundene Proxy-Netzwerke zur sicheren Auswertung der Client-IP aus `X-Forwarded-For`. |
+| `--trusted-proxy-cidr CIDR` | Wiederholbare Option für vertrauenswürdige Netzwerke direkt verbundener Proxys zur sicheren Auswertung der Client-IP aus `X-Forwarded-For`. |
 | `--cookie-secure` | Sendet das Sitzungscookie nur über die HTTPS-Verbindung zwischen Browser und Dienst. |
 | `--kindle` | Stellt minimalistische Seiten ohne Abhängigkeiten für ältere E-Ink-Kindles bereit und leitet Kindle-WebKit-Browser dorthin weiter; standardmäßig deaktiviert. |
 
 #### Legacy-v1-Syntax
 
-Die alte Syntax wird über die gesamte Hauptversionslinie v2 unterstützt:
+Die alte Syntax wird in allen Versionen der v2-Reihe unterstützt:
 
 | v1-Befehl | Zuordnung in v2 |
 | --- | --- |
@@ -690,7 +690,7 @@ Das nur in der alten Version vorhandene `--keep-files` bewahrt ein temporäres S
 
 - Rekursive Erkennung von EPUB/PDF und Calibre-Bibliotheken, Metadaten-Tags, Suche und Pinyin-Suche
 - Responsive Oberflächen für Bibliothek, Buchdetails und Kapitellektüre
-- Scrollen, Umblättern, kontinuierliches Lesen, anpassbare Inhaltsbreite, Schriftarten, eigenes CSS, Designs und reiner Lesemodus
+- Scrollen, Umblättern, kontinuierliches Lesen, anpassbare Inhaltsbreite, Schriftarten, eigenes CSS, Designs und Lesemodus ohne Ablenkungen
 - Markierungen, Notizen, Anmerkungsübersicht, verschachtelte Bücherregalgruppen, Tags und JSON-Import/-Export
 - Oberflächensprachen: Englisch, vereinfachtes Chinesisch, traditionelles Chinesisch,
   Koreanisch, Japanisch, Spanisch, Deutsch, Französisch, Russisch, Italienisch,
@@ -707,13 +707,13 @@ Das nur in der alten Version vorhandene `--keep-files` bewahrt ein temporäres S
 | Konten und Sitzungen | Nicht vorhanden | SQLite unter `<server-dir>/data` |
 | Buchfreigaben | Nicht vorhanden | SQLite unter `<server-dir>/data` |
 
-Der Server bietet keinen Umschalter zwischen lokalem und Cloud-Speicher: Authentifizierte Lesedaten werden immer auf dem Server gespeichert. Der detaillierte private Verlauf von Lesesitzungen wird von SSG niemals ausgegeben. SSG fragt niemals Server-APIs ab und verwendet stets den lokalen Speicher des aktuellen Browser-Ursprungs.
+Der Server bietet keinen Umschalter zwischen lokalem und Cloud-Speicher: Lesedaten authentifizierter Benutzer werden immer auf dem Server gespeichert. Der detaillierte private Verlauf von Lesesitzungen wird von SSG niemals ausgegeben. SSG fragt niemals Server-APIs ab und verwendet stets den lokalen Speicher des aktuellen Browser-Ursprungs.
 
 ### Eigenständiger Betrieb und Netzwerkverhalten
 
 Die Anwendung ist für das Lesen eigenständig: Erforderliches JavaScript, CSS, Schriftarten, Symbole, Manifeste und konvertierte EPUB-Ressourcen werden lokal bereitgestellt. Es gibt keine CDN-Abhängigkeiten zur Laufzeit. Das Blockieren ausgehender Internetzugriffe verhindert weder Einrichtung, Anmeldung, Stöbern, Lesen, Anmerkungen, Fortschritt, Bücherregalnutzung oder Verwaltung noch die Konvertierung der Quellen.
 
-Die Fußzeile kann optional die GitHub-Releases-API abfragen, um eine neuere EPUB-Browser-Version zu erkennen. Ein Fehler, eine Blockierung oder Offline-Betrieb unterdrückt lediglich diesen Update-Hinweis.
+Die Fußzeile kann optional die GitHub-Releases-API abfragen, um eine neuere EPUB-Browser-Version zu erkennen. Fehler, Blockierungen oder Offline-Betrieb unterdrücken lediglich diesen Update-Hinweis.
 
 SSG veröffentlicht einen statischen Service Worker. Der Server deaktiviert und entfernt den ursprungsweiten Service Worker bewusst, damit ein Konto keine zwischengespeicherten geschützten Inhalte eines anderen Kontos erhalten kann.
 
@@ -725,15 +725,15 @@ Das OpenAPI-3.1-Dokument ist unter `/openapi.json` verfügbar; angemeldete Benut
 
 Listen-Endpunkte liefern `items` und `next_cursor`. Der Standardwert für `limit` ist 24, der Höchstwert 100. Übergib `next_cursor` als `cursor` mit denselben Filtern, um die nächste Seite abzurufen. Ein Cursor mit dem Wert null kennzeichnet die letzte Seite. Verwende beispielsweise `/api/v1/me/annotations?book_id=BOOK_ID&chapter_index=0&fields=id,text,note`, um ausgewählte Anmerkungsfelder aus einem EPUB-Kapitel oder einer PDF-Seite abzurufen. Abfragefilter und unterstützte Felder sind im OpenAPI-Dokument aufgeführt.
 
-Der Wortschatz verwendet standardmäßig dasselbe Listenformat. Clients, die die ältere `words`-Antwort verwenden, können `page=1` oder `page_size` senden, um das alte Seitenformat auszuwählen.
+Der Wortschatz verwendet standardmäßig dasselbe Listenformat. Clients, die die ältere `words`-Antwort verwenden, können `page=1` oder `page_size` senden, um das ältere Paginierungsformat auszuwählen.
 
-Administratoren verwalten WebHook-Endpunkte unter Administration. Secrets werden nur beim Erstellen oder Rotieren angezeigt. Zustellungen werden signiert und dauerhaft gespeichert, bei Nicht-2xx-Antworten erneut versucht; Ereignisse zu Buchrezensionen enthalten IDs und Aktionszeitstempel, aber niemals Bewertungen oder Rezensionstext.
+Administratoren verwalten WebHook-Endpunkte unter Administration. Secrets werden nur beim Erstellen oder Rotieren angezeigt. Zustellungen werden signiert, dauerhaft gespeichert und bei Nicht-2xx-Antworten wiederholt; Ereignisse zu Buchrezensionen enthalten IDs und Aktionszeitstempel, aber niemals Bewertungen oder Rezensionstext.
 
 ### Datensicherheit und Migration
 
 Sichere vor dem Upgrade dauerhafter Server-Installationen die EPUB-/PDF-Quellen und `<server-dir>/data`. Behalte beim Austausch von Containern dasselbe dauerhafte Zustandsvolume bei.
 
-Die Migration beim Start erfolgt automatisch und ist neustartsicher. Sie prüft alte Datenbanken, erstellt eine Sicherung, aktualisiert eine Kopie, importiert geeignete alte Bücherregal-, Fortschritts- und Anmerkungsdaten in den noch einzurichtenden ersten Administrator und entfernt erst nach erfolgreichen Prüfpunkten ersetzbare alte öffentliche Artefakte. Gewöhnliche Anfragen durchsuchen niemals alte Synchronisierungsverzeichnisse. Beschädigte Datenbanken, ungültige Passwort-Hashes, mehrdeutige alte Datenbanken und widersprüchliche IDs führen zu einem sicheren Abbruch, statt geschätzt oder überschrieben zu werden.
+Die Migration beim Start erfolgt automatisch und kann nach einem Neustart sicher fortgesetzt werden. Sie prüft alte Datenbanken, erstellt eine Sicherung, aktualisiert eine Kopie, importiert geeignete alte Bücherregal-, Fortschritts- und Anmerkungsdaten in den noch einzurichtenden ersten Administrator und entfernt erst nach erfolgreichen Prüfpunkten ersetzbare alte öffentliche Artefakte. Gewöhnliche Anfragen durchsuchen niemals alte Synchronisierungsverzeichnisse. Beschädigte Datenbanken, ungültige Passwort-Hashes, mehrdeutige alte Datenbanken und widersprüchliche IDs brechen den Start sicher ab, anstatt Werte zu erraten oder Daten zu überschreiben.
 
 Eine migrierte `epub-browser.db` oder `annotations.db` im Wurzelverzeichnis bleibt als vertrauliche, nicht maßgebliche Wiederherstellungskopie erhalten; `data/epub-browser.db` ist maßgeblich, und Server-Anfragen verwenden die im Wurzelverzeichnis verbliebene Datei nicht. Halte die Wiederherstellungskopie privat. Entferne sie nur manuell bei gestopptem Server, nachdem du die maßgebliche Datenbank und die erfasste Sicherung geprüft hast, und nur wenn kein Rollback auf v1 mehr erforderlich ist. EPUB Browser löscht sie niemals automatisch.
 
@@ -743,7 +743,7 @@ Wenn im alten Wurzelverzeichnis sowohl `epub-browser.db` als auch `annotations.d
 
 #### Der Befehl wurde gestartet, aber kein Browser geöffnet
 
-Entferne `--no-browser` auf einem lokalen Rechner mit grafischer Oberfläche oder öffne die ausgegebene/gebundene URL manuell. Bei Docker, systemd, SSH und nicht interaktiven Sitzungen wird erwartet, dass du die URL selbst öffnest.
+Entferne `--no-browser` auf einem lokalen Rechner mit grafischer Oberfläche oder öffne die ausgegebene URL beziehungsweise die Adresse, auf der der Server lauscht, manuell. Bei Docker, systemd, SSH und nicht interaktiven Sitzungen wird erwartet, dass du die URL selbst öffnest.
 
 #### Die CLI scheint keine Meldungen auszugeben
 
@@ -785,7 +785,7 @@ Bereitstellungsmodi getestet werden.
 
 #### Entwicklung aus einem Quell-Checkout
 
-Drittanbieterdateien für den Browser sind erzeugte Build-Eingaben und kein
+Drittanbieterdateien für den Browser sind generierte Eingaben für den Build und kein
 Projektquellcode; deshalb ist `epub_browser/assets/vendor/` absichtlich nicht in
 Git enthalten. Lade vor dem Entwickeln oder Erstellen ausdrücklich die exakt
 festgelegten Versionen und überprüfe sie anschließend offline:
@@ -797,17 +797,17 @@ python3 -m unittest tests.test_vendor_assets -v
 python3 -m build
 ```
 
-`fetch` ist der einzige der obigen Befehle, der Browser-Vendor-Assets herunterlädt.
-Die Sperrdatei erfasst unveränderliche npm-Tarballs, Datei-Digests, Allowlists
-und Lizenzen; `verify`, Tests, Builds aus einem aufgefüllten Checkout und der
-installierte Reader laden keine Browser-Assets herunter. Der isolierte Standardbefehl
+`fetch` ist der einzige der obigen Befehle, der Drittanbieter-Assets für den Browser herunterlädt.
+Die Sperrdatei erfasst unveränderliche npm-Tarballs, Hashwerte der Dateien, Allowlists
+und Lizenzen; `verify`, Tests, Builds aus einem Checkout mit vollständig geladenen
+Drittanbieter-Assets und der installierte Reader laden keine Browser-Assets herunter. Der isolierte Standardbefehl
 `python3 -m build` kann weiterhin einen Python-Paketindex für Build-Anforderungen
-abfragen. Für einen Build ganz ohne Netzwerk fülle den Vendor-Baum auf und
-installiere `build`, `setuptools` und `wheel`, bevor du die Verbindung trennst;
+abfragen. Für einen Build ganz ohne Netzwerk lade den Verzeichnisbaum der Drittanbieter-Assets
+vollständig und installiere `build`, `setuptools` und `wheel`, bevor du die Verbindung trennst;
 führe anschließend `PIP_NO_INDEX=1 python3 -m build --no-isolation` aus. Wheels,
 Quell-Distributionen, Docker-Images und erzeugte SSG-Websites enthalten die geprüften
 Dateien und benötigen zur Laufzeit kein CDN. Der Ablauf für Aktualisierungen,
-Releases und Repository-Hygiene steht in [third_party/README.md](../../third_party/README.md).
+Releases und Repository-Pflege steht in [third_party/README.md](../../third_party/README.md).
 
 ### Lizenz
 

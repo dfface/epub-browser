@@ -1,9 +1,9 @@
 # EPUB Browser
 
-> **把书变成网站，拥有自己的书库。**
+> **把书变成网站，搭建自己的书库。**
 >
-> 把 EPUB 和 PDF 书籍发布成静态网站，或运行私有、自托管的书库，
-> 获得账户、进度同步、标注和可选的 AI 原生阅读。
+> 把 EPUB 和 PDF 书籍发布成静态网站，也可以自己托管一个私有书库，
+> 支持账户、进度同步、标注和可选的 AI 原生阅读。
 
 [浏览静态书库](https://epub-browser-test.yuhan.tech/) · [体验私有书库](#演示站点)
 
@@ -21,61 +21,35 @@
 
 EPUB Browser 不只是书籍转换器，更是一套可以发布到任何地方、也可以自己托管的
 完整阅读平台。EPUB 与 PDF 共用书库、书籍页、目录、阅读模式、主题、阅读进度和
-标注流程。PDF 的每一页都会成为阅读器中的一个章节，由本地 PDF.js 在同一套阅读
-体验中渲染——不需要独立查看器，也不依赖运行时 CDN。
+标注流程。PDF 的每一页都会对应阅读器中的一个章节，由本地 PDF.js 在同一个阅读
+界面中渲染 - 不需要独立查看器，也不依赖运行时 CDN。
 
 ## 目录
 
-- [EPUB Browser](#epub-browser)
-  - [目录](#目录)
-  - [项目概览](#项目概览)
-    - [为什么选择 EPUB Browser](#为什么选择-epub-browser)
-    - [技术栈](#技术栈)
-    - [选择 SSG 或 Server](#选择-ssg-或-server)
-    - [演示站点](#演示站点)
-    - [AI 原生阅读（仅 Server 模式）](#ai-原生阅读仅-server-模式)
-    - [Kindle 极简模式](#kindle-极简模式)
-  - [开始使用](#开始使用)
-    - [选择安装方式](#选择安装方式)
-      - [PyPI（SSG 或 Server）](#pypissg-或-server)
-      - [Docker（Server）](#dockerserver)
-    - [快速开始](#快速开始)
-      - [生成静态站点](#生成静态站点)
-      - [运行持久化 Server 书库](#运行持久化-server-书库)
-  - [格式与阅读体验](#格式与阅读体验)
-    - [输入源与稳定书籍身份](#输入源与稳定书籍身份)
-    - [PDF：一页就是一个章节](#pdf一页就是一个章节)
-  - [部署](#部署)
-    - [SSG](#ssg)
-    - [Server](#server)
-      - [首次设置、账户与权限](#首次设置账户与权限)
-      - [OIDC 单点登录与账户绑定](#oidc-单点登录与账户绑定)
-      - [配置与治理 AI 阅读](#配置与治理-ai-阅读)
-      - [浏览器启动与日志](#浏览器启动与日志)
-      - [持久化与临时状态](#持久化与临时状态)
-      - [局域网与反向代理](#局域网与反向代理)
-    - [Docker](#docker)
-      - [Docker Compose](#docker-compose)
-  - [参考与运维](#参考与运维)
-    - [命令参考](#命令参考)
-      - [`epub-browser ssg SOURCE [SOURCE ...]`](#epub-browser-ssg-source-source-)
-      - [`epub-browser server SOURCE [SOURCE ...]`](#epub-browser-server-source-source-)
-      - [旧版 v1 语法](#旧版-v1-语法)
-    - [阅读数据与功能归属](#阅读数据与功能归属)
-    - [自包含与网络行为](#自包含与网络行为)
-    - [Server API 与 WebHooks](#server-api-与-webhooks)
-    - [数据安全与迁移](#数据安全与迁移)
-    - [常见问题](#常见问题)
-      - [命令已启动，但没有打开浏览器](#命令已启动但没有打开浏览器)
-      - [CLI 看起来没有输出](#cli-看起来没有输出)
-      - [Docker 无法写入稳定 ID](#docker-无法写入稳定-id)
-      - [生成的 SSG 站点在子路径下出现失效链接](#生成的-ssg-站点在子路径下出现失效链接)
-      - [升级后 Server 拒绝启动](#升级后-server-拒绝启动)
-  - [开发与许可证](#开发与许可证)
-    - [参与贡献](#参与贡献)
-      - [维护者架构约定](#维护者架构约定)
-      - [从源码检出目录开发](#从源码检出目录开发)
-    - [许可证](#许可证)
+- [项目概览](#项目概览)
+  - [为什么选择 EPUB Browser](#为什么选择-epub-browser)
+  - [技术栈](#技术栈)
+  - [选择 SSG 或 Server](#选择-ssg-或-server)
+  - [演示站点](#演示站点)
+  - [AI 原生阅读（仅 Server 模式）](#ai-原生阅读仅-server-模式)
+  - [Kindle 极简模式](#kindle-极简模式)
+- [开始使用](#开始使用)
+  - [选择安装方式](#选择安装方式)
+  - [快速开始](#快速开始)
+- [格式与阅读体验](#格式与阅读体验)
+  - [来源与稳定的书籍 ID](#来源与稳定的书籍-id)
+  - [PDF：一页就是一个章节](#pdf一页就是一个章节)
+- [部署](#部署)
+  - [SSG](#ssg)
+  - [Server](#server)
+  - [Docker](#docker)
+- [参考与运维](#参考与运维)
+  - [命令参考](#命令参考)
+  - [阅读数据与功能归属](#阅读数据与功能归属)
+  - [Server API 与 WebHooks](#server-api-与-webhooks)
+  - [数据安全与故障排查](#数据安全与迁移)
+- [开发与许可证](#开发与许可证)
+- [文档中心](../README.md)
 
 ## 项目概览
 
@@ -83,27 +57,27 @@ EPUB Browser 不只是书籍转换器，更是一套可以发布到任何地方�
 
 - **发布到哪里，都由你掌控。** 一条命令即可为 Pages、对象存储或 Nginx 生成完整
   静态网站，也可以运行持久化 Server，使用账户、书籍权限和 OIDC。应用资源、字体、
-  PDF.js 和渲染器全部本地提供，阅读从不依赖 CDN。
-- **EPUB 与 PDF，共用一套真正的阅读器。** 两种格式共用书库、书籍页、目录、响应式
-  布局、三种阅读模式、主题、全屏和阅读进度。PDF 每页都留在阅读舞台中，支持缩放、
-  文本层选择与标注，而不是另开一套预览器。
+  PDF.js 和渲染器全部由本地提供，阅读从不依赖 CDN。
+- **EPUB 和 PDF，用的是同一套阅读器。** 两种格式共用书库、书籍页、目录、响应式
+  布局、三种阅读模式、主题、全屏和阅读进度。PDF 的每一页都显示在阅读区中，支持缩放、
+  文本层选择和标注，无需另用一套预览器。
 - **既能找到那本书，也能找到那段话。** 书库搜索覆盖元数据、标签和拼音，并提供排序
   与分页。Server 的 EPUB 全书搜索按章节分组返回完整结果，可直接跳到高亮的原文段落。
-  稳定的书籍 ID 让续读位置、标注和阅读历史始终关联同一本书。
+  稳定的书籍 ID 让续读位置、标注和阅读历史始终与同一本书关联。
 - **不只翻过，还要读懂。** Server 模式下，EPUB 章节导读、带证据链接的解释、思维
-  导图和私密 Ask AI 都留在原文旁边。高亮、笔记、词典和百科覆盖 EPUB 与带文本层的
+  导图和私密 Ask AI 都留在原文旁边。高亮、笔记、词典和百科可用于 EPUB 与带文本层的
   PDF；Server 生词本还会记录每个单词的出处与掌握状态。
-- **把阅读积累成值得保留的历史。** 嵌套书架、评分、书评、标注导出、活动日历、趋势、
+- **把阅读积累成值得保留的记录。** 嵌套书架、评分、书评、标注导出、活动日历、趋势、
   单书统计和阅读时长排行共同构成一份彼此关联的记录。Server 按账户私密保存阅读数据，
   并跨设备同步。
 - **运行的是阅读服务，不只是查看器。** Server 模式下，管理员可通过 Web 上传书籍，
-  也可使用监听目录；通过可配置的 LRU 缓存淘汰限制磁盘占用，管理成员与 AI 权限，
-  并通过 OpenAPI、PAT 和 WebHook 集成。Kindle 极简阅读支持能力受限的设备；Server
+  也可使用监听目录；通过可配置的 LRU 缓存淘汰机制控制磁盘占用，管理成员与 AI 权限，
+  还可通过 OpenAPI、PAT 和 WebHooks 集成。Kindle 极简阅读支持能力受限的设备；Server
   还提供个人 Kindle 屏保仪表盘，带有时钟、日历、日程、备忘录和番茄钟。
 
 ![贴着 EPUB 原文生成的章节导读，以及私密 Ask AI 抽屉。](assets/ai-native-reading.png)
 
-*AI 原生导读与私密提问始终锚定在原书内容旁。*
+*AI 原生导读和私密提问都围绕原书内容展开。*
 
 ![私人阅读洞察视图，包含活动日历和阅读时长趋势。](assets/reading-insights.png)
 
@@ -120,9 +94,9 @@ EPUB Browser 有意采用精简的服务端渲染 Web 技术栈。安装后的�
 | CLI 与 Server | Python 3.9+、Starlette、Uvicorn | 转换命令、鉴权页面、API 与后台任务 |
 | 数据 | SQLite 与可重建的 JSON 内容缓存 | 用户状态与 EPUB/PDF 派生内容彼此分离 |
 | 书籍格式 | lxml、pypdf、pypdfium2、PDF.js | 统一的严格优先 EPUB 解析/清洗、PDF 元数据/封面和浏览器本地渲染 |
-| 离线与资源 | Service Worker、带哈希的不可变资源、锁定的 vendor 依赖 | 运行时不依赖 CDN 的自包含交付 |
+| 离线与资源 | Service Worker、带哈希的不可变资源、锁定版本的第三方依赖 | 运行时不依赖 CDN 的自包含交付 |
 | 发布 | PyPI、Docker、普通静态托管 | 同一份代码既可生成 SSG，也可运行持久化 Server |
-| 可选 AI | OpenAI-compatible API，以及本地渲染的 Markdown、KaTeX、Mermaid | 仅 Server 模式下的 EPUB 学习层 |
+| 可选 AI | OpenAI 兼容 API，以及本地渲染的 Markdown、KaTeX、Mermaid | 仅 Server 模式下的 EPUB 学习层 |
 
 Node.js 只供维护者运行浏览器侧测试，不属于读者侧的生产运行时。
 
@@ -140,17 +114,17 @@ Node.js 只供维护者运行浏览器侧测试，不属于读者侧的生产运
 | 进度、标注、书架 | 当前浏览器本地保存 | 按已登录账户同步到 SQLite |
 | 评分、书评、阅读时段 | 不生成 | 每个账户私有保存，并提供阅读洞察 |
 | 源文件更新 | 重新运行 `ssg` | 重启、重新扫描或使用 `--watch` |
-| 管理后台、标签、OpenAPI、WebHook | 不包含 | 包含 |
+| 管理后台、标签、OpenAPI、WebHooks | 不包含 | 包含 |
 | AI 阅读与 Ask AI | 不包含 | 配置并显式授权后可用于 EPUB；PDF 中隐藏 |
 | 运行时数据库 | 无 | 持久化模式必需 |
-| 适用场景 | 公共/静态托管、离线包、简单个人发布 | 私有书库、多设备或多人阅读、自动化与访问治理 |
+| 适用场景 | 公共/静态托管、离线包、简单个人发布 | 私有书库、多设备或多人阅读、自动化与访问管理 |
 
-如果产物必须是普通静态文件，请使用 `ssg`；如果读者需要账户、跨设备数据、访问控制或自动协调源文件变化，请使用 `server`。
+如果产物必须是普通静态文件，请使用 `ssg`；如果读者需要账户、跨设备数据、访问控制或自动同步源文件变化，请使用 `server`。
 
 ### 演示站点
 
 - **SSG 模式**：[epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
-- **Server 模式**：[epub.yuhan.tech](https://epub.yuhan.tech/)——用户名 `demo`，密码 `demo`。
+- **Server 模式**：[epub.yuhan.tech](https://epub.yuhan.tech/) - 用户名 `demo`，密码 `demo`。
 
 ### AI 原生阅读（仅 Server 模式）
 
@@ -164,36 +138,37 @@ PDF 则明确隐藏 AI 阅读与 Ask AI。
 
 ### Kindle 极简模式
 
-老款 e-Ink Kindle（以及任何受限浏览器）都能使用一套零依赖的极简阅读界面。通过
+老款 e-Ink Kindle（以及任何功能受限的浏览器）都能使用一套零依赖的极简阅读界面。通过
 `--kindle` 开启：
 
 - SSG：`epub-browser ssg --kindle -o output/ SOURCE...`
 - Server：`epub-browser server --kindle --server-dir data SOURCE...`
 
-每本 EPUB 书籍（不含 PDF）会额外获得三个页面：
+每本 EPUB 书籍（不含 PDF）都会增加三个页面：
 
 - 极简书架 `/kindle-library.html`
 - 书籍页 `/book/<id>/kindle.html`
 - 章节页 `/book/<id>/kindle_chapter_N.html`
 
-这些页面针对 e-Ink 调优：极简标记、纯 CSS 主题、兼容 ES5 的脚本、无 Service
-Worker、无框架。即使完全不运行 JavaScript 也能阅读；主题切换（浅色 / 米黄 / 深色）、
-字号调节（A- / A+）与界面本地化，都是在纯 HTML 之上叠加的轻量内联脚本。
+这些页面针对 e-Ink 调优：精简的 HTML 标记、纯 CSS 主题、兼容 ES5 的脚本，
+不使用 Service Worker 或框架。即使完全不运行 JavaScript 也能阅读；主题切换
+（浅色 / 米黄 / 深色）、字号调节（A- / A+）与界面本地化，都是通过纯 HTML 之上的
+轻量内联脚本实现的。
 
 每个页面都提供主题与字号控制（页头以及章节页底部各一组）、目录导航、上一章/下一章，
 以及从已保存进度恢复的“继续阅读”链接。
 
 阅读进度因模式而异：
 
-- **SSG：** 进度保存在当前浏览器 Cookie 中——仅本地，无需账户。
+- **SSG：** 进度保存在当前浏览器 Cookie 中 - 仅本地，无需账户。
 - **Server：** 进度与阅读心跳按已登录账户同步到 SQLite。Kindle 界面只负责读取和上报：
-  记录当前章节、上报心跳并渲染只读书架，绝不暴露阅读洞察或内容管理。
+  记录当前章节、上报心跳并渲染只读书架，不提供阅读洞察或内容管理功能。
 
 所有 Kindle 界面都会执行访问控制。对于受限可见性书籍，未授权用户访问极简书架时
 看不到该书，访问书籍页、章节页和进度 API 时会收到 403。
 
 受支持的浏览器（UA 包含 `Kindle/`、`Arora/` 等）会从完整阅读器自动重定向到极简页；
-上面的 URL 也可直接访问。这让极简模式成为低性能或 JavaScript 受限设备的优雅降级方案。
+上面的 URL 也可直接访问。因此，低配置或 JavaScript 功能受限的设备也能通过极简模式正常阅读。
 
 ## 开始使用
 
@@ -264,14 +239,14 @@ epub-browser server /path/to/books \
   --watch
 ```
 
-打开 `http://127.0.0.1:8000/`。首次访问时，EPUB Browser 会引导你创建初始管理员。完成这次性设置之前，书库不会开始扫描，也不会对外暴露。
+打开 `http://127.0.0.1:8000/`。首次访问时，EPUB Browser 会引导你创建初始管理员。完成这项一次性设置之前，书库不会开始扫描，也不会对外暴露。
 
 如果选择 Docker，请跳过上面的 Python 命令，继续查看
 [Docker Compose 快速启动](#docker-compose)。
 
 ## 格式与阅读体验
 
-### 输入源与稳定书籍身份
+### 来源与稳定的书籍 ID
 
 每个位置参数 `SOURCE` 都可以是 EPUB 文件、PDF 文件或目录；目录会递归搜索。
 一个命令可传入多个来源：
@@ -282,7 +257,7 @@ epub-browser server book.epub /srv/library /srv/periodicals \
   --watch
 ```
 
-每本书会获得稳定的 `book_id`，它在生成的 URL 和浏览器数据中也称为 `book_hash`。通用 CLI 默认使用：
+每本书都会获得稳定的 `book_id`，在生成的 URL 和浏览器数据中也称为 `book_hash`。CLI 的通用默认设置是：
 
 ```bash
 --book-id-storage sidecar
@@ -296,7 +271,7 @@ Sidecar 模式会在源文件旁写入可见的身份文件，例如 `BOOK.epub.
 --book-id-storage embedded
 ```
 
-Embedded 模式可能在转换前重建 EPUB ZIP，或追加 PDF 元数据更新。如果 PDF 无法更新且源文件未发生变化，EPUB Browser 会把同一个 ID 保存到相邻的 sidecar；签名、加密和只读 PDF 也适用。当 ID 不一致、活动源文件存在重复 ID、载体无效，或必需载体无法写入时，EPUB Browser 会停止。
+Embedded 模式可能在转换前重建 EPUB ZIP，或追加 PDF 元数据更新。如果 PDF 无法更新且源文件未发生变化，EPUB Browser 会把同一个 ID 保存到相邻的 sidecar；签名、加密和只读 PDF 也适用。当 ID 不一致、当前使用的源文件存在重复 ID、载体无效，或必需载体无法写入时，EPUB Browser 会停止。
 
 切换存储方式时，EPUB Browser 会把既有 ID 复制到所选载体，并保留另一个有效载体。v2.0.4 中已有的嵌入式 ID 会复制到默认 sidecar，不会重写 EPUB。无论是否更新元数据，SSG 与 Server 都会交付 PDF 源文件的逐字节副本。
 
@@ -311,33 +286,32 @@ Embedded 模式可能在转换前重建 EPUB ZIP，或追加 PDF 元数据更新
 | 第 1 页 URL | `chapter_0.html` | `/book/<book-id>/chapter_0.html` |
 | 第 N 页 URL | `chapter_{N-1}.html` | `/book/<book-id>/chapter_{N-1}.html` |
 | 页码标签和目录 | 本地生成；每页都会列出 | 从 PDF 元数据缓存渲染；每页都会列出 |
-| 内嵌 outline | 在目标页的目录项上显示 marker | 同样显示 marker，不会删除或重排页码项 |
-| 滚动与分页/翻页 | 静态章节壳和本地 PDF.js | 动态共享章节壳和本地 PDF.js |
-| 高亮、笔记、词典、百科 | 有文本层时使用共享的浏览器本地组件 | 有文本层时使用共享的已认证组件 |
-| 原始 PDF 字节 | 静态书籍产物中只有一个 `document.pdf` | 仅 Session 可访问、支持 Range 的缓存文档路由 |
+| 内嵌大纲 | 在目标页的目录项上显示大纲标记 | 同样显示大纲标记，不会删除或重排页码项 |
+| 滚动与分页/翻页 | 静态章节页面框架和本地 PDF.js | 动态共享章节页面框架和本地 PDF.js |
+| 高亮、笔记、词典、百科 | 有文本层时使用同一套浏览器本地组件 | 有文本层时使用同一套鉴权组件 |
+| 原始 PDF 字节 | 静态书籍产物中只有一个 `document.pdf` | 仅限 Session 访问且支持 Range 的缓存文档路由 |
 
 可见标签和 PDF.js 中的页码从 1 开始；URL、状态、API 和 SQLite 中的章节索引从 0
 开始。因此 PDF 第 1 页始终是 `chapter_0.html`。规范化目录为每一页保留一个 `Page N`
-项；PDF 内嵌 outline 标题会作为 outline marker 附加到目标项，同一页的多个 marker
-也都会保留。
+项；PDF 内嵌大纲的标题会作为大纲标记附加到目标目录项，同一页的多个大纲标记也都会保留。
 
-SSG 写出一个 `document.pdf`，并为每页写出一个 `chapter_<index>.html` 壳。SSG
+SSG 写出一个 `document.pdf`，并为每页写出一个 `chapter_<index>.html` 页面框架。SSG
 产物不含 Session 脚本、`/api/*` 调用、同步标注数据或 Server 依赖。Server 把完整且
 逐字节一致的源文件保存为 `book/<book-id>/pdf/document.pdf`，绝不拆页或重写；相同的
-章节壳由 Server 根据 PDF 元数据动态渲染。源文件发生变化时，PDF 缓存（文档、元数据和
+章节页面框架由 Server 根据 PDF 元数据动态渲染。源文件发生变化时，PDF 缓存（文档、元数据和
 派生封面）会失效并全量刷新，不会混用新旧页面。
 
 Server 的原始文档端点只接受 Session：
 `GET`/`HEAD /api/books/<book-id>/document`。它会检查身份认证、书籍可见性、PDF 格式和
-源/缓存指纹，再支持有界的单一 Range 响应，并设置 `ETag`、`Accept-Ranges`、private
+源/缓存指纹，再支持范围受限的单区间 Range 响应，并设置 `ETag`、`Accept-Ranges`、private
 缓存、`nosniff` 和 inline PDF disposition。端点不会暴露绝对路径，不接受 PAT 认证，
-也不列入 PAT/OpenAPI 接口面。SSG 只有本地 `document.pdf`，没有原始文档 API。
+也不列入 PAT/OpenAPI 接口范围。SSG 只有本地 `document.pdf`，没有原始文档 API。
 
-有可用 PDF.js 文本层的 PDF 会原样复用现有的选区弹窗与标注组件，提供 Highlight 和
-Note，以及 Dictionary 和 Encyclopedia。标注存储、归属、导出、列表和深链接继续共享；
+有可用 PDF.js 文本层的 PDF 会原样复用现有的选区弹窗与标注组件，提供高亮、
+笔记、词典和百科。标注存储、归属、导出、列表和深链接继续共用同一套实现；
 不会新增 PDF 专用标注表或设置 UI。扫描版或纯图片 PDF 仍可阅读，但没有可用文本层时，
-基于选择的 Highlight、Note、Dictionary、Encyclopedia 和文档搜索会明确不可用。跨页
-选择的内容仍可复制，但标注和查询操作会显示本地化的不支持提示；页内选择继续正常工作。
+基于选区的高亮、笔记、词典、百科和文档搜索会明确不可用。跨页选择的内容仍可复制，
+但标注和查询操作会显示本地化的不支持提示；页内选择继续正常工作。
 
 PDF.js 不是第二套查看器外壳。构建或发布前，先补齐并验证锁定的第三方资源：
 
@@ -346,8 +320,8 @@ python3 tools/sync_vendor_assets.py fetch
 python3 tools/sync_vendor_assets.py verify
 ```
 
-随后，应用会在运行时提供本地带哈希的 PDF.js module 和 worker 资源，绝不从 CDN
-获取。图片 lightbox 使用锁定的 GLightbox 依赖；Fancyapps/Fancybox 不是运行时依赖，
+随后，应用会在运行时提供本地带哈希的 PDF.js 模块和 Worker 资源，绝不从 CDN
+获取。图片灯箱使用锁定版本的 GLightbox 依赖；Fancyapps/Fancybox 不是运行时依赖，
 也不会随项目重新分发。锁定资源与发布流程见 [third_party/README.md](../../third_party/README.md)。
 
 ## 部署
@@ -358,13 +332,13 @@ SSG 会先在相邻的 staging 目录生成完整快照并验证，然后替换�
 
 SSG 有意保持本地化且不包含账户体系：
 
-- 阅读进度和标注使用当前源的浏览器存储。
-- 书架支持本地 JSON 导入和导出，没有云端 Sync 操作。
+- 阅读进度和标注使用当前源下的浏览器存储。
+- 书架支持本地 JSON 导入和导出，没有云端同步操作。
 - 不包含登录、账户设置、Server API 或依赖用户身份的控件。
 - 存储位置固定为浏览器本地，不作为设置项展示。
 - 静态产物包含支持资源离线使用所需的 Service Worker。
 
-应用所需的全部 JavaScript、CSS、字体和图标都会包含在产物中。唯一的可选网络请求见[自包含与网络行为](#自包含与网络行为)。
+应用所需的全部 JavaScript、CSS、字体和图标都会包含在产物中。唯一的可选网络请求见 [自包含与网络行为](#自包含与网络行为)。
 
 ### Server
 
@@ -390,7 +364,7 @@ Keycloak、Authentik 和其他兼容服务。在 **管理后台 → OIDC 登录*
 Provider 名称、Issuer URL、客户端 ID、客户端密钥、完整回调 URI、Scopes 和用户名
 Claim。EPUB Browser 使用 discovery 和带 S256 PKCE 的 Authorization Code 流程，
 验证签名后的 ID Token，并且只用 `(issuer, sub)` 标识外部账户；邮件地址和用户名 Claim
-只是展示/创建账户的提示，绝不会作为身份键。
+只用于辅助展示和创建账户，绝不会用作身份标识。
 
 请在 Provider 中登记这个完全一致的回调地址，包括协议和主机名：
 
@@ -398,12 +372,12 @@ Claim。EPUB Browser 使用 discovery 和带 S256 PKCE 的 Authorization Code �
 https://reader.example.com/auth/oidc/callback
 ```
 
-已有用户可先使用本地账户登录，再从“账户设置”连接 Provider。对于未知外部身份，系统
-否则会要求一次性输入现有本地用户名和密码。可选的自动创建功能会生成无密码成员，
-绝不会导入管理员角色。应先让已有用户完成绑定：过早开启自动创建可能产生**重复的
-本地账户**。即使关闭本地成员密码登录，**本地管理员**密码登录也始终可用。请定期验证
-并妥善保护这份恢复凭据。系统不会执行 Provider 退出，也不会保存 Provider 的
-access/refresh token。
+已有用户可先使用本地账户登录，再从“账户设置”连接 Provider。如果外部身份尚未关联
+本地账户，系统会要求输入一次现有本地账户的用户名和密码。可选的自动创建功能会生成
+无密码成员，绝不会导入管理员角色。应先让已有用户完成绑定：过早开启自动创建可能产生
+**重复的本地账户**。即使关闭本地成员密码登录，**本地管理员**密码登录也始终可用。
+请确认这份恢复凭据可用，并妥善保护。系统不会执行 Provider 退出，也不会保存 Provider
+的 access/refresh token。
 
 Authelia 需要在其 OIDC Provider 部分配置 confidential client。下面的片段使用刻意
 虚构的值，并假设 Authelia 必需的 Provider 密钥和策略已经配置。请在 Authelia 中保存
@@ -432,14 +406,14 @@ identity_providers:
 Scopes `openid profile email` 和用户名 Claim `preferred_username`。保存时会实时执行
 discovery 与能力校验；失败时，之前的配置仍然有效。
 
-#### 配置与治理 AI 阅读
+#### 配置和管理 AI 阅读
 
 管理员在 **管理后台** 配置 AI 阅读，该页面紧跟用户管理，位于书籍管理之前。页面会把
-OpenAI-compatible Base URL、API Key、模型、超时、上下文预算、并发上限和默认每日
+OpenAI 兼容 Base URL、API Key、模型、超时、上下文预算、并发上限和默认每日
 Provider 调用限额保存到 Server 的 SQLite 数据库。AI 默认对成员关闭；管理员必须逐一
 授予成员访问权限，并可设置个人每日限额（`0` 表示不限）。
 
-章节学习层与整书评读会按适用语言共享，后续对话则仅归各账户私有。结果、任务状态、
+章节学习层与整书点评会按适用语言共享，后续对话则仅归各账户私有。结果、任务状态、
 自定义标签、书籍阅读分类和私有追问都保存在 SQLite。模型配置变化后，旧结果仍然可用，
 直到管理员显式重新生成。
 
@@ -465,13 +439,13 @@ epub-browser server /path/to/books \
 
 默认情况下，Server 在 HTTP 监听器启动后，会尝试打开操作系统的默认浏览器。`--no-browser` 会阻止这次本机启动动作，**不会关闭 Web 界面，也不会禁止浏览器访问**；它只是抑制本机的 `webbrowser.open(...)` 调用。Docker、systemd、SSH 会话、无头主机和脚本中都应使用它。
 
-默认使用 `--log-level error`，CLI 只输出错误，避免日常信息或警告打断终端进度展示。交互式终端会打印一次绑定 URL；非交互的 Docker 和服务运行则保持安静。使用 `--log-level warning` 显示警告，使用 `--log-level info` 开启运行日志和 HTTP 访问日志，使用 `--log-level debug` 获取最详细的信息。`--log` 保留为 `--log-level info` 的兼容别名。
+默认使用 `--log-level error`，CLI 只输出错误，避免常规消息或警告打断终端进度展示。交互式终端会打印一次绑定 URL；非交互式的 Docker 和服务运行则保持安静。使用 `--log-level warning` 显示警告，使用 `--log-level info` 开启运行日志和 HTTP 访问日志，使用 `--log-level debug` 获取最详细的信息。`--log` 保留为 `--log-level info` 的兼容别名。
 
-首次扫描和监听扫描的进度显示在 Web 界面，而不是终端 `tqdm`。成功摘要会自动关闭；失败信息会保留到手动关闭。使用 `--watch` 时，修复或替换源文件就会触发下一次扫描，无需手动重试。
+初始扫描和监视扫描的进度显示在 Web 界面，而不是终端 `tqdm`。成功摘要会自动关闭；失败信息会保留到手动关闭。使用 `--watch` 时，修复或替换源文件就会触发下一次扫描，无需手动重试。
 
 #### 持久化与临时状态
 
-持久化 Server 模式必须使用 `--server-dir`。一次性运行可改用 `--ephemeral`：
+持久化 Server 模式必须使用 `--server-dir`。临时运行可改用 `--ephemeral`：
 
 ```bash
 epub-browser server book.epub --ephemeral
@@ -513,7 +487,7 @@ epub-browser server /path/to/books \
 
 不要把内置 HTTP Server 直接暴露到公网。请在反向代理处终止 TLS、实施网络访问控制，并启用安全 Cookie。
 
-要让活跃会话和登录限流在反向代理后记录真实客户端 IP，请配置反向代理的**直接套接字网络**（不是公网客户端地址段）：
+要让活跃会话和登录限流在反向代理后记录真实客户端 IP，请配置**与 Server 直接相连的代理所在网段**（不是公网客户端网段）：
 
 ```bash
 epub-browser server /path/to/books \
@@ -526,7 +500,7 @@ epub-browser server /path/to/books \
   --no-browser
 ```
 
-每个直连代理地址或网段都要重复传入一次 `--trusted-proxy-cidr`。只有直连对等端属于其中任一 CIDR 的请求才能提供 `X-Forwarded-For`；其他来源只记录直连地址。Uvicorn 的转发地址处理已禁用，因此 `Forwarded` 和 `FORWARDED_ALLOW_IPS` 都不能扩大该信任边界。仅当浏览器通过 HTTPS 访问服务时才使用 `--cookie-secure`。
+每个直连代理地址或网段都要重复传入一次 `--trusted-proxy-cidr`。只有直接对端属于其中任一 CIDR 的请求，才会接受其 `X-Forwarded-For`；其他对端只记录直连地址。Uvicorn 的转发地址处理已禁用，因此 `Forwarded` 和 `FORWARDED_ALLOW_IPS` 都不能扩大该信任边界。仅当浏览器通过 HTTPS 访问服务时才使用 `--cookie-secure`。
 
 ### Docker
 
@@ -584,7 +558,7 @@ docker run -d \
 -v /path/to/legacy-sync:/app/SyncData:ro
 ```
 
-示例中的 loopback 发布端口让容器留在主机边界之后。远程访问时，请使用 TLS 反向代理，配置其实际容器网络 CIDR，并添加 `--cookie-secure`。
+示例将发布端口绑定到 loopback，使容器服务只能通过本机访问。远程访问时，请使用 TLS 反向代理，配置其实际容器网络 CIDR，并添加 `--cookie-secure`。
 
 ## 参考与运维
 
@@ -599,7 +573,7 @@ docker run -d \
 | `--book-id-storage sidecar\|embedded` | 每个所选源文件的稳定身份载体，默认 `sidecar`。 |
 | `--kindle` | 为旧式 e-Ink Kindle 生成无依赖极简页面，并将 Kindle WebKit 浏览器重定向到这些页面；默认关闭。 |
 | `--log` | `--log-level info` 的兼容别名。 |
-| `--log-level debug\|info\|warning\|error` | 运行日志详细程度；默认 `error`，日常转换输出和警告保持安静。 |
+| `--log-level debug\|info\|warning\|error` | 运行日志详细程度；默认 `error`，不输出常规转换信息和警告。 |
 
 #### `epub-browser server SOURCE [SOURCE ...]`
 
@@ -609,7 +583,7 @@ docker run -d \
 | --- | --- |
 | `--server-dir DIR` | 持久化权威数据与可替换缓存的根目录。 |
 | `--ephemeral` | 使用一次性状态；与 `--server-dir` 互斥。 |
-| `--watch`, `-w` | 监听源文件并协调新增、更新、移动和删除。 |
+| `--watch`, `-w` | 监听源文件并同步处理新增、更新、移动和删除。 |
 | `--host ADDRESS` | 绑定地址，默认 `127.0.0.1`。 |
 | `--port PORT`, `-p PORT` | 绑定端口，默认 `8000`。 |
 | `--no-browser` | 不启动本机默认浏览器；Web 界面仍可访问。 |
@@ -617,7 +591,7 @@ docker run -d \
 | `--log-level debug\|info\|warning\|error` | 运行日志详细程度；默认 `error`。`info` 和 `debug` 会开启 HTTP 访问日志。 |
 | `--legacy-sync-dir DIR` | 启动迁移时读取旧书架 JSON。 |
 | `--book-id-storage sidecar\|embedded` | 每个所选源文件的稳定身份载体，默认 `sidecar`。 |
-| `--admin-username NAME` | 无人值守的初始管理员；后备为 `EPUB_BROWSER_ADMIN_USERNAME`。 |
+| `--admin-username NAME` | 无人值守设置中的初始管理员用户名；未指定时读取 `EPUB_BROWSER_ADMIN_USERNAME`。 |
 | `--admin-password-file FILE` | 首选初始密钥文件；后备为 `EPUB_BROWSER_ADMIN_PASSWORD_FILE`，未设置文件时再使用 `EPUB_BROWSER_ADMIN_PASSWORD`。 |
 | `--trusted-proxy-cidr CIDR` | 可重复指定的直接代理网络信任边界，用于安全解析 `X-Forwarded-For` 中的客户端 IP。 |
 | `--cookie-secure` | 只通过浏览器侧 HTTPS 发送会话 Cookie。 |
@@ -634,7 +608,7 @@ docker run -d \
 | `epub-browser BOOKS --no-server --output-dir DIST` | `epub-browser ssg BOOKS --output-dir DIST` |
 | `--sync-dir DIR` | `server --legacy-sync-dir DIR` |
 
-旧版专用 `--keep-files` 会保留临时 Server 目录；持久化 Server 目录本来就是永久保留的。指定 `--log` 时，兼容适配器会打印等价的 v2 命令，否则保持安静。
+旧版专用 `--keep-files` 会保留临时 Server 目录；持久化 Server 目录本来就是永久保留的。指定 `--log` 时，兼容适配器会打印等价的 v2 命令，否则不输出该提示。
 
 ### 阅读数据与功能归属
 
@@ -644,7 +618,7 @@ docker run -d \
 - 高亮、笔记、标注浏览、嵌套书架分组、标签和 JSON 导入/导出
 - 界面支持英文、简体中文、繁体中文、韩语、日语、西班牙语、德语、法语、俄语、
   意大利语、巴西葡萄牙语、阿拉伯语、印尼语、印地语、越南语、泰语和马来语
-- 适合 Kindle/Silk 浏览器的电子阅读器行为；依赖浏览器高级能力的功能可能会精简
+- 适配 Kindle/Silk 浏览器的电子阅读器使用体验；依赖浏览器高级能力的功能可能会精简
 
 | 数据 | SSG | Server |
 | --- | --- | --- |
@@ -661,9 +635,9 @@ Server 不提供“本地/云端”存储选择器：已认证阅读数据始终
 
 应用的阅读功能是自包含的：所需 JavaScript、CSS、字体、图标、清单和转换后的 EPUB 资源全部由本地提供，没有 CDN 运行时依赖。阻断公网出站访问不会妨碍首次设置、登录、浏览、阅读、标注、进度、书架使用、后台管理或源文件转换。
 
-页脚可能向 GitHub Releases API 发起一次可选请求，用于发现是否有新版 EPUB Browser。请求失败、被阻断或离线使用只会隐藏更新提示。
+页脚可能向 GitHub Releases API 发起一次可选请求，用于检查是否有新版 EPUB Browser。请求失败、被阻断或离线使用只会隐藏更新提示。
 
-SSG 会发布静态 Service Worker。Server 会有意禁用并清退整个源范围的 Service Worker，避免一个账户收到另一个账户缓存过的受保护内容。
+SSG 会发布静态 Service Worker。Server 会有意禁用并清除整个源的 Service Worker，避免一个账户收到另一个账户缓存过的受保护内容。
 
 ### Server API 与 WebHooks
 
@@ -681,11 +655,11 @@ OpenAPI 3.1 文档位于 `/openapi.json`，已登录用户可在 `/api-docs` 浏
 
 升级持久化 Server 安装前，请备份源 EPUB/PDF 书籍和 `<server-dir>/data`。替换容器时，必须保留同一个持久化状态卷。
 
-启动迁移会自动执行，并可安全重启。它会验证旧数据库、创建备份、升级副本、把符合条件的旧书架/进度/标注数据导入待创建的初始管理员账户，并只在成功检查点之后清退可替换的旧公开产物。普通请求绝不会扫描旧同步目录。数据库损坏、密码哈希无效、旧数据库含义不明确和 ID 冲突都会按失败关闭处理，而不是猜测或覆盖。
+启动迁移会自动执行，并可安全重启。它会验证旧数据库、创建备份、升级副本、把符合条件的旧书架/进度/标注数据导入待创建的初始管理员账户，并只在成功检查点之后清退可替换的旧公开产物。普通请求绝不会扫描旧同步目录。数据库损坏、密码哈希无效、旧数据库含义不明确或 ID 冲突都会直接报错并停止，不会尝试猜测或覆盖。
 
-迁移后的根目录 `epub-browser.db` 或 `annotations.db` 会作为敏感的非权威恢复副本保留；`data/epub-browser.db` 才是权威数据库，Server 请求不会使用保留的根目录文件。请让恢复副本保持私密。只有在 Server 已停止、权威数据库与记录的备份均已验证，并且不再需要回滚到 v1 时，才可手动删除；EPUB Browser 绝不会自动删除它。
+迁移后的根目录 `epub-browser.db` 或 `annotations.db` 会作为敏感的非权威恢复副本保留；`data/epub-browser.db` 才是权威数据库，Server 请求不会使用保留的根目录文件。请让恢复副本保持私密。只有在 Server 已停止、权威数据库与已记录的备份均已验证，并且不再需要回滚到 v1 时，才可手动删除；EPUB Browser 绝不会自动删除它。
 
-如果旧根目录同时包含 `epub-browser.db` 与 `annotations.db`，启动会停止并保留原文件不动。备份、回滚、缓存重建和冲突恢复见[迁移到 v2](../migration-v2.md)。
+如果旧根目录同时包含 `epub-browser.db` 与 `annotations.db`，启动会停止并保留原文件不动。备份、回滚、缓存重建和冲突恢复见 [迁移到 v2](../migration-v2.md)。
 
 ### 常见问题
 
@@ -713,7 +687,7 @@ OpenAPI 3.1 文档位于 `/openapi.json`，已登录用户可在 `/api-docs` 浏
 
 ### 参与贡献
 
-欢迎在 [dfface/epub-browser](https://github.com/dfface/epub-browser) 提交 Issue 和 Pull Request。有用的问题报告应包含准确命令、浏览器/设备、复现步骤、相关日志，以及在可以合法分享时附上的 EPUB 或 PDF。
+欢迎在 [dfface/epub-browser](https://github.com/dfface/epub-browser) 提交 Issue 和 Pull Request。有用的问题报告应包含实际执行的命令、浏览器/设备、复现步骤、相关日志，以及在可以合法分享时附上的 EPUB 或 PDF。
 
 #### 维护者架构约定
 
@@ -727,9 +701,9 @@ OpenAPI 3.1 文档位于 `/openapi.json`，已登录用户可在 `/api-docs` 浏
 必须与 SQLite 用户数据分离；绝不能新增运行时 CDN 依赖。影响共享界面的改动，应在适用
 范围内同时用两种格式与两种部署模式测试。
 
-#### 从源码检出目录开发
+#### 从源码目录开发
 
-第三方浏览器文件是生成的构建输入，不是项目源码，因此 Git 会有意不包含
+第三方浏览器文件是生成的构建输入，不是项目源码，因此 Git 仓库有意不收录
 `epub_browser/assets/vendor/`。开发或构建前，需要显式补齐锁定版本的资源，再离线验证：
 
 ```bash
@@ -739,13 +713,13 @@ python3 -m unittest tests.test_vendor_assets -v
 python3 -m build
 ```
 
-上述命令只有 `fetch` 会下载浏览器 vendor 资源。锁文件记录不可变的 npm tarball、
-文件摘要、允许列表和许可证；`verify`、测试、在已补齐资源的源码检出目录中构建，以及
+上述命令中，只有 `fetch` 会下载浏览器第三方资源。锁文件记录不可变的 npm tarball、
+文件摘要、允许列表和许可证；`verify`、测试、在资源已补齐的源码目录中构建，以及
 安装后的阅读器都不会下载浏览器资源。标准的隔离构建命令 `python3 -m build` 仍可能访问
-Python 包索引以获取构建依赖。若要在完全断网的环境构建，请在断网前补齐 vendor 目录树
+Python 包索引以获取构建依赖。若要在完全断网的环境构建，请在断网前补齐第三方资源目录树
 并预装 `build`、`setuptools` 和 `wheel`，然后运行
 `PIP_NO_INDEX=1 python3 -m build --no-isolation`。wheel、源码分发包、Docker 镜像和生成的
-SSG 站点都包含已验证文件，没有运行时 CDN 依赖。更新、发布和仓库清洁度流程见
+SSG 站点都包含已验证文件，没有运行时 CDN 依赖。更新、发布和仓库维护流程见
 [third_party/README.md](../../third_party/README.md)。
 
 ### 许可证

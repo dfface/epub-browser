@@ -1,9 +1,9 @@
 # EPUB Browser
 
-> **Ubah buku menjadi situs web. Bangun perpustakaan yang benar-benar milik Anda.**
+> **Ubah buku menjadi situs web. Bangun perpustakaan milik Anda sendiri.**
 >
 > Publikasikan buku EPUB dan PDF sebagai situs web statis, atau jalankan perpustakaan pribadi
-> yang dihosting sendiri dengan akun, kemajuan yang disinkronkan, anotasi, dan pembacaan AI-native opsional.
+> yang dihosting sendiri dengan akun, kemajuan yang disinkronkan, anotasi, dan pembacaan dengan AI terintegrasi opsional.
 
 [Jelajahi perpustakaan statis](https://epub-browser-test.yuhan.tech/) · [Coba perpustakaan pribadi](#demo-langsung)
 
@@ -32,7 +32,7 @@ PDF.js dalam pengalaman membaca yang sama—tanpa viewer terpisah dan tanpa CDN 
   - [Tumpukan teknologi](#tumpukan-teknologi)
   - [Pilih SSG atau Server](#pilih-ssg-atau-server)
   - [Demo langsung](#demo-langsung)
-  - [Pembacaan AI-native](#pembacaan-ai-native-khusus-server)
+  - [Pembacaan dengan AI terintegrasi](#pembacaan-dengan-ai-terintegrasi-khusus-server)
   - [Mode minimal Kindle](#mode-minimal-kindle)
 - [Memulai](#memulai)
   - [Pilih pemasangan](#pilih-pemasangan)
@@ -60,14 +60,14 @@ PDF.js dalam pengalaman membaca yang sama—tanpa viewer terpisah dan tanpa CDN 
   penyimpanan objek, atau Nginx dengan satu perintah, atau jalankan Server persisten dengan
   akun, izin buku, dan OIDC. Aset aplikasi, font, PDF.js, dan perender disajikan secara lokal,
   sehingga membaca tidak pernah bergantung pada CDN.
-- **EPUB dan PDF, satu pembaca yang sesungguhnya.** Kedua format menggunakan Perpustakaan,
+- **EPUB dan PDF, satu pembaca yang sama.** Kedua format menggunakan Perpustakaan,
   halaman buku, daftar isi, tata letak responsif, tiga mode membaca, tema, layar penuh, dan
   pelacakan kemajuan yang sama. Setiap halaman PDF tetap berada di area membaca, dengan zoom,
-  pemilihan lapisan teks, dan anotasi, bukan dalam pratinjau terpisah.
-- **Temukan buku—dan kutipannya.** Pencarian Perpustakaan mencakup metadata, tag, dan pinyin,
+  pemilihan teks pada lapisan teks, dan anotasi, bukan dalam pratinjau terpisah.
+- **Temukan buku—dan bagian yang dicari.** Pencarian Perpustakaan mencakup metadata, tag, dan pinyin,
   dengan pengurutan dan paginasi. Pencarian seluruh buku EPUB di sisi Server menampilkan hasil
-  lengkap yang dikelompokkan per bab dan dapat melompat ke kutipan yang disorot. ID buku yang
-  stabil menjaga titik lanjut membaca, anotasi, dan riwayat tetap terkait dengan buku yang sama.
+  lengkap yang dikelompokkan per bab dan dapat melompat ke bagian yang disorot. ID buku yang
+  stabil menjaga posisi terakhir, anotasi, dan riwayat tetap terkait dengan buku yang sama.
 - **Pahami, bukan hanya menggulir.** Dalam mode Server, panduan bab EPUB, penjelasan yang
   terhubung ke bukti, peta pikiran, dan Ask AI privat tetap berada di samping teks sumber.
   Sorotan, catatan, Kamus, dan Ensiklopedia berfungsi pada EPUB serta PDF yang memiliki lapisan
@@ -77,15 +77,15 @@ PDF.js dalam pengalaman membaca yang sama—tanpa viewer terpisah dan tanpa CDN 
   membaca membentuk catatan yang saling terhubung. Server menjaga data membaca tetap privat
   untuk setiap akun dan menyinkronkannya antarperangkat.
 - **Jalankan layanan membaca, bukan sekadar viewer.** Dalam mode Server, tambahkan buku melalui
-  unggahan web administrator atau folder yang dipantau, batasi penggunaan disk dengan pengosongan
-  cache LRU yang dapat dikonfigurasi, kelola izin anggota dan AI, serta lakukan integrasi melalui
+  unggahan web administrator atau folder yang dipantau, batasi penggunaan disk dengan penghapusan
+  entri cache LRU yang dapat dikonfigurasi, kelola izin anggota dan AI, serta lakukan integrasi melalui
   OpenAPI, PAT, dan WebHooks. Pembacaan minimal Kindle mendukung perangkat dengan kemampuan
   terbatas; Server juga menyediakan dasbor screen saver Kindle pribadi dengan jam, kalender,
   agenda, memo, dan timer Pomodoro.
 
 ![Panduan bab yang disematkan di samping teks EPUB asli, dengan panel Ask AI privat.](assets/ai-native-reading.png)
 
-*Panduan AI-native dan pertanyaan privat tetap terhubung dengan buku aslinya.*
+*Panduan dengan AI terintegrasi dan pertanyaan privat tetap terhubung dengan buku aslinya.*
 
 ![Tampilan wawasan membaca privat dengan kalender aktivitas dan tren waktu membaca.](assets/reading-insights.png)
 
@@ -101,10 +101,10 @@ terpasang tidak memiliki framework SPA dan tidak memerlukan runtime Node.js:
 | Frontend | HTML semantik, CSS, VanillaJS dengan modul ES dan API peramban | Satu UI responsif bersama untuk SSG dan Server |
 | CLI dan Server | Python 3.9+, Starlette, Uvicorn | Perintah konversi, halaman dengan autentikasi, API, dan pekerjaan latar belakang |
 | Data | SQLite serta cache konten JSON yang dapat dibangun ulang | Status pengguna tetap terpisah dari konten turunan EPUB/PDF |
-| Format buku | lxml, pypdf, pypdfium2, PDF.js | Parsing dan sanitasi EPUB terpadu yang mengutamakan mode ketat, metadata/sampul PDF, rendering lokal di peramban |
+| Format buku | lxml, pypdf, pypdfium2, PDF.js | Parsing dan sanitasi EPUB terpadu dengan parsing ketat yang didahulukan, metadata/sampul PDF, rendering lokal di peramban |
 | Offline dan aset | Service Worker, aset immutable dengan hash, dependensi vendor yang versinya dikunci | Penyajian mandiri tanpa CDN saat runtime |
 | Distribusi | PyPI, Docker, hosting statis biasa | Basis kode yang sama tersedia sebagai SSG atau Server persisten |
-| AI opsional | API yang kompatibel dengan OpenAI dengan Markdown, KaTeX, dan Mermaid yang dirender secara lokal | Lapisan pembelajaran EPUB hanya dalam mode Server |
+| AI opsional | API kompatibel OpenAI serta Markdown, KaTeX, dan Mermaid yang dirender secara lokal | Lapisan pembelajaran EPUB hanya dalam mode Server |
 
 Node.js hanya digunakan oleh maintainer untuk pengujian sisi peramban; Node.js bukan bagian
 dari runtime produksi pembaca.
@@ -121,7 +121,7 @@ jelas. Pilih berdasarkan tempat penyimpanan data membaca, bukan berdasarkan form
 | Akun dan kontrol akses | Tidak ada | Akun administrator/anggota, pemberian akses buku terbatas, sesi, dan perlindungan CSRF |
 | Login tunggal OIDC | Tidak disertakan | Provider generik, penautan akun yang sudah ada, dan penyediaan anggota opsional |
 | Kemajuan, anotasi, rak buku | Disimpan di peramban saat ini | Disinkronkan untuk setiap akun yang diautentikasi dalam SQLite |
-| Rating, ulasan, sesi membaca | Tidak dihasilkan | Catatan privat per akun dan wawasan membaca |
+| Rating, ulasan, sesi membaca | Tidak disertakan dalam output | Catatan privat per akun dan wawasan membaca |
 | Pembaruan sumber | Jalankan `ssg` lagi | Mulai ulang, pindai ulang, atau gunakan `--watch` |
 | Administrasi, tag, OpenAPI, WebHooks | Tidak disertakan | Disertakan |
 | Pembacaan AI dan Ask AI | Tidak disertakan | Tersedia untuk EPUB bila dikonfigurasi dan diizinkan secara eksplisit; disembunyikan untuk PDF |
@@ -135,7 +135,7 @@ Gunakan `ssg` jika hasilnya harus berupa berkas statis biasa. Gunakan `server` j
 - **Mode SSG**: [epub-browser-test.yuhan.tech](https://epub-browser-test.yuhan.tech/)
 - **Mode Server**: [epub.yuhan.tech](https://epub.yuhan.tech/) — masuk dengan nama pengguna `demo` dan kata sandi `demo`.
 
-### Pembacaan AI-native (khusus Server)
+### Pembacaan dengan AI terintegrasi (khusus Server)
 
 Untuk buku EPUB, mode Server dapat menambahkan panduan bab, penjelasan yang terhubung
 ke bukti, peta pikiran, pertanyaan reflektif, dan panel Ask AI privat tanpa mengalihkan
@@ -143,7 +143,7 @@ pembaca dari teks aslinya. Hasil tetap tunduk pada izin buku; setiap anggota har
 izin secara eksplisit, sedangkan SSG tidak memuat kontrol AI, tugas, data akun, atau
 konfigurasi provider apa pun. PDF sengaja menyembunyikan pembacaan AI dan Ask AI.
 
-Lihat [panduan pembacaan AI-native](../ai-native-reading.md) untuk model interaksi
+Lihat [panduan pembacaan dengan AI terintegrasi](../ai-native-reading.md) untuk model interaksi
 lengkap dan [catatan perender rich text lokal](../third-party-ai-renderers.md) untuk
 batas rendering dan keamanan jaringan.
 
@@ -290,9 +290,9 @@ Untuk menempatkan ID dalam metadata OPF EPUB atau kamus informasi dokumen PDF, p
 --book-id-storage embedded
 ```
 
-Mode embedded dapat membangun ulang ZIP EPUB atau menambahkan pembaruan metadata PDF sebelum konversi. Jika PDF tidak dapat diperbarui dan sumbernya tidak berubah, EPUB Browser menyimpan ID yang sama dalam sidecar yang berdekatan. Ini mencakup PDF yang ditandatangani, dienkripsi, dan hanya-baca. EPUB Browser berhenti ketika ID tidak cocok, beberapa sumber aktif menduplikasi suatu ID, pembawa identitas tidak valid, atau pembawa yang diperlukan tidak dapat ditulis.
+Mode embedded dapat membangun ulang ZIP EPUB atau menambahkan pembaruan metadata PDF sebelum konversi. Jika PDF tidak dapat diperbarui dan sumbernya tidak berubah, EPUB Browser menyimpan ID yang sama dalam sidecar yang berdekatan. Ini mencakup PDF yang ditandatangani, dienkripsi, dan hanya-baca. EPUB Browser berhenti ketika ID tidak cocok, beberapa sumber aktif menggunakan ID yang sama, penyimpanan ID tidak valid, atau penyimpanan yang diperlukan tidak dapat ditulis.
 
-Saat bermigrasi antarmode penyimpanan, EPUB Browser menyalin ID yang ada ke pembawa yang dipilih dan mempertahankan pembawa lain yang masih valid. ID embedded yang sudah ada dari v2.0.4 disalin ke sidecar default tanpa menulis ulang EPUB. Baik SSG maupun Server menyajikan salinan byte demi byte dari sumber PDF setelah pembaruan metadata apa pun.
+Saat bermigrasi antarmode penyimpanan, EPUB Browser menyalin ID yang ada ke penyimpanan yang dipilih dan mempertahankan penyimpanan lain yang masih valid. ID embedded yang sudah ada dari v2.0.4 disalin ke sidecar default tanpa menulis ulang EPUB. Baik SSG maupun Server menyajikan salinan byte demi byte dari sumber PDF setelah pembaruan metadata apa pun.
 
 ### PDF: satu halaman, satu bab
 
@@ -335,7 +335,7 @@ tidak memiliki API dokumen mentah.
 
 PDF dengan lapisan teks PDF.js yang dapat digunakan memakai kembali popup pemilihan dan
 komponen anotasi yang sama persis untuk Sorotan dan Catatan, serta Kamus dan Ensiklopedia.
-Penyimpanan, kepemilikan, ekspor, pencantuman, dan deep link anotasi tetap digunakan bersama;
+Penyimpanan, kepemilikan, ekspor, tampilan daftar, dan deep link anotasi tetap digunakan bersama;
 tidak ada tabel anotasi atau UI pengaturan khusus PDF. PDF hasil pindaian atau yang hanya
 berisi gambar tetap dapat dibaca, tetapi Sorotan, Catatan, Kamus, Ensiklopedia, dan pencarian
 dokumen berbasis pemilihan secara eksplisit tidak tersedia jika tidak ada lapisan teks yang
@@ -443,8 +443,8 @@ identity_providers:
 
 Di EPUB Browser, gunakan issuer `https://auth.example.com`, client ID
 `epub-browser`, scope `openid profile email`, dan claim nama pengguna
-`preferred_username`. Penyimpanan menjalankan discovery langsung dan validasi kemampuan;
-jika gagal, konfigurasi sebelumnya tetap aktif.
+`preferred_username`. Saat konfigurasi disimpan, EPUB Browser menjalankan discovery langsung
+dan validasi kemampuan; jika gagal, konfigurasi sebelumnya tetap aktif.
 
 #### Konfigurasikan dan kelola pembacaan AI
 
@@ -459,7 +459,7 @@ Lapisan pembelajaran bab dan ulasan tingkat buku digunakan bersama untuk setiap 
 memenuhi syarat, sedangkan percakapan lanjutan tetap privat untuk setiap akun. Hasil, status
 tugas, tag kustom, klasifikasi bacaan buku, dan percakapan lanjutan privat disimpan dalam
 SQLite. Hasil lama tetap tersedia setelah konfigurasi model diubah sampai administrator
-secara eksplisit membuatnya ulang.
+secara eksplisit membuat ulang hasil tersebut.
 
 Ketika pembaca meminta panduan AI atau mengajukan pertanyaan, teks EPUB yang dipilih dan
 konteks percakapan yang telah dipadatkan dikirim ke provider eksternal yang dikonfigurasi.
@@ -497,7 +497,7 @@ Mode Server persisten memerlukan `--server-dir`. Untuk menjalankan instance seka
 epub-browser server book.epub --ephemeral
 ```
 
-State sementara dihapus saat shutdown. Karena basis datanya baru pada setiap proses, penyiapan juga diulang kecuali kredensial bootstrap tanpa pengawasan disediakan.
+State sementara dihapus saat shutdown. Karena setiap proses menggunakan basis data baru, penyiapan juga diulang kecuali kredensial bootstrap tanpa pengawasan disediakan.
 
 Tata letak persisten:
 
@@ -514,7 +514,7 @@ Tata letak persisten:
     └── staging/                 # replaceable conversion work
 ```
 
-Hanya `data/` yang bersifat otoritatif. `cache/` dapat dihapus dan akan dibangun ulang. Pertahankan `data/` saat upgrade dan penggantian container. Lock sistem operasi mengatur eksklusivitas; `.server.lock` dapat tetap ada setelah shutdown normal sebagai metadata diagnostik.
+Hanya `data/` yang bersifat otoritatif. `cache/` dapat dihapus dan akan dibangun ulang. Pertahankan `data/` saat upgrade dan penggantian container. Lock sistem operasi mengatur akses eksklusif; `.server.lock` dapat tetap ada setelah shutdown normal sebagai metadata diagnostik.
 
 Simpan `data/epub-browser.db` persisten pada filesystem lokal. Filesystem bersama atau jaringan tidak didukung untuk konkurensi WAL. Cadangan terverifikasi tetap berada di bawah `data/backups/` dan mencakup semua data WAL yang telah di-commit.
 
@@ -531,7 +531,7 @@ epub-browser server /path/to/books \
   --no-browser
 ```
 
-Jangan ekspos HTTP server bawaan langsung ke internet publik. Terminasi TLS di reverse proxy, terapkan kontrol jaringan, dan aktifkan secure cookie.
+Jangan ekspos HTTP server bawaan langsung ke internet publik. Akhiri TLS di reverse proxy, terapkan kontrol jaringan, dan aktifkan cookie aman.
 
 Untuk mencatat IP klien sebenarnya dalam sesi aktif dan pembatasan laju login di belakang reverse proxy, konfigurasikan **jaringan socket langsungnya** (bukan rentang klien publik):
 
@@ -616,7 +616,7 @@ Port terbitan loopback dalam contoh menjaga container berada di belakang batas h
 | --- | --- |
 | `--output-dir DIR`, `-o DIR` | Tujuan wajib untuk snapshot statis atomik. |
 | `--base-path PATH` | Prefiks URL publik; default `/`. Harus diawali dan diakhiri dengan `/`. |
-| `--book-id-storage sidecar\|embedded` | Pembawa identitas stabil untuk setiap sumber yang dipilih; default `sidecar`. |
+| `--book-id-storage sidecar\|embedded` | Media penyimpanan ID stabil untuk setiap sumber yang dipilih; default `sidecar`. |
 | `--kindle` | Hasilkan halaman minimal tanpa dependensi untuk Kindle e-Ink lama dan alihkan peramban Kindle WebKit ke halaman tersebut; nonaktif secara default. |
 | `--log` | Alias kompatibilitas untuk `--log-level info`. |
 | `--log-level debug\|info\|warning\|error` | Tingkat detail log operasional; default `error`, yang membuat output konversi rutin dan peringatan tidak ditampilkan. |
@@ -636,7 +636,7 @@ Tepat satu dari `--server-dir` dan `--ephemeral` wajib digunakan.
 | `--log` | Alias kompatibilitas untuk `--log-level info`. |
 | `--log-level debug\|info\|warning\|error` | Tingkat detail log operasional; default `error`. Log akses HTTP diaktifkan pada `info` dan `debug`. |
 | `--legacy-sync-dir DIR` | Baca JSON rak buku lama selama migrasi startup. |
-| `--book-id-storage sidecar\|embedded` | Pembawa identitas stabil untuk setiap sumber yang dipilih; default `sidecar`. |
+| `--book-id-storage sidecar\|embedded` | Media penyimpanan ID stabil untuk setiap sumber yang dipilih; default `sidecar`. |
 | `--admin-username NAME` | Administrator awal tanpa pengawasan; fallback `EPUB_BROWSER_ADMIN_USERNAME`. |
 | `--admin-password-file FILE` | Berkas secret awal yang disarankan; fallback `EPUB_BROWSER_ADMIN_PASSWORD_FILE`, lalu `EPUB_BROWSER_ADMIN_PASSWORD` jika tidak ada berkas yang ditetapkan. |
 | `--trusted-proxy-cidr CIDR` | Batas kepercayaan jaringan proxy langsung yang dapat diulang untuk parsing IP klien `X-Forwarded-For` yang aman. |
@@ -676,7 +676,7 @@ Sintaks lama didukung di seluruh lini utama v2:
 | Akun dan sesi | Tidak tersedia | SQLite di bawah `<server-dir>/data` |
 | Pemberian akses buku | Tidak tersedia | SQLite di bawah `<server-dir>/data` |
 
-Server tidak menawarkan pemilih penyimpanan lokal/cloud: data membaca pengguna yang diautentikasi selalu disimpan di Server. Riwayat sesi membaca privat yang terperinci tidak pernah dihasilkan oleh SSG. SSG tidak pernah memeriksa Server API dan selalu menggunakan penyimpanan lokal pada origin peramban saat ini.
+Server tidak menawarkan pemilih penyimpanan lokal/cloud: data membaca pengguna yang diautentikasi selalu disimpan di Server. Riwayat sesi membaca privat yang terperinci tidak pernah dihasilkan oleh SSG. SSG tidak pernah mengakses Server API dan selalu menggunakan penyimpanan lokal pada origin peramban saat ini.
 
 ### Kemandirian dan perilaku jaringan
 
@@ -696,7 +696,7 @@ Endpoint daftar mengembalikan `items` dan `next_cursor`. `limit` default adalah 
 
 Kosakata menggunakan format daftar yang sama secara default. Klien yang menggunakan respons `words` lama dapat mengirim `page=1` atau `page_size` untuk memilih format paginasi lama.
 
-Administrator mengelola endpoint WebHook di Administrasi. Secret hanya ditampilkan saat dibuat atau dirotasi. Pengiriman ditandatangani, bersifat durable, dicoba ulang untuk respons non-2xx, dan event ulasan buku berisi ID serta timestamp tindakan tetapi tidak pernah menyertakan rating atau teks ulasan.
+Administrator mengelola endpoint WebHook di Administrasi. Secret hanya ditampilkan saat dibuat atau dirotasi. Pengiriman ditandatangani, disimpan secara persisten, dan dicoba ulang untuk respons non-2xx. Event ulasan buku berisi ID serta timestamp tindakan, tetapi tidak pernah menyertakan rating atau teks ulasan.
 
 ### Keamanan data dan migrasi
 
@@ -704,7 +704,7 @@ Sebelum mengupgrade instalasi Server persisten, cadangkan buku sumber EPUB/PDF d
 
 Migrasi startup berjalan otomatis dan aman diulang setelah restart. Migrasi memverifikasi basis data lama, membuat cadangan, mengupgrade salinan, mengimpor data rak buku/kemajuan/anotasi lama yang memenuhi syarat ke administrator awal yang masih tertunda, dan mempensiunkan hanya artefak publik lama yang dapat diganti setelah checkpoint berhasil. Permintaan biasa tidak pernah memindai direktori sinkronisasi lama. Basis data rusak, hash kata sandi tidak valid, basis data lama yang ambigu, dan ID yang bertentangan membuat proses berhenti demi keamanan, bukan ditebak atau ditimpa.
 
-`epub-browser.db` atau `annotations.db` hasil migrasi di root dipertahankan sebagai salinan pemulihan sensitif yang tidak otoritatif; `data/epub-browser.db` bersifat otoritatif dan permintaan Server tidak menggunakan berkas root yang dipertahankan. Jaga kerahasiaan salinan pemulihan. Hapus secara manual hanya ketika Server berhenti, setelah memverifikasi basis data otoritatif dan cadangan yang tercatat, serta hanya jika rollback ke v1 tidak lagi diperlukan. EPUB Browser tidak pernah menghapusnya secara otomatis.
+`epub-browser.db` atau `annotations.db` hasil migrasi di root dipertahankan sebagai salinan pemulihan yang memuat data sensitif dan tidak bersifat otoritatif; `data/epub-browser.db` bersifat otoritatif dan permintaan Server tidak menggunakan berkas root yang dipertahankan. Jaga kerahasiaan salinan pemulihan. Hapus secara manual hanya ketika Server berhenti, setelah memverifikasi basis data otoritatif dan cadangan yang tercatat, serta hanya jika rollback ke v1 tidak lagi diperlukan. EPUB Browser tidak pernah menghapusnya secara otomatis.
 
 Jika `epub-browser.db` dan `annotations.db` sama-sama ada di root lama, startup berhenti dan membiarkan keduanya tidak tersentuh. Lihat [Migrasi ke v2](../migration-v2.md) untuk pencadangan, rollback, pembangunan ulang cache, dan pemulihan konflik.
 
@@ -720,7 +720,7 @@ Perilaku tanpa pesan memang disengaja jika tidak menggunakan `--log`, terutama d
 
 #### Docker tidak dapat menulis ID stabil
 
-Image menggunakan identitas embedded secara default. Mount `/app/Library` sebagai baca-tulis atau tanamkan terlebih dahulu ID valid yang cocok. Gunakan perintah kustom dengan `--book-id-storage sidecar` hanya jika pembawa sidecar yang dapat ditulis lebih sesuai.
+Image menggunakan identitas embedded secara default. Mount `/app/Library` sebagai baca-tulis atau tanamkan terlebih dahulu ID valid yang cocok. Gunakan perintah kustom dengan `--book-id-storage sidecar` hanya jika penyimpanan sidecar yang dapat ditulis lebih sesuai.
 
 #### Situs SSG yang dihasilkan memiliki tautan rusak di bawah subpath
 
@@ -750,7 +750,7 @@ pisahkan cache turunan EPUB dan PDF dari data pengguna SQLite, dan jangan pernah
 menambahkan dependensi CDN saat runtime. Perubahan yang memengaruhi antarmuka bersama
 harus diuji dengan kedua format dan kedua mode deployment jika berlaku.
 
-#### Pengembangan dari checkout sumber
+#### Pengembangan dari checkout kode sumber
 
 Berkas pihak ketiga untuk peramban merupakan input build yang dihasilkan, bukan sumber
 proyek, sehingga `epub_browser/assets/vendor/` sengaja tidak disertakan dalam Git. Lengkapi
@@ -764,7 +764,7 @@ python3 -m unittest tests.test_vendor_assets -v
 python3 -m build
 ```
 
-`fetch` adalah satu-satunya perintah di atas yang mengunduh aset vendor peramban. Lock
+`fetch` adalah satu-satunya perintah di atas yang mengunduh aset vendor peramban. Berkas lock
 mencatat tarball npm immutable, digest berkas, allowlist, dan lisensi; `verify`, pengujian,
 build dari checkout yang telah dilengkapi, dan pembaca yang terpasang tidak mengunduh aset
 peramban. Perintah `python3 -m build` terisolasi standar masih dapat menghubungi indeks
@@ -774,7 +774,7 @@ memutus koneksi, lalu jalankan `PIP_NO_INDEX=1 python3 -m build --no-isolation`.
 source distribution, image Docker, dan situs SSG yang dihasilkan memuat berkas terverifikasi
 serta tidak memiliki dependensi CDN saat runtime. Lihat
 [third_party/README.md](../../third_party/README.md) untuk alur kerja pembaruan, rilis,
-dan kebersihan repositori.
+dan cara menjaga repositori tetap rapi.
 
 ### Lisensi
 
