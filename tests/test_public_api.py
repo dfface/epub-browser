@@ -177,6 +177,11 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         self.store.record_vocabulary_lookup(self.principal, "pdf", 0, "pdf", "Run", "run")
         read = self.bearer("vocabulary:read")
         write = self.bearer("vocabulary:read", "vocabulary:write")
+        first = self.client.get(path, params={"limit": 1}, headers=read).json()
+        self.assertEqual(len(first["items"]), 1)
+        second = self.client.get(path, params={"limit": 1, "cursor": first["next_cursor"]}, headers=read).json()
+        self.assertNotEqual(first["items"][0]["id"], second["items"][0]["id"])
+        self.assertEqual(self.client.get(path, params={"limit": 1, "page": 1}, headers=read).status_code, 400)
         self.assertEqual(self.client.get(path).status_code, 401)
         self.assertEqual(self.client.get(path, headers=self.bearer("library:read")).status_code, 403)
         page = self.client.get(path, params={"q": "RUN", "page_size": 1}, headers=read).json()
@@ -192,26 +197,27 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         word_path = path + "/" + page["words"][0]["id"]
         self.assertEqual(self.client.patch(word_path, json={"mastery": "learning"}, headers=read).status_code, 403)
         self.assertEqual(self.client.patch(word_path, json={"mastery": "learning"}, headers=write).status_code, 200)
-        result = self.client.get(path, params={"mastery": "learning"}, headers=read).json()
+        result = self.client.get(path, params={"mastery": "learning", "page": 1}, headers=read).json()
         self.assertEqual([word["word"] for word in result["words"]], ["Run"])
         other = self.store.create_user("other", None)
         token = self.store.create_personal_access_token(other.user_id, "Other", ("vocabulary:read", "vocabulary:write"), expires_at=None)
         other_headers = {"Authorization": "Bearer " + token.raw_token}
-        self.assertEqual(self.client.get(path, headers=other_headers).json()["total"], 0)
+        self.assertEqual(self.client.get(path, headers=other_headers).json(),
+                         {"items": [], "next_cursor": None})
         self.assertEqual(self.client.delete(word_path, headers=other_headers).status_code, 404)
         self.assertEqual(self.client.delete(word_path, params={"book_id": "book"}, headers=write).status_code, 204)
-        self.assertEqual(self.client.get(path, params={"book_id": "book", "q": "run"}, headers=read).json()["total"], 1)
+        self.assertEqual(self.client.get(path, params={"book_id": "book", "q": "run", "page": 1}, headers=read).json()["total"], 1)
         self.assertEqual(self.client.delete(word_path, headers=write).status_code, 204)
         lookup = {"word": "Run", "book_id": "pdf", "chapter_index": 1, "lookup_id": "retry"}
         self.assertEqual(self.client.post(path, json=lookup, headers=read).status_code, 403)
         for _ in range(2):
             self.assertEqual(self.client.post(path, json=lookup, headers=write).status_code, 204)
-        entry = self.client.get(path, params={"book_id": "pdf"}, headers=read).json()["words"][0]
+        entry = self.client.get(path, params={"book_id": "pdf"}, headers=read).json()["items"][0]
         self.assertEqual((entry["lookup_count"], entry["sources"][0]["chapter_index"]), (1, 1))
         self.assertEqual(self.client.post(path, json={**lookup, "chapter_index": 2}, headers=write).status_code, 400)
         operation = openapi_document()["paths"][path]["get"]
         self.assertEqual({p["name"] for p in operation["parameters"]},
-                         {"book_id", "q", "mastery", "page", "page_size"})
+                         {"book_id", "q", "mastery", "page", "page_size", "limit", "cursor"})
 
     def test_openapi_contract_matches_declared_operations_and_scopes(self):
         document = openapi_document()
@@ -238,12 +244,48 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         served = self.client.get("/openapi.json")
         self.assertEqual(served.status_code, 200)
         self.assertEqual(served.json()["openapi"], "3.1.0")
+        cached = self.client.get("/openapi.json", headers={"If-None-Match": served.headers["etag"]})
+        self.assertEqual(cached.status_code, 304)
+        self.assertEqual(cached.content, b"")
         self.assertEqual(self.client.get("/api-docs").status_code, 200)
         self.assertNotIn("/api/books/{book_id}/document", document["paths"])
         self.assertEqual(
             document["components"]["schemas"]["Book"]["properties"]["format"],
             {"enum": ["epub", "pdf"]},
         )
+
+    def test_all_list_operations_expose_the_same_pagination(self):
+        headers = self.bearer(
+            "library:read", "progress:read", "annotations:read", "reviews:read",
+            "vocabulary:read", "admin:data:read",
+        )
+        document = openapi_document()
+        self.store.set_reading_progress(self.principal.user_id, "book", 0)
+        self.store.upsert_book_review("book", self.principal.user_id, 5, "Review")
+        for path, methods in document["paths"].items():
+            get = methods.get("get", {})
+            if not get.get("operationId", "").startswith("list"):
+                continue
+            with self.subTest(path=path):
+                parameters = {parameter["name"]: parameter for parameter in get["parameters"]}
+                self.assertEqual(parameters["limit"]["schema"]["maximum"], 100)
+                self.assertIn("cursor", parameters)
+                url = path.format(book_id="pdf", user_id=self.principal.user_id)
+                response = self.client.get(url, params={"limit": 1}, headers=headers)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(set(response.json()), {"items", "next_cursor"})
+                self.assertLessEqual(len(response.json()["items"]), 1)
+                invalid = self.client.get(url, params={"limit": 101}, headers=headers)
+                self.assertEqual(invalid.status_code, 400)
+                self.assertEqual(invalid.json()["code"], "invalid_list_query")
+
+        books = self.client.get("/api/v1/books", params={"format": "pdf"}, headers=headers)
+        self.assertEqual([book["id"] for book in books.json()["items"]], ["pdf"])
+        chapters = self.client.get(
+            "/api/v1/books/pdf/chapters", params={"limit": 1, "cursor": "1"}, headers=headers
+        ).json()
+        self.assertEqual(chapters["items"][0]["index"], 1)
+        self.assertIsNone(chapters["next_cursor"])
 
     def test_api_docs_are_grouped_searchable_and_public(self):
         page = self.client.get("/api-docs")
@@ -264,6 +306,18 @@ class PublicAPIBoundaryTests(unittest.TestCase):
         self.assertIn('src="/assets/logo-mark-color.png"', page.text)
         self.assertIn("default-src 'self'", page.headers["content-security-policy"])
         self.assertEqual(page.headers["cache-control"], "public, max-age=300")
+
+    def test_api_docs_show_request_examples_and_parameter_constraints(self):
+        page = self.client.get("/api-docs", headers={"Accept-Language": "zh-CN"})
+        self.assertEqual(page.status_code, 200)
+        self.assertEqual(page.text.count('data-api-endpoint-details'), len(public_api_operations()))
+        self.assertIn('data-i18n="apiDocs.param.cursor"', page.text)
+        self.assertIn("默认值 24", page.text)
+        self.assertIn("1–100", page.text)
+        self.assertIn('book_id=BOOK_ID&amp;chapter_index=0', page.text)
+        self.assertIn('data-api-copy="api-example-listMyAnnotations"', page.text)
+        self.assertIn('--data', page.text)
+        self.assertIn('&quot;chapter_index&quot;:0', page.text)
 
     def test_api_docs_use_the_library_brand_asset_from_the_current_release(self):
         logo_url = "/assets/immutable/logo-mark-color.release.png"
@@ -379,6 +433,54 @@ class PublicAPIBoundaryTests(unittest.TestCase):
             "/api/v1/me/progress", headers=self.bearer("progress:read")
         )
         self.assertEqual(listing.json()["items"][0]["book_id"], "book")
+
+    def test_annotation_pages_filter_by_visible_book_and_chapter(self):
+        member = self.store.create_user("reader", None)
+        token = self.store.create_personal_access_token(
+            member.user_id, "Reader", ("annotations:read",), expires_at=None
+        )
+        headers = {"Authorization": "Bearer " + token.raw_token}
+        path = "/api/v1/me/annotations"
+        for identifier, book_id, chapter in (
+            ("a", "book", 0), ("b", "book", 0), ("c", "book", 1), ("d", "pdf", 0),
+        ):
+            self.store.upsert_annotation({
+                "id": identifier, "book_hash": book_id, "chapter_index": chapter,
+                "text": "Selected", "note": "", "color": "#ffff00",
+                "created_at": "2026-08-27T00:00:00Z", "updated_at": "2026-08-27T00:00:00Z",
+            }, member.user_id)
+        self.store.update_admin_book_settings(
+            "pdf", visibility="restricted", user_ids=[], tag_ids=[], profile="auto"
+        )
+
+        query = {"book_id": "book", "chapter_index": 0, "limit": 1, "fields": "id"}
+        first = self.client.get(path, params=query, headers=headers).json()
+        self.assertEqual(first["items"], [{"id": "a"}])
+        second = self.client.get(
+            path, params={**query, "cursor": first["next_cursor"]}, headers=headers
+        ).json()
+        self.assertEqual(second, {"items": [{"id": "b"}], "next_cursor": None})
+        visible = self.client.get(path, params={"chapter_index": 0}, headers=headers).json()
+        self.assertEqual([row["id"] for row in visible["items"]], ["a", "b"])
+        for params in ({"limit": 101}, {"cursor": "-1"}, {"chapter_index": -1}, {"fields": "bogus"}):
+            response = self.client.get(path, params=params, headers=headers)
+            self.assertEqual(response.status_code, 400, response.text)
+            self.assertEqual(response.json()["code"], "invalid_list_query")
+
+    def test_annotation_list_defaults_to_a_bounded_page(self):
+        for index in range(25):
+            self.store.upsert_annotation({
+                "id": str(index), "book_hash": "book", "chapter_index": 0,
+                "text": "Selected", "note": "", "color": "#ffff00",
+                "created_at": "2026-08-27T00:00:00Z", "updated_at": "2026-08-27T00:00:00Z",
+            }, self.principal.user_id)
+        path = "/api/v1/me/annotations"
+        headers = self.bearer("annotations:read")
+        first = self.client.get(path, headers=headers).json()
+        self.assertEqual(len(first["items"]), 24)
+        last = self.client.get(path, params={"cursor": first["next_cursor"]}, headers=headers).json()
+        self.assertEqual(len(last["items"]), 1)
+        self.assertIsNone(last["next_cursor"])
 
     def test_annotation_owner_comes_only_from_authenticated_pat(self):
         payload = {

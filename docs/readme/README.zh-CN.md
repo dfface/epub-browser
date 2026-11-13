@@ -646,6 +646,10 @@ Server 账户可在“账户设置”中创建带作用域的个人访问令牌�
 
 OpenAPI 3.1 文档位于 `/openapi.json`，登录后可在 `/api-docs` 浏览本地接口参考。例如：`curl -H 'Authorization: Bearer …' https://reader.example/api/v1/books`。章节接口默认返回已清洗 HTML，添加 `?format=text` 可返回纯文本。
 
+列表接口返回 `items` 和 `next_cursor`，默认每页 24 条，`limit` 最大为 100。保持筛选条件一致，将 `next_cursor` 作为 `cursor` 请求下一页。游标为 `null` 时表示已到末页。例如，`/api/v1/me/annotations?book_id=BOOK_ID&chapter_index=0&fields=id,text,note` 会返回指定 EPUB 章节或 PDF 页面的标注字段。各接口的筛选条件和可选字段见 OpenAPI 文档。
+
+词汇表默认采用相同的列表格式。使用旧版 `words` 响应的客户端可通过传入 `page=1` 或 `page_size` 继续使用原有分页格式。
+
 管理员可在“后台管理”中维护 WebHook。签名密钥只在创建或轮换时显示；投递会持久化、签名并对非 2xx 结果重试。书评事件只含用户 ID、书籍 ID、动作和时间，不包含评分或书评正文。
 
 ### 数据安全与迁移

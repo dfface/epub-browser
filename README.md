@@ -698,6 +698,10 @@ Server accounts can create scoped personal access tokens in Account settings. Ex
 
 The OpenAPI 3.1 document is available at `/openapi.json`; signed-in users can browse the local reference at `/api-docs`. For example: `curl -H 'Authorization: Bearer …' https://reader.example/api/v1/books`. Chapter detail returns sanitized HTML by default and plain text with `?format=text`.
 
+List endpoints return `items` and `next_cursor`. The default `limit` is 24 and the maximum is 100. Pass `next_cursor` as `cursor` with the same filters to fetch the next page. A null cursor marks the last page. For example, use `/api/v1/me/annotations?book_id=BOOK_ID&chapter_index=0&fields=id,text,note` to retrieve selected annotation fields from one EPUB chapter or PDF page. Query filters and supported fields are listed in the OpenAPI document.
+
+Vocabulary uses the same list format by default. Clients that use the older `words` response can send `page=1` or `page_size` to select the legacy pagination format.
+
 Administrators manage WebHook endpoints in Administration. Secrets are shown only on creation or rotation. Deliveries are signed, durable, retried for non-2xx responses, and book-review events contain IDs and action timestamps but never rating or review text.
 
 ### Data safety and migration

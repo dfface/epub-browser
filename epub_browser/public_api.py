@@ -6,6 +6,7 @@ import json
 import re
 import uuid
 from dataclasses import dataclass
+from functools import cache
 from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
@@ -25,6 +26,10 @@ from .vocabulary import MASTERY_STATES, MAX_PAGE_SIZE, MAX_QUERY_LENGTH, PAGE_SI
 
 
 PUBLIC_API_CONTEXT_KEY = "epub_browser.public_api_context"
+_LIST_LIMIT = 24
+_MAX_LIST_LIMIT = 100
+_MAX_LIST_OFFSET = 2**63 - 1
+_PRIVATE_HEADERS = {"Cache-Control": "private, no-store"}
 _BEARER_PATTERN = re.compile(r"^Bearer ([^\s,]+)$")
 
 
@@ -45,7 +50,7 @@ class PublicAPIOperation:
 
 
 def public_api_error(code: str, message: str, status: int, *, headers=None):
-    response_headers = {"Cache-Control": "private, no-store"}
+    response_headers = dict(_PRIVATE_HEADERS)
     response_headers.update(headers or {})
     return JSONResponse(
         {"code": code, "message": message},
@@ -111,17 +116,16 @@ def _book_payload(store, book):
 
 async def _list_books(request, authenticated: AuthenticatedPAT):
     store = _context(request).store
+    page = request.state.public_list_page
 
-    def _book_items():
-        return [
-            _book_payload(store, book)
-            for book in store.visible_books(authenticated.principal)
-        ]
+    def load():
+        books = store.visible_books(
+            authenticated.principal, source_format=page.filters.get("format"), **page.window
+        )
+        return [_book_payload(store, book) for book in books[:page.limit]], len(books) > page.limit
 
-    return JSONResponse(
-        {"items": await run_db(_book_items), "next_cursor": None},
-        headers={"Cache-Control": "private, no-store"},
-    )
+    items, has_more = await run_db(load)
+    return page.response(items, has_more=has_more)
 
 
 def _authorized_book_sync(store, authenticated, book_id):
@@ -200,10 +204,8 @@ async def _book_chapters(request, authenticated: AuthenticatedPAT):
         return public_api_error(
             "book_content_unavailable", "Book content is unavailable", 503
         )
-    return JSONResponse(
-        {"items": items, "next_cursor": None},
-        headers={"Cache-Control": "private, no-store"},
-    )
+    page = request.state.public_list_page
+    return page.response(items[page.offset:page.offset + page.limit + 1])
 
 
 class _PlainTextExtractor(HTMLParser):
@@ -384,17 +386,12 @@ async def _put_bookshelf(request, authenticated):
         _bookshelf_document, store, user_id
     )
     if version != current_version:
-        response = public_api_error(
-            "bookshelf_conflict", "Bookshelf changed on the server", 409
-        )
-        response.body = json.dumps({
+        return JSONResponse({
             "code": "bookshelf_conflict",
             "message": "Bookshelf changed on the server",
             "version": current_version,
             "data": current_data,
-        }, separators=(",", ":")).encode("utf-8")
-        response.headers["content-length"] = str(len(response.body))
-        return response
+        }, status_code=409, headers=_PRIVATE_HEADERS)
     next_version = version + 1
     if version == 0:
         await run_db(store.create_bookshelf, user_id, next_version, document)
@@ -406,31 +403,14 @@ async def _put_bookshelf(request, authenticated):
     )
 
 
-def _visible_items(store, authenticated, items, book_key="book_id"):
-    return [
-        item for item in items
-        if store.can_read_book(
-            authenticated.principal.user_id,
-            authenticated.principal.role,
-            item.get(book_key),
-        )
-    ]
-
-
 async def _list_progress(request, authenticated):
-    store = _context(request).store
-
-    def _items():
-        return _visible_items(
-            store,
-            authenticated,
-            store.list_reading_progress(authenticated.principal.user_id),
-        )
-
-    return JSONResponse(
-        {"items": await run_db(_items), "next_cursor": None},
-        headers={"Cache-Control": "private, no-store"},
+    principal = authenticated.principal
+    page = request.state.public_list_page
+    items = await run_db(
+        _context(request).store.list_reading_progress,
+        principal.user_id, visible_to=principal, **page.filters, **page.window,
     )
+    return page.response(items)
 
 
 async def _progress_item(request, authenticated):
@@ -439,7 +419,7 @@ async def _progress_item(request, authenticated):
     if await _authorized_book(request, authenticated, book_id) is None:
         return public_api_error("book_not_found", "Book not found", 404)
     user_id = authenticated.principal.user_id
-    if request.method == "GET":
+    if request.method in ("GET", "HEAD"):
         chapter_index = await run_db(
             store.get_reading_progress, user_id, book_id
         )
@@ -481,20 +461,14 @@ async def _progress_item(request, authenticated):
 
 
 async def _list_annotations(request, authenticated):
-    store = _context(request).store
-
-    def _items():
-        return _visible_items(
-            store,
-            authenticated,
-            store.list_annotations(user_id=authenticated.principal.user_id),
-            book_key="book_hash",
-        )
-
-    return JSONResponse(
-        {"items": await run_db(_items), "next_cursor": None},
-        headers={"Cache-Control": "private, no-store"},
+    principal = authenticated.principal
+    page = request.state.public_list_page
+    items = await run_db(
+        _context(request).store.list_annotations,
+        book_hash=page.filters.get("book_id"), chapter_index=page.filters.get("chapter_index"),
+        user_id=principal.user_id, visible_to=principal, **page.window,
     )
+    return page.response(items)
 
 
 def _valid_annotation(data):
@@ -564,7 +538,7 @@ async def _annotation_item(request, authenticated):
         request, authenticated, stored["book_hash"]
     ) is None:
         return public_api_error("annotation_not_found", "Annotation not found", 404)
-    if request.method == "GET":
+    if request.method in ("GET", "HEAD"):
         return JSONResponse({"annotation": stored}, headers={"Cache-Control": "private, no-store"})
     if request.method == "DELETE":
         await run_db(store.delete_annotation, annotation_id, user_id)
@@ -580,19 +554,13 @@ async def _annotation_item(request, authenticated):
 
 
 async def _list_reviews(request, authenticated):
-    store = _context(request).store
-
-    def _items():
-        return _visible_items(
-            store,
-            authenticated,
-            store.list_book_reviews(authenticated.principal.user_id),
-        )
-
-    return JSONResponse(
-        {"items": await run_db(_items), "next_cursor": None},
-        headers={"Cache-Control": "private, no-store"},
+    principal = authenticated.principal
+    page = request.state.public_list_page
+    items = await run_db(
+        _context(request).store.list_book_reviews,
+        principal.user_id, visible_to=principal, **page.filters, **page.window,
     )
+    return page.response(items)
 
 
 async def _review_item(request, authenticated):
@@ -601,7 +569,7 @@ async def _review_item(request, authenticated):
     if await _authorized_book(request, authenticated, book_id) is None:
         return public_api_error("book_not_found", "Book not found", 404)
     user_id = authenticated.principal.user_id
-    if request.method == "GET":
+    if request.method in ("GET", "HEAD"):
         review = await run_db(store.get_book_review, book_id, user_id)
         if review is None:
             return public_api_error("review_not_found", "Review not found", 404)
@@ -639,36 +607,34 @@ def _user_payload(user):
 
 
 async def _admin_users(request, authenticated):
-    del authenticated
-    store = _context(request).store
-
-    def _items():
-        return [_user_payload(user) for user in store.list_users()]
-
-    return JSONResponse(
-        {"items": await run_db(_items), "next_cursor": None},
-        headers={"Cache-Control": "private, no-store"},
-    )
+    page = request.state.public_list_page
+    users = await run_db(_context(request).store.list_users, **page.window)
+    return page.response([_user_payload(user) for user in users])
 
 
-def _admin_items_response(items):
-    return JSONResponse(
-        {"items": list(items), "next_cursor": None},
-        headers={"Cache-Control": "private, no-store"},
-    )
+def _admin_user_list(method):
+    async def handler(request, authenticated):
+        store = _context(request).store
+        user_id = request.path_params["user_id"]
+        page = request.state.public_list_page
 
+        def load():
+            if _admin_user(store, user_id) is None:
+                return None
+            filters = page.filters
+            if method == "list_annotations":
+                return store.list_annotations(
+                    user_id=user_id, book_hash=filters.get("book_id"),
+                    chapter_index=filters.get("chapter_index"), **page.window,
+                )
+            return getattr(store, method)(user_id, **filters, **page.window)
 
-async def _admin_user_items(request, loader):
-    """Run an admin per-user listing with its existence check in the DB pool."""
-    store = _context(request).store
-    user_id = request.path_params["user_id"]
+        items = await run_db(load)
+        if items is None:
+            return public_api_error("user_not_found", "User not found", 404)
+        return page.response(items)
 
-    def _load():
-        if _admin_user(store, user_id) is None:
-            return None
-        return loader(store, user_id)
-
-    return await run_db(_load)
+    return handler
 
 
 async def _admin_bookshelf(request, authenticated):
@@ -688,47 +654,6 @@ async def _admin_bookshelf(request, authenticated):
     return JSONResponse({"version": version, "data": data}, headers={"Cache-Control": "private, no-store"})
 
 
-async def _admin_progress(request, authenticated):
-    del authenticated
-    items = await _admin_user_items(
-        request, lambda store, user_id: store.list_reading_progress(user_id)
-    )
-    if items is None:
-        return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(items)
-
-
-async def _admin_annotations(request, authenticated):
-    del authenticated
-    items = await _admin_user_items(
-        request, lambda store, user_id: store.list_annotations(user_id=user_id)
-    )
-    if items is None:
-        return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(items)
-
-
-async def _admin_reviews(request, authenticated):
-    del authenticated
-    items = await _admin_user_items(
-        request, lambda store, user_id: store.list_book_reviews(user_id)
-    )
-    if items is None:
-        return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(items)
-
-
-async def _admin_reading_sessions(request, authenticated):
-    del authenticated
-    items = await _admin_user_items(
-        request,
-        lambda store, user_id: store.list_reading_sessions_for_user(user_id),
-    )
-    if items is None:
-        return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(items)
-
-
 async def _admin_reading_insights(request, authenticated):
     del authenticated
     store = _context(request).store
@@ -741,7 +666,9 @@ async def _admin_reading_insights(request, authenticated):
         if _admin_user(store, user_id) is None:
             return None
         anchor = date.fromisoformat(anchor_value)
-        return store.reading_insights(user_id, period, anchor, timezone_name)
+        return store.reading_insights(
+            user_id, period, anchor, timezone_name, maximum_rank_limit=_MAX_LIST_LIMIT
+        )
 
     try:
         insights = await run_db(_load)
@@ -750,28 +677,6 @@ async def _admin_reading_insights(request, authenticated):
     if insights is None:
         return public_api_error("user_not_found", "User not found", 404)
     return JSONResponse({"insights": insights}, headers={"Cache-Control": "private, no-store"})
-
-
-async def _admin_ai_conversations(request, authenticated):
-    del authenticated
-    items = await _admin_user_items(
-        request,
-        lambda store, user_id: store.list_ai_book_chat_turns_for_user(user_id),
-    )
-    if items is None:
-        return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(items)
-
-
-async def _admin_ai_results(request, authenticated):
-    del authenticated
-    items = await _admin_user_items(
-        request,
-        lambda store, user_id: store.list_ai_reading_results_for_user(user_id),
-    )
-    if items is None:
-        return public_api_error("user_not_found", "User not found", 404)
-    return _admin_items_response(items)
 
 
 async def _kindle_memo(request, authenticated):
@@ -800,11 +705,21 @@ async def _vocabulary(request, authenticated):
         return public_api_error("book_not_found", "Book not found", 404)
     if request.method in ("GET", "HEAD"):
         try:
+            page = request.state.public_list_page
             options = vocabulary_page_options(request.query_params)
+            legacy = "page" in request.query_params or "page_size" in request.query_params
+            if legacy and ("cursor" in request.query_params or "limit" in request.query_params):
+                raise ValueError
+            if not legacy:
+                options.update(page_size=page.limit, offset=page.offset)
         except ValueError:
             return public_api_error("invalid_vocabulary_query", "Invalid vocabulary query", 400)
         result = await run_db(store.list_vocabulary, principal, book_id, **options)
-        return JSONResponse(result, headers=headers)
+        if legacy:
+            return JSONResponse(result, headers=headers)
+        return page.response(
+            result["words"], has_more=page.offset + page.limit < result["total"]
+        )
 
     if request.method == "POST":
         data, error = await bounded_public_json_object(request, maximum_size=16 * 1024)
@@ -916,14 +831,89 @@ def public_api_operations():
         PublicAPIOperation("/api/v1/me/kindle-memo", ("PUT",), "kindle-memo:write", "Replace the token owner's Kindle memo", "putMyKindleMemo", _kindle_memo),
         PublicAPIOperation("/api/v1/admin/users", ("GET",), "admin:data:read", "List public account metadata", "listAdminUsers", _admin_users),
         PublicAPIOperation("/api/v1/admin/users/{user_id}/bookshelf", ("GET",), "admin:data:read", "Read a user's bookshelf", "getAdminUserBookshelf", _admin_bookshelf),
-        PublicAPIOperation("/api/v1/admin/users/{user_id}/progress", ("GET",), "admin:data:read", "Read a user's progress", "listAdminUserProgress", _admin_progress),
-        PublicAPIOperation("/api/v1/admin/users/{user_id}/annotations", ("GET",), "admin:data:read", "Read a user's annotations", "listAdminUserAnnotations", _admin_annotations),
-        PublicAPIOperation("/api/v1/admin/users/{user_id}/reviews", ("GET",), "admin:data:read", "Read a user's reviews", "listAdminUserReviews", _admin_reviews),
-        PublicAPIOperation("/api/v1/admin/users/{user_id}/reading-sessions", ("GET",), "admin:data:read", "Read a user's reading sessions", "listAdminUserReadingSessions", _admin_reading_sessions),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/progress", ("GET",), "admin:data:read", "Read a user's progress", "listAdminUserProgress", _admin_user_list("list_reading_progress")),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/annotations", ("GET",), "admin:data:read", "Read a user's annotations", "listAdminUserAnnotations", _admin_user_list("list_annotations")),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/reviews", ("GET",), "admin:data:read", "Read a user's reviews", "listAdminUserReviews", _admin_user_list("list_book_reviews")),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/reading-sessions", ("GET",), "admin:data:read", "Read a user's reading sessions", "listAdminUserReadingSessions", _admin_user_list("list_reading_sessions_for_user")),
         PublicAPIOperation("/api/v1/admin/users/{user_id}/reading-insights", ("GET",), "admin:data:read", "Read a user's reading insights", "getAdminUserReadingInsights", _admin_reading_insights),
-        PublicAPIOperation("/api/v1/admin/users/{user_id}/ai-conversations", ("GET",), "admin:data:read", "Read a user's AI conversations", "listAdminUserAIConversations", _admin_ai_conversations),
-        PublicAPIOperation("/api/v1/admin/users/{user_id}/ai-results", ("GET",), "admin:data:read", "Read a user's AI results", "listAdminUserAIResults", _admin_ai_results),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/ai-conversations", ("GET",), "admin:data:read", "Read a user's AI conversations", "listAdminUserAIConversations", _admin_user_list("list_ai_book_chat_turns_for_user")),
+        PublicAPIOperation("/api/v1/admin/users/{user_id}/ai-results", ("GET",), "admin:data:read", "Read a user's AI results", "listAdminUserAIResults", _admin_user_list("list_ai_reading_results_for_user")),
     )
+
+
+# List item schemas also define which fields callers can select.
+_LISTS = {
+    "listBooks": ("Book", ("format",), False),
+    "listBookChapters": ("ChapterListItem", (), False),
+    "listMyProgress": ("Progress", ("book_id",), False),
+    "listMyAnnotations": ("Annotation", ("book_id", "chapter_index"), True),
+    "listMyReviews": ("Review", ("book_id",), True),
+    "listMyVocabulary": ("VocabularyWord", (), False),
+    "listAdminUsers": ("User", (), False),
+    "listAdminUserProgress": ("Progress", ("book_id",), False),
+    "listAdminUserAnnotations": ("Annotation", ("book_id", "chapter_index"), True),
+    "listAdminUserReviews": ("Review", ("book_id",), True),
+    "listAdminUserReadingSessions": ("ReadingSession", ("book_id", "chapter_index"), False),
+    "listAdminUserAIConversations": ("AIConversation", ("book_id", "chapter_index"), True),
+    "listAdminUserAIResults": ("AIResult", ("book_id", "chapter_index"), True),
+}
+
+
+def _query_value(params, name):
+    values = params.getlist(name)
+    if len(values) > 1 or (values and not values[0].strip()):
+        raise ValueError
+    return values[0] if values else None
+
+
+def _query_integer(value, minimum, maximum):
+    if not re.fullmatch(r"[0-9]{1,19}", value):
+        raise ValueError
+    parsed = int(value)
+    if not minimum <= parsed <= maximum:
+        raise ValueError
+    return parsed
+
+
+@dataclass(frozen=True)
+class _ListPage:
+    limit: int
+    offset: int
+    filters: dict
+    fields: tuple[str, ...]
+
+    @classmethod
+    def parse(cls, params, operation_id):
+        item_schema, supported_filters, sparse = _LISTS[operation_id]
+        limit = _query_integer(_query_value(params, "limit") or str(_LIST_LIMIT), 1, _MAX_LIST_LIMIT)
+        offset = _query_integer(_query_value(params, "cursor") or "0", 0, _MAX_LIST_OFFSET)
+        filters = {}
+        for name in supported_filters:
+            value = _query_value(params, name)
+            if value is not None:
+                if name == "chapter_index":
+                    value = _query_integer(value, 0, _MAX_LIST_OFFSET)
+                if name == "format" and value not in {"epub", "pdf"}:
+                    raise ValueError
+                filters[name] = value
+        fields = _query_value(params, "fields")
+        selected = tuple(fields.split(",")) if fields else ()
+        if selected and (not sparse or not set(selected) <= _resource_properties()[item_schema].keys()):
+            raise ValueError
+        return cls(limit, offset, filters, selected)
+
+    @property
+    def window(self):
+        return {"limit": self.limit + 1, "offset": self.offset}
+
+    def response(self, items, *, has_more=None):
+        if has_more is None:
+            has_more = len(items) > self.limit
+        items = items[:self.limit]
+        if self.fields:
+            items = [{name: item[name] for name in self.fields if name in item} for item in items]
+        next_cursor = str(self.offset + self.limit) if has_more else None
+        return JSONResponse({"items": items, "next_cursor": next_cursor}, headers=_PRIVATE_HEADERS)
 
 
 def _endpoint(operation: PublicAPIOperation):
@@ -931,6 +921,12 @@ def _endpoint(operation: PublicAPIOperation):
         authenticated = await require_pat(request, operation.required_scope)
         if isinstance(authenticated, Response):
             return authenticated
+        if operation.operation_id in _LISTS:
+            try:
+                request.state.public_list_page = _ListPage.parse(request.query_params, operation.operation_id)
+            except ValueError:
+                message = get_bundle(resolve_request_locale(request))["apiDocs.error.invalidListQuery"]
+                return public_api_error("invalid_list_query", message, 400)
         return await operation.handler(request, authenticated)
 
     endpoint.__name__ = operation.operation_id
@@ -964,6 +960,126 @@ async def _public_api_fallback(request):
     return public_api_error("not_found", "API resource not found", 404)
 
 
+_STRING = {"type": "string"}
+_INTEGER = {"type": "integer"}
+_NONNEGATIVE = {"type": "integer", "minimum": 0}
+_NULLABLE_STRING = {"type": ["string", "null"]}
+_BOOK_FORMAT = {"enum": ["epub", "pdf"]}
+
+
+def _object(properties, required=None):
+    return {
+        "type": "object",
+        "required": list(properties) if required is None else required,
+        "properties": properties,
+    }
+
+
+@cache
+def _resource_properties():
+    timestamped = {"created_at": _STRING, "updated_at": _STRING}
+    chapter = {"book_id": _STRING, "chapter_index": _NONNEGATIVE}
+    return {
+        "Progress": {"user_id": _STRING, **chapter, "updated_at": _STRING},
+        "Annotation": {
+            "id": _STRING, "user_id": _STRING, "book_hash": _STRING,
+            "chapter_index": _NONNEGATIVE, "text": _STRING, "note": _NULLABLE_STRING,
+            "color": _NULLABLE_STRING, "start_meta": _NULLABLE_STRING, "end_meta": _NULLABLE_STRING,
+            "startMeta": {}, "endMeta": {}, **timestamped,
+        },
+        "Review": {
+            "user_id": _STRING, "book_id": _STRING,
+            "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+            "review_text": _STRING, **timestamped,
+        },
+        "User": {
+            "id": _STRING, "username": _STRING, "role": {"enum": ["admin", "member"]},
+            "enabled": {"type": "boolean"}, **timestamped,
+        },
+        "ReadingSession": {
+            "id": _STRING, "user_id": _STRING, **chapter,
+            "book_title": _STRING, "chapter_label": _STRING, "started_at": _STRING,
+            "ended_at": _STRING, "active_seconds": _NONNEGATIVE, "client_id": _STRING,
+            "last_client_sequence": _NONNEGATIVE,
+        },
+        "AIConversation": {
+            "id": _STRING, **chapter, "result_id": _NULLABLE_STRING,
+            "context_mode": {"enum": ["shared_layer", "chapter_source"]},
+            "book_context": {"enum": [0, 1]}, "owner_user_id": _STRING,
+            "question": _STRING, "language": _STRING, "answer": _NULLABLE_STRING,
+            "status": {"enum": ["queued", "running", "complete", "failed", "interrupted"]},
+            "error_code": _NULLABLE_STRING, **timestamped,
+        },
+        "AIResult": {
+            "id": _STRING, "cache_key": _STRING, "book_id": _STRING,
+            "chapter_index": {"type": ["integer", "null"]}, "scope": {"enum": ["book", "chapter"]},
+            "mode": _STRING, "profile": _STRING, "language": _STRING,
+            "reading_boundary": {"type": ["integer", "null"]},
+            "config_revision": _NONNEGATIVE, "template_id": _STRING,
+            "template_version": _NONNEGATIVE, "content": {},
+            "created_by_user_id": _STRING, "created_at": _STRING,
+        },
+    }
+
+
+def _ref(name):
+    return {"$ref": "#/components/schemas/" + name}
+
+
+def _json_content(schema):
+    return {"application/json": {"schema": schema}}
+
+
+def _array(schema, maximum=None):
+    result = {"type": "array", "items": schema}
+    if maximum is not None:
+        result["maxItems"] = maximum
+    return result
+
+
+def _query_parameter(name, schema, description):
+    return {"name": name, "in": "query", "schema": schema, "description": description}
+
+
+def _list_contract(operation_id):
+    item_name, filters, sparse = _LISTS[operation_id]
+    parameters = [
+        _query_parameter("limit", {
+            "type": "integer", "minimum": 1, "maximum": _MAX_LIST_LIMIT, "default": _LIST_LIMIT,
+        }, "Maximum number of items to return."),
+        _query_parameter("cursor", {
+            "type": "string", "pattern": "^[0-9]{1,19}$",
+        }, "Pass next_cursor from the previous page with the same filters. The cursor is an "
+           "decimal offset from 0 to 9223372036854775807 in the current ordering. "
+           "Concurrent edits can shift results."),
+    ]
+    filter_parameters = {
+        "format": _query_parameter("format", _BOOK_FORMAT, "Filter by source format."),
+        "book_id": _query_parameter("book_id", {"type": "string", "minLength": 1}, "Filter by book ID."),
+        "chapter_index": _query_parameter(
+            "chapter_index", {**_NONNEGATIVE, "maximum": _MAX_LIST_OFFSET},
+            "Filter by zero-based chapter index or PDF page index.",
+        ),
+    }
+    parameters.extend(filter_parameters[name] for name in filters)
+    item = _ref(item_name)
+    if sparse:
+        properties = _resource_properties()[item_name]
+        parameters.append({
+            **_query_parameter(
+                "fields", {"type": "string"},
+                "Comma-separated item fields to return. Allowed: " + ", ".join(properties) + ".",
+            ),
+            "x-allowed-fields": list(properties),
+        })
+        item = _object(properties, required=[])
+    schema = _object({
+        "items": _array(item, _MAX_LIST_LIMIT),
+        "next_cursor": {**_NULLABLE_STRING, "description": "Cursor for the next page, or null at the end."},
+    })
+    return parameters, schema
+
+
 def openapi_document():
     schemas = {
         "Book": {
@@ -987,17 +1103,6 @@ def openapi_document():
                 "visibility": {"type": "string"},
                 "created_at": {"type": "string"},
                 "updated_at": {"type": "string"},
-            },
-        },
-        "BookList": {
-            "type": "object",
-            "required": ["items", "next_cursor"],
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {"$ref": "#/components/schemas/Book"},
-                },
-                "next_cursor": {"type": ["string", "null"]},
             },
         },
         "BookDetail": {
@@ -1047,135 +1152,230 @@ def openapi_document():
             }],
         },
     }
+    schemas.update({name: _object(fields) for name, fields in _resource_properties().items()})
+    schemas["Annotation"]["properties"] = {
+        **schemas["Annotation"]["properties"],
+        "username": {"type": "string", "deprecated": True},
+    }
+    schemas["VocabularyWord"] = _vocabulary_schema()
+    schemas["Error"] = _object({"code": _STRING, "message": _STRING})
+    schemas["Bookshelf"] = _object({"version": _NONNEGATIVE, "data": {"type": "object"}})
+    schemas["BookshelfConflict"] = {
+        "allOf": [_ref("Error"), _ref("Bookshelf")],
+    }
+    ranked_book = _object({"book_id": _STRING, "title": _STRING, "active_seconds": _NONNEGATIVE})
+    day = {"date": {"type": "string", "format": "date"}, "active_seconds": _NONNEGATIVE}
+    insight_fields = {
+        "period": {"enum": ["overview", "day", "week", "month"]},
+        "timezone": _STRING,
+        "total_active_seconds": _NONNEGATIVE,
+        "top_book": {"anyOf": [ranked_book, {"type": "null"}]},
+        "books": _array(ranked_book, _MAX_LIST_LIMIT),
+        "books_read_count": _NONNEGATIVE,
+        "trend": _object({
+            "granularity": {"enum": ["hour", "day", "month"]},
+            "start_date": day["date"], "end_date": day["date"],
+            "points": _array(_object({
+                "bucket": _STRING, "active_seconds": _NONNEGATIVE, "book_count": _NONNEGATIVE,
+            }), 31),
+        }),
+    }
+    schemas["ReadingInsights"] = _object({
+        **insight_fields,
+        "activity": _object({"days": _array(_object({**day, "book_count": _NONNEGATIVE}), 366)}),
+        "days": _array(_object(day), 31),
+    }, required=list(insight_fields))
     paths = {}
     for operation in public_api_operations():
         path_item = paths.setdefault(operation.path, {})
-        for method in operation.methods:
-            success = {"description": "Successful response"}
-            schema_name = {
-                "listBooks": "BookList",
-                "getBook": "BookDetail",
-            }.get(operation.operation_id)
-            if schema_name:
-                success["content"] = {
-                    "application/json": {
-                        "schema": {"$ref": "#/components/schemas/" + schema_name}
-                    }
-                }
-            path_item[method.lower()] = {
-                "operationId": operation.operation_id,
-                "summary": operation.summary,
-                "security": [{"PATBearer": [operation.required_scope]}],
-                "responses": {
-                    "200": success,
-                    "401": {"description": "Missing or invalid token"},
-                    "403": {"description": "Insufficient scope"},
-                },
-            }
-    vocabulary = paths["/api/v1/me/vocabulary"]
-    vocabulary_item = paths["/api/v1/me/vocabulary/{word_id}"]
-    mastery_schema = {"type": "string", "enum": list(MASTERY_STATES)}
-    string_schema = {"type": "string"}
-    book_parameter = {
-        "name": "book_id", "in": "query", "schema": string_schema,
-        "description": "Limit the operation to this visible book.",
-    }
-    vocabulary["get"]["parameters"] = [book_parameter] + [
-        {"name": name, "in": "query", "schema": schema}
-        for name, schema in (
-            ("q", {"type": "string", "maxLength": MAX_QUERY_LENGTH}),
-            ("mastery", mastery_schema),
-            ("page", {"type": "integer", "minimum": 1, "maximum": 2**31 - 1, "default": 1}),
-            ("page_size", {"type": "integer", "minimum": 1, "maximum": MAX_PAGE_SIZE, "default": PAGE_SIZE}),
-        )
-    ]
-    for operation in vocabulary_item.values():
-        operation["parameters"] = [
-            {"name": "word_id", "in": "path", "required": True, "schema": string_schema},
-            book_parameter,
+        operation_id = operation.operation_id
+        parameters = [
+            {"name": name, "in": "path", "required": True,
+             "schema": _NONNEGATIVE if name == "chapter_index" else _STRING}
+            for name in re.findall(r"{(\w+)}", operation.path)
         ]
-    for operation in (*vocabulary.values(), *vocabulary_item.values()):
-        operation["responses"].update({
-            "400": {"description": "Invalid request"},
-            "404": {"description": "Book or word is unavailable to the token owner"},
-        })
+        responses = {
+            "200": {"description": "Successful response"},
+            "401": {"description": "Missing or invalid token"},
+            "403": {"description": "Insufficient scope"},
+            "503": {"description": "Administrator setup required"},
+        }
+        if operation_id in _LISTS:
+            query, schema = _list_contract(operation_id)
+            parameters.extend(query)
+            if operation_id == "listBooks":
+                schemas["BookList"] = schema
+                schema = _ref("BookList")
+            responses["200"]["content"] = _json_content(schema)
+            responses["400"] = {"description": "Invalid list query"}
+        if "{" in operation.path:
+            responses["404"] = {"description": "Resource unavailable"}
+        path_item[operation.methods[0].lower()] = {
+            "operationId": operation_id,
+            "summary": operation.summary,
+            "security": [{"PATBearer": [operation.required_scope]}],
+            "responses": responses,
+            **({"parameters": parameters} if parameters else {}),
+        }
 
-    def object_content(properties):
-        return {"application/json": {"schema": {
-            "type": "object", "required": list(properties), "properties": properties,
-        }}}
+    _describe_resource_operations(paths)
+    for path in paths.values():
+        for operation in path.values():
+            for status, response in operation["responses"].items():
+                if int(status) >= 400:
+                    response.setdefault("content", _json_content(_ref("Error")))
+                if status in {"401", "403"}:
+                    response["headers"] = {"WWW-Authenticate": {"schema": _STRING}}
 
-    source_properties = {
-        "book_id": string_schema, "title": string_schema,
-        "source_format": {"enum": ["epub", "pdf"]},
-        "chapter_index": {"type": "integer", "minimum": 0},
-    }
-    schemas["VocabularySource"] = object_content(source_properties)["application/json"]["schema"]
-    word_properties = {
-        "id": string_schema, "word": string_schema, "mastery": mastery_schema,
-        "lookup_count": {"type": "integer", "minimum": 1},
-        "first_seen": {"type": "string", "format": "date-time"},
-        "last_seen": {"type": "string", "format": "date-time"},
-        "sources": {"type": "array", "items": {"$ref": "#/components/schemas/VocabularySource"}},
-    }
-    schemas["VocabularyWord"] = object_content(word_properties)["application/json"]["schema"]
-    vocabulary["get"]["responses"]["200"]["content"] = object_content({
-        "words": {"type": "array", "items": {"$ref": "#/components/schemas/VocabularyWord"}},
-        "page": {"type": "integer", "minimum": 1, "description": "Clamped to the last page when necessary."},
-        "page_size": {"type": "integer", "minimum": 1},
-        "total": {"type": "integer", "minimum": 0},
-        "total_pages": {"type": "integer", "minimum": 0},
-    })
-    mastery_content = object_content({"mastery": mastery_schema})
-    vocabulary_item["patch"]["requestBody"] = {"required": True, "content": mastery_content}
-    vocabulary_item["patch"]["responses"]["200"]["content"] = mastery_content
-    vocabulary["post"]["requestBody"] = {"required": True, "content": object_content({
-        "book_id": string_schema,
-        "chapter_index": {"type": "integer", "minimum": 0},
-        "word": {"type": "string", "minLength": 1, "maxLength": MAX_QUERY_LENGTH},
-        "lookup_id": {"type": "string", "pattern": "^[a-zA-Z0-9_-]{1,64}$",
-                      "description": "Reuse for retries of the same lookup."},
-    })}
-    vocabulary["post"]["responses"]["503"] = {"description": "Book content is unavailable"}
-    for operation in (vocabulary["post"], vocabulary_item["delete"]):
-        operation["responses"].pop("200")
-        operation["responses"]["204"] = {"description": "Successful response"}
-    memo_content = {"application/json": {"schema": {
-        "type": "object",
-        "required": ["memo"],
-        "properties": {"memo": {"type": "string", "maxLength": KINDLE_MEMO_MAX_LENGTH}},
-    }}}
-    memo_path = paths["/api/v1/me/kindle-memo"]
-    for method in ("get", "put"):
-        memo_path[method]["responses"]["200"]["content"] = memo_content
-    memo_path["put"]["requestBody"] = {"required": True, "content": memo_content}
-    memo_path["put"]["responses"]["400"] = {"description": "Invalid memo"}
-    paths["/api/v1/books/{book_id}/chapters"]["get"]["responses"]["200"]["content"] = {
-        "application/json": {"schema": {"type": "object", "properties": {
-            "items": {"type": "array", "items": {"$ref": "#/components/schemas/ChapterListItem"}},
-        }}}
-    }
-    paths["/api/v1/books/{book_id}/chapters/{chapter_index}"]["get"]["responses"]["200"]["content"] = {
-        "application/json": {"schema": {"oneOf": [
-            {"$ref": "#/components/schemas/Chapter"},
-            {"type": "object", "required": ["chapter"], "properties": {
-                "chapter": {"$ref": "#/components/schemas/Chapter"},
-            }},
-        ]}}
-    }
     return {
         "openapi": "3.1.0",
-        "info": {"title": "EPUB Browser API", "version": "1.1.0"},
+        "info": {"title": "EPUB Browser API", "version": "1.2.0"},
         "paths": paths,
         "components": {
             "securitySchemes": {
                 "PATBearer": {
-                    "type": "http",
-                    "scheme": "bearer",
-                    "bearerFormat": "EPUB Browser PAT",
+                    "type": "http", "scheme": "bearer", "bearerFormat": "EPUB Browser PAT",
                     "x-scopes": sorted(PAT_SCOPES),
                 }
             },
             "schemas": schemas,
         },
     }
+
+
+def _describe_resource_operations(paths):
+    operations = {
+        op["operationId"]: op for path in paths.values() for op in path.values()
+    }
+
+    def describe(name, schema=None, *, body=None, status="200", errors=(), query=()):
+        op = operations[name]
+        responses = op["responses"]
+        success = responses.pop("200")
+        responses[status] = success
+        if schema is not None:
+            success["content"] = _json_content(schema)
+        if body is not None:
+            op["requestBody"] = {"required": True, "content": _json_content(body)}
+        responses.update({code: {"description": description} for code, description in errors})
+        if query:
+            op.setdefault("parameters", []).extend(query)
+
+    unavailable = ("503", "Administrator setup is required or book content is unavailable")
+    missing_book = ("404", "Book is unavailable")
+    invalid = ("400", "Invalid request")
+    describe("getBook", _ref("BookDetail"))
+    operations["listBookChapters"]["responses"]["503"] = {"description": unavailable[1]}
+    describe("getBookChapter", {"oneOf": [
+        {"allOf": [_ref("Chapter"), {"required": ["content_html"], "properties": {"content_html": _STRING}}]},
+        _object({"chapter": {"allOf": [
+            _ref("Chapter"), {"required": ["format"], "properties": {"format": {"const": "pdf"}}},
+        ]}}),
+    ]}, errors=(invalid, unavailable), query=(
+        _query_parameter("format", {"enum": ["html", "text"], "default": "html"},
+                         "Return JSON with sanitized chapter HTML or a plain text response. PDF text is empty."),
+    ))
+    operations["getBookChapter"]["responses"]["200"]["content"]["text/plain"] = {"schema": _STRING}
+
+    for name in ("getMyBookshelf", "getAdminUserBookshelf"):
+        describe(name, _ref("Bookshelf"))
+    describe("putMyBookshelf", _ref("Bookshelf"), body=_ref("Bookshelf"),
+             errors=(invalid, ("409", "Bookshelf changed on the server")))
+    operations["putMyBookshelf"]["responses"]["409"]["content"] = _json_content(_ref("BookshelfConflict"))
+    progress = _object({"book_id": _STRING, "chapter_index": _NONNEGATIVE})
+    describe("getMyProgress", progress)
+    describe("putMyProgress", progress, body=_object({"chapter_index": _NONNEGATIVE}),
+             errors=(invalid, unavailable))
+    describe("deleteMyProgress", status="204")
+
+    annotation = _object({"annotation": _ref("Annotation")})
+    annotation_update = {
+        "note": _NULLABLE_STRING,
+        "color": _NULLABLE_STRING,
+        "chapter_index": _NONNEGATIVE, "startMeta": {}, "endMeta": {},
+    }
+    annotation_create = _object({
+        **annotation_update,
+        "note": {"type": "string", "maxLength": 100000},
+        "color": {"type": "string", "minLength": 1, "maxLength": 64},
+        "id": {"type": "string", "description": "Omit to generate an ID. Accepted length is 1–128."},
+        "book_hash": {"type": "string", "minLength": 1},
+        "text": {"type": "string", "minLength": 1, "maxLength": 100000},
+        "created_at": _STRING, "updated_at": _STRING,
+    }, required=["book_hash", "chapter_index", "text", "color"])
+    describe("createMyAnnotation", annotation, body=annotation_create, status="201",
+             errors=(invalid, missing_book, ("409", "Annotation conflict")))
+    describe("getMyAnnotation", annotation)
+    describe("putMyAnnotation", annotation, body={
+        **_object(annotation_update, required=[]),
+        "anyOf": [{"required": [field]} for field in annotation_update],
+    }, errors=(invalid,))
+    describe("deleteMyAnnotation", status="204")
+    review = _object({"review": _ref("Review")})
+    describe("getMyReview", review)
+    describe("putMyReview", review, body=_object({
+        "rating": {"type": "integer", "minimum": 1, "maximum": 5},
+        "review_text": {"type": "string", "description": "Up to 10,000 characters after trimming."},
+    }), errors=(invalid,))
+    describe("deleteMyReview", status="204")
+
+    describe("getAdminUserReadingInsights", _object({"insights": _ref("ReadingInsights")}),
+             errors=(invalid,), query=(
+        _query_parameter("period", {"enum": ["overview", "day", "week", "month"], "default": "overview"},
+                         "Report period containing the anchor date."),
+        _query_parameter("anchor", {"type": "string", "format": "date"}, "Defaults to the server's current date."),
+        _query_parameter("timezone", {"type": "string", "default": "UTC"}, "IANA time zone for the report."),
+    ))
+    memo = _object({"memo": {"type": "string", "maxLength": KINDLE_MEMO_MAX_LENGTH}})
+    describe("getMyKindleMemo", memo)
+    describe("putMyKindleMemo", memo, body=memo, errors=(invalid,))
+    _describe_vocabulary(operations, describe, invalid, missing_book, unavailable)
+
+
+def _vocabulary_schema():
+    source = _object({
+        "book_id": _STRING, "title": _STRING, "source_format": _BOOK_FORMAT,
+        "chapter_index": _NONNEGATIVE,
+    })
+    return _object({
+        "id": _STRING, "word": _STRING,
+        "mastery": {"enum": list(MASTERY_STATES)},
+        "lookup_count": {"type": "integer", "minimum": 1},
+        "first_seen": {"type": "string", "format": "date-time"},
+        "last_seen": {"type": "string", "format": "date-time"},
+        "sources": _array(source),
+    })
+
+
+def _describe_vocabulary(operations, describe, invalid, missing_book, unavailable):
+    book = _query_parameter("book_id", _STRING, "Limit the operation to this visible book.")
+    mastery = {"enum": list(MASTERY_STATES)}
+    legacy_page = {"type": "integer", "minimum": 1, "maximum": 2**31 - 1, "default": 1}
+    legacy_size = {"type": "integer", "minimum": 1, "maximum": MAX_PAGE_SIZE, "default": PAGE_SIZE}
+    describe("listMyVocabulary", errors=(invalid, missing_book), query=(
+        book,
+        _query_parameter("q", {"type": "string", "maxLength": MAX_QUERY_LENGTH}, "Filter by word."),
+        _query_parameter("mastery", mastery, "Filter by mastery state."),
+        {**_query_parameter("page", legacy_page, "Legacy page number. Use without cursor or limit."), "deprecated": True},
+        {**_query_parameter("page_size", legacy_size, "Legacy page size. Use without cursor or limit."), "deprecated": True},
+    ))
+    response = operations["listMyVocabulary"]["responses"]["200"]["content"]["application/json"]
+    response["schema"] = {"oneOf": [
+        response["schema"],
+        _object({
+            "words": _array(_ref("VocabularyWord"), MAX_PAGE_SIZE),
+            "page": {"type": "integer", "minimum": 1, "description": "Clamped to the last page."},
+            "page_size": legacy_size, "total": _NONNEGATIVE, "total_pages": _NONNEGATIVE,
+        }),
+    ]}
+    describe("recordMyVocabularyLookup", body=_object({
+        "book_id": _STRING, "chapter_index": _NONNEGATIVE,
+        "word": {"type": "string", "minLength": 1, "maxLength": MAX_QUERY_LENGTH},
+        "lookup_id": {"type": "string", "pattern": "^[a-zA-Z0-9_-]{1,64}$",
+                      "description": "Reuse for retries of the same lookup."},
+    }), status="204", errors=(invalid, missing_book, unavailable), query=(book,))
+    missing_word = ("404", "Book or word is unavailable to the token owner")
+    mastery_object = _object({"mastery": mastery})
+    describe("patchMyVocabulary", mastery_object, body=mastery_object,
+             errors=(invalid, missing_word), query=(book,))
+    describe("deleteMyVocabulary", status="204", errors=(missing_word,), query=(book,))

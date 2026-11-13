@@ -47,9 +47,6 @@
     var resultCount;
     var emptyState;
     var groupLinks;
-    var copyButton;
-    var copyStatus;
-    var example;
     if (!documentObject || !i18n) return null;
     i18n.init();
     i18n.translateDocument();
@@ -59,10 +56,6 @@
     groupLinks = Array.prototype.slice.call(documentObject.querySelectorAll('[data-api-group-link]'));
     resultCount = documentObject.getElementById('apiResultCount');
     emptyState = documentObject.getElementById('apiEmptyState');
-    copyButton = documentObject.getElementById('apiCopyExample');
-    copyStatus = documentObject.getElementById('apiCopyStatus');
-    example = documentObject.getElementById('apiExampleCode');
-
     function setLocalizedText(node, key, params) {
       if (node) node.textContent = key ? i18n.t(key, params) : '';
     }
@@ -71,15 +64,11 @@
       if (node) node.textContent = String(value == null ? '' : value);
     }
 
-    function setCopyStatus(key) {
-      setLocalizedText(copyStatus, key);
-    }
-
     function filter() {
       var query = normalizeQuery(search && search.value);
       var visible = 0;
       endpoints.forEach(function(endpoint) {
-        var matches = matchesEndpoint(endpoint.textContent || endpoint.getAttribute('data-api-search'), query);
+        var matches = matchesEndpoint(endpoint.textContent + ' ' + endpoint.getAttribute('data-api-search'), query);
         endpoint.hidden = !matches;
         if (matches) visible += 1;
       });
@@ -109,18 +98,23 @@
       event.preventDefault();
       if (search) search.focus();
     });
-    if (copyButton && example) {
-      copyButton.addEventListener('click', function() {
-        copyButton.disabled = true;
+    documentObject.querySelectorAll('[data-api-copy]').forEach(function(button) {
+      var example = documentObject.getElementById(button.getAttribute('data-api-copy'));
+      var status = button.closest('.api-code-card').querySelector('[data-api-copy-status]');
+      button.addEventListener('click', function() {
+        button.disabled = true;
+        function report(key) {
+          status.setAttribute('data-i18n', key);
+          setLocalizedText(status, key);
+          button.disabled = false;
+        }
         copyText(root, example.textContent).then(function() {
-          setCopyStatus('apiDocs.copied');
+          report('apiDocs.copied');
         }, function() {
-          setCopyStatus('apiDocs.copyFailed');
-        }).then(function() {
-          copyButton.disabled = false;
+          report('apiDocs.copyFailed');
         });
       });
-    }
+    });
     i18n.onLocaleChange(filter);
     filter();
     return { filter: filter };

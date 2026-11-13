@@ -879,3 +879,79 @@ body.api-docs-page {
         transition-duration: .01ms !important;
     }
 }
+
+.api-endpoint-details {
+    grid-column: 1 / -1;
+    min-width: 0;
+}
+
+.api-endpoint-details summary {
+    width: fit-content;
+    cursor: pointer;
+    color: var(--api-primary);
+    font-size: .84rem;
+    font-weight: 700;
+    padding-block: 6px;
+}
+
+.api-endpoint-content {
+    display: grid;
+    gap: 16px;
+    padding-block: 10px 4px;
+}
+
+.api-params {
+    margin: 0;
+    border: 1px solid var(--api-border);
+    border-radius: 8px;
+}
+
+.api-param {
+    display: grid;
+    grid-template-columns: minmax(8rem, 1fr) minmax(0, 3fr);
+    gap: 8px 14px;
+    padding: 10px 12px;
+    font-size: .83rem;
+    overflow-wrap: anywhere;
+}
+
+.api-param + .api-param {
+    border-top: 1px solid var(--api-border);
+}
+
+.api-param dt {
+    font-weight: 700;
+}
+
+.api-param dd {
+    margin: 0;
+    color: var(--api-muted);
+}
+
+.api-param-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    margin-block-end: 3px;
+    color: var(--api-text);
+    font-size: .75rem;
+}
+
+.api-endpoint-example {
+    box-shadow: none;
+}
+
+.api-endpoint-example .api-code-header {
+    min-height: 0;
+    padding: 8px 14px;
+}
+
+.api-endpoint-example pre {
+    padding: 12px 14px;
+}
+
+@media (max-width: 540px) {
+    .api-param {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
