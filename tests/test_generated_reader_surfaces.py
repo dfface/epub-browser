@@ -1656,6 +1656,47 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn("window.initScriptBook()", book_html)
         self.assertIn("window.initScriptChapter()", chapter_html)
 
+    def test_in_book_search_is_server_only_on_book_and_chapter_pages(self):
+        def render(deployment_mode):
+            with tempfile.TemporaryDirectory() as directory:
+                processor = EPUBProcessor(
+                    "book.epub",
+                    directory,
+                    deployment_mode=deployment_mode,
+                )
+                processor.book_title = "A Book"
+                processor.chapters = [{"title": "One"}]
+                Path(processor.web_dir).mkdir(parents=True)
+                processor.create_index_page()
+                book_html = Path(processor.web_dir, "index.html").read_text(
+                    encoding="utf-8"
+                )
+                chapter_html = processor.create_chapter_template(
+                    "<p>Text</p>", "", 0, "One"
+                )
+            return book_html, chapter_html
+
+        server_book, server_chapter = render("server")
+        ssg_book, ssg_chapter = render("ssg")
+
+        self.assertIn("data-book-search", server_book)
+        self.assertRegex(
+            server_book, r"/assets/immutable/book-search\.[0-9a-f]{12}\.js"
+        )
+        self.assertIn('id="bookSearchForm"', server_book)
+        self.assertIn('id="bookSearchModal"', server_book)
+        self.assertLess(
+            server_book.index('id="bookSearchToggle"'),
+            server_book.index("data-book-review-toggle"),
+            "Search opens from the action row before the review button",
+        )
+        self.assertIn("bookSearchDrawer", server_chapter)
+
+        for html in (ssg_book, ssg_chapter):
+            self.assertNotIn("data-book-search", html)
+            self.assertNotIn("bookSearchDrawer", html)
+            self.assertNotRegex(html, r"book-search\.[0-9a-f]{12}\.js")
+
     def test_server_reader_pages_gate_protected_startup_behind_cache_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
             processor = EPUBProcessor(

@@ -216,6 +216,32 @@ class ServerLibraryManagerTests(unittest.TestCase):
             self.assertTrue((epub_root / "content" / "chapter_0.json").exists())
             self.assertFalse((pdf_root / "pdf" / "document.pdf").exists())
 
+    def test_book_search_queries_the_index_without_rewarming_the_book_cache(self):
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        record = manager.reconcile().active_books[0]
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, AuthConfig.from_values([])),
+            library_manager=manager,
+        )
+        with TestClient(app) as client:
+            self.assertEqual(_json_login(client, "admin", "secret").status_code, 200)
+            search_url = f"/api/books/{record.book_id}/search?q=Original"
+            first = client.get(search_url)
+            self.assertEqual(first.status_code, 200, first.text)
+            self.assertEqual(first.headers["cache-control"], "private, no-store")
+            self.assertEqual(first.json()["results"][0]["match"], "Original")
+            chapter_file = (
+                manager.public_dir / "book" / record.book_id / "content" / "chapter_0.json"
+            )
+            chapter_file.unlink()
+            second = client.get(search_url)
+            self.assertEqual(second.status_code, 200, second.text)
+            self.assertEqual(second.json()["results"][0]["match"], "Original")
+            self.assertFalse(chapter_file.exists())
+
     def test_new_epub_metadata_and_content_cache_share_one_extraction(self):
         manager = self._manager()
         original_extract = EPUBProcessor.extract_epub

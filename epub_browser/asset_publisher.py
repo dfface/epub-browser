@@ -54,6 +54,8 @@ SERVER_ONLY_ASSET_PATHS = frozenset({
     'dictionary.js',
     'book-reviews.css',
     'book-reviews.js',
+    'book-search.css',
+    'book-search.js',
     'reading-sessions.js',
     'reading-insights.css',
     'reading-insights.js',

@@ -243,6 +243,15 @@ SERVER_ACCOUNT_PANEL = '''
                     </div>
                     <p class="admin-setting-help" id="adminGeneralBookCacheHelp" data-i18n="admin.general.bookCacheLimitHelp">The server keeps this many recently opened books ready to read. Other books are prepared when opened.</p>
                 </div>
+                <div class="admin-setting-row">
+                    <div class="admin-setting-main">
+                        <label class="admin-setting-label" for="adminGeneralSearchIndexCacheLimit">
+                            <span data-i18n="admin.general.searchIndexCacheLimit">Book search indexes cached on disk</span>
+                        </label>
+                        <input class="admin-general-input" type="text" name="search_index_cache_limit" id="adminGeneralSearchIndexCacheLimit" inputmode="numeric" pattern="[0-9]+" required aria-describedby="adminGeneralSearchIndexCacheHelp adminGeneralError">
+                    </div>
+                    <p class="admin-setting-help" id="adminGeneralSearchIndexCacheHelp" data-i18n="admin.general.searchIndexCacheLimitHelp">The server keeps this many recently used search indexes. Removing one only means it is rebuilt the next time that book is searched.</p>
+                </div>
                 <p class="admin-setting-error" id="adminGeneralError" role="alert" hidden></p>
             </div>
             <div class="admin-form-actions">

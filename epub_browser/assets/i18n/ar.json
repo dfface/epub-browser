@@ -1573,5 +1573,20 @@
   "apiDocs.operation.listMyVocabulary": "عرض قائمة كلماتك",
   "apiDocs.operation.recordMyVocabularyLookup": "تسجيل البحث عن كلمة",
   "apiDocs.operation.patchMyVocabulary": "تحديث مستوى إتقان كلمة",
-  "apiDocs.operation.deleteMyVocabulary": "حذف كلمة أو سجل البحث عنها في كتاب"
+  "apiDocs.operation.deleteMyVocabulary": "حذف كلمة أو سجل البحث عنها في كتاب",
+  "book.search": "البحث في هذا الكتاب",
+  "book.searchPlaceholder": "البحث في هذا الكتاب",
+  "book.searchHint": "اكتب كلمة أو عبارة للبحث في هذا الكتاب.",
+  "book.searching": "جارٍ البحث…",
+  "book.searchNoResults": "لم يتم العثور على نتائج مطابقة.",
+  "book.searchResultCount": "النتائج: {count}",
+  "book.searchPrevPage": "الصفحة السابقة",
+  "book.searchNextPage": "الصفحة التالية",
+  "book.searchPageStatus": "الصفحة {page} من {pages}",
+  "book.searchPageOutOfRange": "لا توجد نتائج في هذه الصفحة",
+  "book.searchFailed": "فشل البحث. حاول مرة أخرى.",
+  "book.searchUnavailable": "البحث غير متاح مؤقتًا. حاول لاحقًا.",
+  "book.closeSearch": "إغلاق البحث",
+  "admin.general.searchIndexCacheLimit": "فهارس البحث المخزنة على القرص",
+  "admin.general.searchIndexCacheLimitHelp": "يحتفظ الخادم بهذا العدد من فهارس البحث المستخدمة حديثًا. عند حذف فهرس، يُعاد بناؤه عند البحث التالي في ذلك الكتاب."
 }

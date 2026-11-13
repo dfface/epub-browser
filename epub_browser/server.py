@@ -114,6 +114,12 @@ from .server_library import (
     PDF_OUTPUT_REVISION_FILE,
     library_metadata,
 )
+from .book_search import (
+    BookSearchService,
+    BookSearchUnavailable,
+    SearchGenerationChanged,
+    normalize_search_query,
+)
 from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import EPUB_FORMAT, PDF_FORMAT, is_supported_source
 from .kindle import KINDLE_WIDGETS, kindle_timezone_offset, kindle_timezones, valid_kindle_memo
@@ -818,6 +824,9 @@ def create_app(
 
     webhook_service = WebhookService(store)
     dictionary_service = DictionaryService(store, data_directory)
+    search_service = BookSearchService(
+        base_directory, store, library_manager=library_manager
+    )
     encyclopedia = WikimediaEncyclopedia()
     heartbeat_attempts = {}
     store.requeue_running_ai_jobs()
@@ -3185,8 +3194,9 @@ window.location.assign(payload.redirect||'/');
 
     def general_settings_response(settings):
         # Preserve exact values when the browser cannot represent them as numbers.
-        if settings['book_cache_limit'] > 2**53 - 1:
-            settings['book_cache_limit'] = str(settings['book_cache_limit'])
+        for key in ('book_cache_limit', 'search_index_cache_limit'):
+            if settings[key] > 2**53 - 1:
+                settings[key] = str(settings[key])
         return response({'settings': settings})
 
     async def admin_general_settings(request):
@@ -3199,15 +3209,21 @@ window.location.assign(payload.redirect||'/');
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
         changes = {
             key: data[key]
-            for key in ('recent_reading_limit', 'reading_insights_rank_limit', 'book_cache_limit')
+            for key in (
+                'recent_reading_limit',
+                'reading_insights_rank_limit',
+                'book_cache_limit',
+                'search_index_cache_limit',
+            )
             if key in data
         }
         try:
             if not changes or any(value is None for value in changes.values()):
                 raise ValueError
-            cache_limit = changes.get('book_cache_limit')
-            if isinstance(cache_limit, str) and re.fullmatch(r'[0-9]+', cache_limit):
-                changes['book_cache_limit'] = int(cache_limit)
+            for key in ('book_cache_limit', 'search_index_cache_limit'):
+                limit = changes.get(key)
+                if isinstance(limit, str) and re.fullmatch(r'[0-9]+', limit):
+                    changes[key] = int(limit)
             settings = await run_db(store.set_general_settings, **changes)
         except ValueError:
             return response(
@@ -3216,6 +3232,8 @@ window.location.assign(payload.redirect||'/');
             )
         if library_manager is not None and 'book_cache_limit' in changes:
             await run_io(library_manager.trim_book_cache)
+        if library_manager is not None and 'search_index_cache_limit' in changes:
+            await run_io(library_manager.trim_search_index_cache)
         return general_settings_response(settings)
 
     async def admin_ai_user_access(request):
@@ -4611,6 +4629,59 @@ window.location.assign(payload.redirect||'/');
                 'X-Content-Type-Options': 'nosniff',
             },
         )
+
+    async def book_search(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if not await run_db(
+            store.can_read_book, principal.user_id, principal.role, book_id
+        ):
+            return response(error_payload('not_found', 'Not Found'), 404)
+        book = await run_db(store.book_by_id, book_id)
+        if book is None or book.source_format != EPUB_FORMAT:
+            return response(error_payload('not_found', 'Not Found'), 404)
+        values = request.query_params.getlist('q')
+        query = normalize_search_query(values[0]) if len(values) == 1 else None
+        if query is None:
+            return response(
+                error_payload('invalid_book_search_query', 'Invalid search query'),
+                400,
+                cache_control='private, no-store',
+            )
+        pages = request.query_params.getlist('page')
+        page_value = pages[0] if len(pages) == 1 else '1'
+        if not re.fullmatch(r'[0-9]{1,6}', page_value) or int(page_value) < 1:
+            return response(
+                error_payload('invalid_book_search_page', 'Invalid search page'),
+                400,
+                cache_control='private, no-store',
+            )
+        try:
+            result = await run_io(search_service.search, book_id, query, int(page_value))
+        except (
+            BookSearchUnavailable,
+            SearchGenerationChanged,
+            ServerPageError,
+            OSError,
+            sqlite3.Error,
+        ):
+            return response(
+                error_payload(
+                    'book_search_unavailable',
+                    'Book search is temporarily unavailable',
+                ),
+                503,
+                cache_control='private, no-store',
+            )
+        if not await run_db(
+            store.can_read_book, principal.user_id, principal.role, book_id
+        ):
+            return response(
+                error_payload('not_found', 'Not Found'),
+                404,
+                cache_control='private, no-store',
+            )
+        return response(result, cache_control='private, no-store')
 
     async def pdf_document(request):
         principal = require_principal(request)
@@ -6015,6 +6086,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/webhooks/{webhook_id}/rotate-secret', admin_webhook_rotate, methods=['POST']),
         Route('/api/admin/webhooks/{webhook_id}', admin_webhook, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
+        Route('/api/books/{book_id}/search', book_search, methods=['GET']),
         Route(
             '/api/books/{book_id}/document',
             pdf_document,

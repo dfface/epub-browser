@@ -40,7 +40,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 32
+DB_SCHEMA_VERSION = 33
 APPEARANCE_DEFAULTS = {"automatic": False, "day": "light", "night": "dark", "manual": "light"}
 APPEARANCE_THEMES = frozenset({"light", "dark", "sepia", "forest", "ocean", "peach", "lavender"})
 
@@ -500,6 +500,12 @@ class StateStore:
                     )
                 """)
                 connection.execute("PRAGMA user_version = 32")
+            if version < 33:
+                self._add_column_if_missing(
+                    connection, "general_settings", "search_index_cache_limit",
+                    "TEXT NOT NULL DEFAULT '20'",
+                )
+                connection.execute("PRAGMA user_version = 33")
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -5272,17 +5278,22 @@ class StateStore:
         """Return the public general server configuration."""
         with self._connection() as connection:
             row = connection.execute(
-                "SELECT recent_reading_limit, reading_insights_rank_limit, book_cache_limit "
+                "SELECT recent_reading_limit, reading_insights_rank_limit, "
+                "book_cache_limit, search_index_cache_limit "
                 "FROM general_settings WHERE singleton = 1"
             ).fetchone()
         settings = dict(row)
         settings["book_cache_limit"] = int(settings["book_cache_limit"])
+        settings["search_index_cache_limit"] = int(
+            settings["search_index_cache_limit"]
+        )
         return settings
 
     def set_general_settings(
         self, *, recent_reading_limit: Optional[int] = None,
         reading_insights_rank_limit: Optional[int] = None,
         book_cache_limit: Optional[int] = None,
+        search_index_cache_limit: Optional[int] = None,
     ) -> dict:
         if recent_reading_limit is not None:
             try:
@@ -5299,6 +5310,11 @@ class StateStore:
             type(book_cache_limit) is not int or book_cache_limit < 1
         ):
             raise ValueError("Book cache limit must be a positive integer")
+        if search_index_cache_limit is not None and (
+            type(search_index_cache_limit) is not int
+            or search_index_cache_limit < 1
+        ):
+            raise ValueError("Search index cache limit must be a positive integer")
         try:
             with self._connection() as connection:
                 row = connection.execute(
@@ -5307,20 +5323,29 @@ class StateStore:
                     SET recent_reading_limit = COALESCE(?, recent_reading_limit),
                         reading_insights_rank_limit = COALESCE(?, reading_insights_rank_limit),
                         book_cache_limit = COALESCE(?, book_cache_limit),
+                        search_index_cache_limit = COALESCE(?, search_index_cache_limit),
                         updated_at = CURRENT_TIMESTAMP
                     WHERE singleton = 1
-                    RETURNING recent_reading_limit, reading_insights_rank_limit, book_cache_limit
+                    RETURNING recent_reading_limit, reading_insights_rank_limit,
+                              book_cache_limit, search_index_cache_limit
                     """,
                     (
                         recent_reading_limit,
                         reading_insights_rank_limit,
                         str(book_cache_limit) if book_cache_limit is not None else None,
+                        (
+                            str(search_index_cache_limit)
+                            if search_index_cache_limit is not None else None
+                        ),
                     ),
                 ).fetchone()
         except OverflowError as exc:
             raise ValueError("Setting is outside the SQLite integer range") from exc
         settings = dict(row)
         settings["book_cache_limit"] = int(settings["book_cache_limit"])
+        settings["search_index_cache_limit"] = int(
+            settings["search_index_cache_limit"]
+        )
         return settings
 
     def set_ai_user_access(

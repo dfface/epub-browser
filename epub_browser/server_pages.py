@@ -105,6 +105,16 @@ class ServerPageRenderer:
             "style_links": style_links,
         }
 
+    def chapter_count(self) -> int:
+        """Return the validated EPUB spine length used to build derived indexes."""
+        if self.source_format != EPUB_FORMAT:
+            raise ServerPageError("Book search is EPUB-only")
+        metadata = self._read_json(self.content_dir / "metadata.json")
+        chapters = metadata.get("chapters")
+        if not isinstance(chapters, list):
+            raise ServerPageError("Book content cache is invalid")
+        return len(chapters)
+
     def toc_bytes(self) -> bytes:
         if self.source_format == PDF_FORMAT:
             _metadata, renderer = self._pdf_renderer()

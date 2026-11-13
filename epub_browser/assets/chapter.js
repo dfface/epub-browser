@@ -542,6 +542,9 @@ function initScript() {
         if (isContinuousScroll) {
             initContinuousScroll();
         }
+        if (hasSearchFragment()) {
+            scheduleSearchLocate();
+        }
     }
     
     function savePaginationModeAndReload(nextMode) {
@@ -709,6 +712,7 @@ function initScript() {
                 calculateTotalPages();
                 watchPaginationCanvas();
                 if (target) scrollToPaginationTarget(target);
+                if (hasSearchFragment()) scheduleSearchLocate();
                 setTimeout(function() {
                     hideLoading();
                     Fancybox.bind('#eb-content img', {
@@ -851,7 +855,46 @@ function initScript() {
         }
     }
 
+    function currentSearchHit() {
+        return window.EpubBookSearch && typeof window.EpubBookSearch.parseHash === 'function'
+            ? window.EpubBookSearch.parseHash(window.location.hash)
+            : null;
+    }
+
+    function hasSearchFragment() {
+        return Boolean(currentSearchHit());
+    }
+
+    function searchLocateRoot() {
+        if (!isContinuousScroll) return content;
+        return content.querySelector('.continuous-chapter[data-chapter-index="' + chapter_index + '"]') || content;
+    }
+
+    function applySearchFragment() {
+        var hit = currentSearchHit();
+        if (!hit) return false;
+        return window.EpubBookSearch.locate(searchLocateRoot(), hit, {
+            pagination: isPaginationMode,
+            pageWidth: pageWidth,
+            container: content,
+            showPage: function(page) { showPage(page); }
+        });
+    }
+
+    function scheduleSearchLocate() {
+        window.requestAnimationFrame(function() {
+            window.requestAnimationFrame(function() {
+                if (!applySearchFragment()) {
+                    window.setTimeout(applySearchFragment, 120);
+                }
+            });
+        });
+    }
+
     function loadReadingProgress() {
+        if (hasSearchFragment()) {
+            return;
+        }
         if (isPaginationMode) {
             if (totalPages === 0) {
                 setTimeout(loadReadingProgress, 100);
@@ -996,8 +1039,20 @@ function initScript() {
         link.href = url;
         var match = link.pathname.match(/\/chapter_(\d+)\.html$/);
         if (!match) return null;
-        var bookPath = '/book/' + book_hash + '/';
-        if (link.pathname.indexOf(bookPath) === -1) return null;
+        // Compare path segments so deployments behind a URL prefix still
+        // recognize their own book, and tolerate percent-encoded hashes.
+        var parts = link.pathname.split('/');
+        var bookIndex = parts.indexOf('book');
+        if (bookIndex === -1) return null;
+        var targetHash = parts[bookIndex + 1] || '';
+        if (targetHash !== book_hash) {
+            try {
+                targetHash = decodeURIComponent(targetHash);
+            } catch (error) {
+                return null;
+            }
+            if (targetHash !== book_hash) return null;
+        }
         // Chapter-local state such as `annotation` and `ai_result` must never
         // follow the reader into another chapter.  A hash is retained only
         // because a TOC entry can deliberately point at a section anchor.
@@ -1088,6 +1143,7 @@ function initScript() {
             content.focus({ preventScroll: true });
             if (anchor) anchor.scrollIntoView({ behavior: 'auto', block: 'start' });
             else window.scrollTo(0, 0);
+            if (hasSearchFragment()) scheduleSearchLocate();
         });
     }
 
@@ -1114,7 +1170,7 @@ function initScript() {
         updateTocHighlight();
         setBookTocActiveChapter(target.index, true);
         selectReadingChapter(target.index);
-        var readKey = 'eb_ci_' + target.index + (target.hash || '');
+        var readKey = 'eb_ci_' + target.index + (hasSearchFragment() ? '' : (target.hash || ''));
         localStorage.setItem(book_hash, readKey);
         refreshChapterAnnotations(target, false);
         scrollToChapterTarget(target);
@@ -1192,7 +1248,7 @@ function initScript() {
                 visibleChapterIndex = target.index;
                 selectReadingChapter(target.index);
                 setBookTocActiveChapter(target.index, true);
-                localStorage.setItem(book_hash, 'eb_ci_' + target.index + (target.hash || ''));
+                localStorage.setItem(book_hash, 'eb_ci_' + target.index + (hasSearchFragment() ? '' : (target.hash || '')));
                 announceReadingSessionChapter(
                     target.index,
                     loadedChapter.getAttribute('data-chapter-title') || ''
@@ -1272,6 +1328,34 @@ function initScript() {
 
     window.addEventListener('popstate', function() {
         navigateReaderChapter(window.location.href, { history: false });
+        if (hasSearchFragment()) scheduleSearchLocate();
+    });
+    window.addEventListener('hashchange', function() {
+        if (hasSearchFragment()) scheduleSearchLocate();
+    });
+    window.addEventListener('epub-browser:book-search-locate', function() {
+        scheduleSearchLocate();
+    });
+    window.addEventListener('epub-browser:book-search-navigate', function(event) {
+        event.preventDefault();
+        var href = event.detail && event.detail.href;
+        if (!href) return;
+        var target = chapterTargetFromUrl(href);
+        if (target && !isContinuousScroll && target.path === window.location.pathname) {
+            try {
+                window.history.pushState({ chapterIndex: target.index }, '', href);
+            } catch (error) {
+                window.location.assign(href);
+                return;
+            }
+            scheduleSearchLocate();
+            return;
+        }
+        // Fall back to a regular page load whenever the reader cannot adopt
+        // the URL in place, so a result never turns into a dead click.
+        if (!navigateReaderChapter(href, { history: true })) {
+            window.location.assign(href);
+        }
     });
     wireReaderChapterNavigation();
     
@@ -2586,6 +2670,7 @@ function initScript() {
             }
             var top = destination.getBoundingClientRect().top + window.scrollY - 80;
             window.scrollTo({top: Math.max(0, top), behavior: 'auto'});
+            if (hasSearchFragment()) scheduleSearchLocate();
         });
     }
 

@@ -1573,5 +1573,20 @@
   "apiDocs.operation.listMyVocabulary": "Tampilkan kosakata Anda",
   "apiDocs.operation.recordMyVocabularyLookup": "Catat pencarian kata",
   "apiDocs.operation.patchMyVocabulary": "Perbarui penguasaan kata",
-  "apiDocs.operation.deleteMyVocabulary": "Hapus kata atau pencariannya di satu buku"
+  "apiDocs.operation.deleteMyVocabulary": "Hapus kata atau pencariannya di satu buku",
+  "book.search": "Cari di buku ini",
+  "book.searchPlaceholder": "Cari di buku ini",
+  "book.searchHint": "Ketik kata atau frasa untuk mencari di buku ini.",
+  "book.searching": "Mencari…",
+  "book.searchNoResults": "Tidak ada hasil yang cocok.",
+  "book.searchResultCount": "Hasil: {count}",
+  "book.searchPrevPage": "Halaman sebelumnya",
+  "book.searchNextPage": "Halaman berikutnya",
+  "book.searchPageStatus": "Halaman {page} dari {pages}",
+  "book.searchPageOutOfRange": "Tidak ada hasil di halaman ini",
+  "book.searchFailed": "Pencarian gagal. Coba lagi.",
+  "book.searchUnavailable": "Pencarian sementara tidak tersedia. Coba lagi nanti.",
+  "book.closeSearch": "Tutup pencarian",
+  "admin.general.searchIndexCacheLimit": "Indeks pencarian buku yang di-cache di disk",
+  "admin.general.searchIndexCacheLimitHelp": "Server menyimpan sebanyak ini indeks pencarian yang terakhir digunakan. Indeks yang dihapus akan dibuat ulang saat buku itu dicari lagi."
 }

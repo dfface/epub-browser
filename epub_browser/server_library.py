@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from .asset_publisher import AssetPublisher, PublishedAssets
+from .book_search import BookSearchIndexStore, SearchGeneration
 from .book_identity import (
     BOOK_ID_STORAGE_EMBEDDED,
     BOOK_ID_STORAGE_SIDECAR,
@@ -197,6 +198,12 @@ class ServerLibraryManager:
         self.public_dir = self.cache_dir / "public"
         self.staging_dir = self.cache_dir / "staging"
         self.catalog_path = self.cache_dir / "catalog.json"
+        self.search_indexes = BookSearchIndexStore(
+            self.cache_dir / "search",
+            limit=lambda: self.state_store.get_general_settings()[
+                "search_index_cache_limit"
+            ],
+        )
         self._assets = None
         self._published_library_signature = None
         self._staging_prepared = False
@@ -1374,6 +1381,39 @@ class ServerLibraryManager:
     def trim_book_cache(self) -> None:
         with self._commit_lock:
             self._trim_book_cache_locked()
+
+    def trim_search_index_cache(self) -> None:
+        """Trim derived search indexes to the configured LRU size."""
+        self.search_indexes.trim()
+
+    def search_generation(self, book_id: str) -> Optional[SearchGeneration]:
+        """Return the published EPUB cache identity used to validate an index."""
+        with self._commit_lock:
+            return self._search_generation_locked(book_id)
+
+    def _search_generation_locked(self, book_id: str) -> Optional[SearchGeneration]:
+        record = self.state_store.book_by_id(book_id)
+        if record is None or record.source_format != EPUB_FORMAT:
+            return None
+        directory = self.public_dir / "book" / book_id
+        content = directory / "content"
+        try:
+            stat_result = os.stat(content)
+            revision = (directory / SERVER_OUTPUT_REVISION_FILE).read_text(
+                encoding="utf-8"
+            ).strip()
+        except OSError:
+            return None
+        if revision != SERVER_OUTPUT_REVISION:
+            return None
+        if not (content / "metadata.json").is_file():
+            return None
+        return SearchGeneration(
+            content_revision=revision,
+            source_fingerprint=record.source_fingerprint,
+            content_device=stat_result.st_dev,
+            content_inode=stat_result.st_ino,
+        )
 
     def _trim_book_cache_locked(self) -> None:
         book_root = self.public_dir / "book"

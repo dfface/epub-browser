@@ -1573,5 +1573,20 @@
   "apiDocs.operation.listMyVocabulary": "अपनी शब्द सूची देखें",
   "apiDocs.operation.recordMyVocabularyLookup": "शब्द खोज दर्ज करें",
   "apiDocs.operation.patchMyVocabulary": "शब्द की सीखने की स्थिति बदलें",
-  "apiDocs.operation.deleteMyVocabulary": "शब्द या किसी किताब में उसकी खोजें मिटाएँ"
+  "apiDocs.operation.deleteMyVocabulary": "शब्द या किसी किताब में उसकी खोजें मिटाएँ",
+  "book.search": "इस पुस्तक में खोजें",
+  "book.searchPlaceholder": "इस पुस्तक में खोजें",
+  "book.searchHint": "इस पुस्तक में खोजने के लिए कोई शब्द या वाक्यांश लिखें।",
+  "book.searching": "खोज रहे हैं…",
+  "book.searchNoResults": "कोई मेल नहीं मिला।",
+  "book.searchResultCount": "परिणाम: {count}",
+  "book.searchPrevPage": "पिछला पृष्ठ",
+  "book.searchNextPage": "अगला पृष्ठ",
+  "book.searchPageStatus": "पृष्ठ {page} / {pages}",
+  "book.searchPageOutOfRange": "इस पृष्ठ पर कोई परिणाम नहीं",
+  "book.searchFailed": "खोज विफल रही। फिर से प्रयास करें।",
+  "book.searchUnavailable": "खोज अस्थायी रूप से उपलब्ध नहीं है। बाद में प्रयास करें।",
+  "book.closeSearch": "खोज बंद करें",
+  "admin.general.searchIndexCacheLimit": "डिस्क पर कैश किए गए पुस्तक खोज इंडेक्स",
+  "admin.general.searchIndexCacheLimitHelp": "सर्वर हाल में उपयोग किए गए इतने खोज इंडेक्स रखता है। हटाया गया इंडेक्स उस पुस्तक की अगली खोज पर फिर बनाया जाता है।"
 }
