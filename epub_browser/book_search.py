@@ -114,7 +114,9 @@ def _generation_header(generation: SearchGeneration) -> dict[str, str]:
     }
 
 
-def build_book_search_index(path, renderer, generation: SearchGeneration) -> None:
+def build_book_search_index(
+    path, renderer, generation: SearchGeneration, *, publish=None
+) -> None:
     """Atomically rebuild one book index from validated content-cache chapters."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -166,7 +168,7 @@ def build_book_search_index(path, renderer, generation: SearchGeneration) -> Non
             connection.commit()
         finally:
             connection.close()
-        os.replace(temporary, path)
+        (publish or os.replace)(temporary, path)
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
@@ -386,13 +388,6 @@ class BookSearchIndexStore:
             if trim:
                 self.trim()
 
-    def is_current(self, book_id: str, generation: SearchGeneration) -> bool:
-        """Return whether a usable index already matches this cache generation."""
-        try:
-            return index_matches_generation(self.path_for(book_id), generation)
-        except BookSearchUnavailable:
-            return False
-
     def search(self, book_id, query, generation, renderer, page=1) -> dict:
         path = self.path_for(book_id)
         with self.lease(book_id):
@@ -400,19 +395,18 @@ class BookSearchIndexStore:
                 if not index_matches_generation(path, generation):
                     if renderer is None:
                         raise BookSearchUnavailable("Book content is not cached")
-                    build_book_search_index(path, renderer, generation)
+                    build_book_search_index(path, renderer, generation, publish=self._publish)
                 try:
                     result = query_book_search_index(path, query, page=page)
                 except sqlite3.DatabaseError:
                     if renderer is None:
                         raise BookSearchUnavailable("Book search index is unavailable")
-                    build_book_search_index(path, renderer, generation)
+                    build_book_search_index(path, renderer, generation, publish=self._publish)
                     result = query_book_search_index(path, query, page=page)
                 try:
                     os.utime(path, None)
                 except OSError:
                     pass
-            self.trim()
             return result
 
     def _book_lock(self, book_id: str) -> threading.Lock:
@@ -425,24 +419,32 @@ class BookSearchIndexStore:
 
     def trim(self) -> None:
         with self._lock:
-            limit = max(1, int(self._limit()))
-            candidates = []
-            for path in self.root.glob("*.sqlite3"):
-                try:
-                    candidates.append((path.stat().st_mtime_ns, path))
-                except OSError:
-                    continue
-            candidates.sort(reverse=True)
-            self._needs_trim = False
-            for _, path in candidates[limit:]:
-                book_id = path.name[: -len(".sqlite3")]
-                if self._readers.get(book_id):
-                    self._needs_trim = True
-                    continue
-                try:
-                    path.unlink()
-                except OSError:
-                    self._needs_trim = True
+            self._trim_locked()
+
+    def _publish(self, temporary: Path, destination: Path) -> None:
+        with self._lock:
+            if not destination.exists():
+                self._trim_locked(reserve=1)
+            os.replace(temporary, destination)
+
+    def _trim_locked(self, *, reserve: int = 0) -> None:
+        limit = max(1, int(self._limit()))
+        candidates = []
+        for path in self.root.glob("*.sqlite3"):
+            try:
+                candidates.append((path.stat().st_mtime_ns, path))
+            except OSError:
+                continue
+        candidates.sort(reverse=True)
+        self._needs_trim = False
+        for _, path in candidates[limit - reserve:]:
+            if self._readers.get(path.stem):
+                self._needs_trim = True
+                continue
+            try:
+                path.unlink()
+            except OSError:
+                self._needs_trim = True
 
 
 class BookSearchService:
@@ -471,24 +473,17 @@ class BookSearchService:
             return self._search_published_directory(book_id, query, page)
         from .server_library import BookCacheUnavailable
 
-        restore = False
         for attempt in range(2):
             try:
-                with self.library_manager.book_cache(
-                    book_id, read=True, restore=restore
-                ):
+                with self.library_manager.book_cache(book_id, read=True):
                     generation = self.library_manager.search_generation(book_id)
                     if generation is None:
                         raise BookSearchUnavailable("Book search is unavailable")
-                    if not restore and not self.indexes.is_current(book_id, generation):
-                        restore = True
-                        continue
                     result = self.indexes.search(
                         book_id, query, generation, self._renderer(book_id), page
                     )
                     if self.library_manager.search_generation(book_id) != generation:
                         if attempt == 0:
-                            restore = False
                             continue
                         raise SearchGenerationChanged()
                     return result

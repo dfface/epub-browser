@@ -43,7 +43,7 @@
       body.classList.add('annotation-hub-container');
     }
     const label = className === 'vocabulary-list-dialog' ? append(title, 'span') : title;
-    return {dialog, title: label, close, body};
+    return {dialog, header, title: label, close, body};
   }
 
   function masteryOptions(select, includeAll) {
@@ -57,6 +57,16 @@
   }
 
   const list = panel('vocabulary-title', 'vocabulary-list-dialog');
+  const listHeading = list.title.closest('h2');
+  listHeading.tabIndex = -1;
+  const allWords = button(list.header, 'annotation-hub-header-button', undefined, () => {
+    openList('');
+    listHeading.focus({preventScroll: true});
+  });
+  allWords.hidden = true;
+  list.header.prepend(allWords);
+  append(allWords, 'i', 'fas fa-arrow-left').setAttribute('aria-hidden', 'true');
+  const allWordsLabel = append(allWords, 'span');
   const detail = panel('vocabulary-word', 'vocabulary-detail-dialog');
   const controls = append(list.body, 'div', 'vocabulary-filters');
   const search = append(controls, 'input');
@@ -96,6 +106,10 @@
     if (!view) return;
     const current = document.activeElement?.dataset.wordId;
     list.title.textContent = t(view.bookId ? 'bookTitle' : 'navigation');
+    allWords.hidden = !view.bookId;
+    allWordsLabel.textContent = t('allWords');
+    allWords.setAttribute('aria-label', allWordsLabel.textContent);
+    allWords.title = allWordsLabel.textContent;
     list.close.setAttribute('aria-label', t('close'));
     search.placeholder = t('search');
     search.setAttribute('aria-label', t('search'));
@@ -353,13 +367,20 @@
       detail.title.focus();
     }
   });
+  function openList(bookId) {
+    clearTimeout(searchTimer);
+    view?.controller?.abort();
+    search.value = '';
+    filter.value = '';
+    list.dialog.scrollTop = 0;
+    view = {bookId, words: [], page: 1, total: 0, totalPages: 0};
+    loadPage(view, 1);
+  }
+
   triggers.forEach(control => {
     control.addEventListener('click', () => {
-      search.value = '';
-      filter.value = '';
       list.dialog.showModal();
-      view = {bookId: control.dataset.vocabulary, words: [], page: 1, total: 0, totalPages: 0};
-      loadPage(view, 1);
+      openList(control.dataset.vocabulary);
     });
   });
 })();

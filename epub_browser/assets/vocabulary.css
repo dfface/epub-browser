@@ -167,6 +167,20 @@
 .vocabulary-list-dialog .annotation-hub-header-label {
     font-size: clamp(1.25rem, 2vw, 1.65rem);
 }
+.vocabulary-list-dialog .annotation-hub-header-button {
+    min-width: 44px;
+    max-width: 100%;
+    border: 0;
+    padding: 0 10px;
+    background: transparent;
+    font-weight: 600;
+}
+.vocabulary-list-dialog .annotation-hub-header-button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.vocabulary-list-dialog .annotation-hub-header-button:hover { background: var(--hover); }
 .vocabulary-list-dialog .annotation-hub-icon-button { border: 0; background: transparent; }
 .vocabulary-list-dialog .annotation-hub-icon-button:hover { background: var(--hover); }
 .vocabulary-list-dialog .annotation-hub-container { padding: 0; }

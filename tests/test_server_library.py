@@ -149,6 +149,9 @@ class ServerLibraryManagerTests(unittest.TestCase):
             epub_chapter = f"/book/{epub.book_id}/chapter_0.html"
             self.assertEqual(client.get(epub_chapter).status_code, 200)
             csrf = client.get("/api/session").json()["csrf_token"]
+            self.store.set_reading_progress(
+                self.store.get_user_by_username("admin").user_id, epub.book_id, 0,
+            )
             large_limit = "1000000000000000000000000000001"
             large_settings = client.put(
                 "/api/admin/general-settings",
@@ -204,8 +207,20 @@ class ServerLibraryManagerTests(unittest.TestCase):
             pdf_source.rename(moved_pdf)
             self.assertEqual(client.get(pdf_chapter + "?prepare=start").status_code, 503)
             moved_pdf.rename(pdf_source)
-            self.assertEqual(client.get(pdf_chapter + "?prepare=start").status_code, 204)
-            self.assertEqual(client.get(pdf_chapter).status_code, 200)
+            replace = os.replace
+
+            def check_admission(source, destination):
+                if destination == pdf_root and (source / "pdf" / "document.pdf").is_file():
+                    self.assertFalse((epub_root / "content" / "chapter_0.json").exists())
+                return replace(source, destination)
+
+            with mock.patch("epub_browser.server_library.os.replace", side_effect=check_admission):
+                self.assertEqual(client.get(pdf_chapter + "?prepare=start").status_code, 204)
+            self.assertFalse(manager.book_cache_is_cold(pdf.book_id))
+            opened = client.get(pdf_chapter, headers={"Sec-Fetch-Mode": "navigate"})
+            self.assertEqual(opened.status_code, 200)
+            self.assertNotIn('id="bookPrepareProgress"', opened.text)
+            self.assertIn('id="eb-content"', opened.text)
             document = client.get(
                 f"/api/books/{pdf.book_id}/document", headers={"Range": "bytes=0-4"}
             )
@@ -241,6 +256,55 @@ class ServerLibraryManagerTests(unittest.TestCase):
             self.assertEqual(second.status_code, 200, second.text)
             self.assertEqual(second.json()["results"][0]["match"], "Original")
             self.assertFalse(chapter_file.exists())
+
+    def test_resizing_both_caches_preserves_in_flight_reads_and_rebuilds_on_demand(self):
+        self._write_epub(self.source_dir / "second.epub", "Original second")
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        first, second = manager.reconcile().active_books
+        indexes = manager.search_indexes
+        first_index = indexes.path_for(first.book_id)
+        second_index = indexes.path_for(second.book_id)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, AuthConfig.from_values([])),
+            library_manager=manager,
+        )
+        with TestClient(app) as client:
+            self.assertEqual(_json_login(client, "admin", "secret").status_code, 200)
+            csrf = client.get("/api/session").json()["csrf_token"]
+
+            def resize(limit):
+                result = client.put(
+                    "/api/admin/general-settings",
+                    json={"book_cache_limit": limit, "search_index_cache_limit": limit},
+                    headers={"X-CSRF-Token": csrf},
+                )
+                self.assertEqual(result.status_code, 200, result.text)
+
+            def search(book):
+                result = client.get(f"/api/books/{book.book_id}/search?q=Original")
+                self.assertEqual(result.status_code, 200, result.text)
+
+            search(first)
+            with manager.book_cache(first.book_id), indexes.lease(first.book_id):
+                search(second)
+                resize(1)
+                self.assertFalse(manager.book_cache_is_cold(first.book_id))
+                self.assertTrue(first_index.is_file())
+                self.assertTrue(second_index.is_file())
+
+            self.assertTrue(manager.book_cache_is_cold(first.book_id))
+            self.assertFalse(first_index.exists())
+            resize(2)
+            self.assertTrue(manager.book_cache_is_cold(first.book_id))
+            self.assertFalse(first_index.exists())
+            search(first)
+            self.assertFalse(manager.book_cache_is_cold(first.book_id))
+            self.assertFalse(manager.book_cache_is_cold(second.book_id))
+            self.assertTrue(first_index.is_file())
+            self.assertTrue(second_index.is_file())
 
     def test_new_epub_metadata_and_content_cache_share_one_extraction(self):
         manager = self._manager()
@@ -285,6 +349,40 @@ class ServerLibraryManagerTests(unittest.TestCase):
                 self.assertTrue((book_dir / _EVICTED).is_file())
                 self.assertFalse((book_dir / "content" / "chapter_0.json").exists())
 
+        cold = next(record for record in records if record.book_id != recent.book_id)
+        app = create_app(
+            manager.public_dir,
+            state_store=self.store,
+            auth_service=AuthService(self.store, AuthConfig.from_values([])),
+            library_manager=manager,
+        )
+        with TestClient(app) as client:
+            self.assertEqual(_json_login(client, "admin", "secret").status_code, 200)
+            book_url = f"/book/{cold.book_id}/index.html"
+            navigation = {"Sec-Fetch-Mode": "navigate"}
+            waiting = client.get(book_url, headers=navigation)
+            self.assertIn('id="bookPrepareProgress"', waiting.text)
+            self.assertIn('href="?open=1"', waiting.text)
+            self.assertEqual(client.get(book_url + "?prepare=start").status_code, 204)
+            opened = client.get(book_url, headers=navigation)
+            self.assertEqual(opened.status_code, 200)
+            self.assertNotIn('id="bookPrepareProgress"', opened.text)
+            self.assertIn('class="book-info-title"', opened.text)
+            self.assertTrue(manager.book_cache_is_cold(recent.book_id))
+            self.assertFalse(manager.book_cache_is_cold(cold.book_id))
+            # Another reader takes the only slot before the browser follows the
+            # preparation page's direct-open link.
+            recent_url = f"/book/{recent.book_id}/chapter_0.html"
+            self.assertEqual(client.get(recent_url).status_code, 200)
+            self.assertTrue(manager.book_cache_is_cold(cold.book_id))
+            direct = client.get(book_url + "?open=1", headers=navigation)
+            self.assertEqual(direct.status_code, 200)
+            self.assertIn('class="book-info-title"', direct.text)
+            self.assertTrue(manager.book_cache_is_cold(recent.book_id))
+            search = client.get(f"/api/books/{recent.book_id}/search?q=third")
+            self.assertEqual(search.status_code, 200, search.text)
+            self.assertFalse(manager.book_cache_is_cold(recent.book_id))
+
     def test_lru_cold_pdf_keeps_shelf_metadata_and_can_restore(self):
         self.source.unlink()
         first = self.source_dir / "first.pdf"
@@ -312,11 +410,12 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertTrue((cold_dir / _EVICTED).is_file())
         self.assertTrue((cold_dir / "pdf" / "metadata.json").is_file())
         self.assertFalse((cold_dir / "pdf" / "document.pdf").exists())
-        with manager.book_cache(cold.book_id):
-            self.assertEqual(
-                (cold_dir / "pdf" / "document.pdf").read_bytes(),
-                first.read_bytes(),
-            )
+        with manager.book_cache(recent.book_id), manager.book_cache(cold.book_id):
+            self.assertEqual((cold_dir / "pdf" / "document.pdf").read_bytes(), first.read_bytes())
+            self.assertFalse(manager.book_cache_is_cold(recent.book_id))
+
+        self.assertTrue(manager.book_cache_is_cold(recent.book_id))
+        self.assertFalse(manager.book_cache_is_cold(cold.book_id))
 
     def test_cancelled_reconcile_cleans_prepared_epub_staging(self):
         manager = self._manager()

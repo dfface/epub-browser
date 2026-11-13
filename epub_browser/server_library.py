@@ -989,11 +989,15 @@ class ServerLibraryManager:
                     f".rollback-{plan.record.book_id}-{uuid.uuid4().hex}"
                 )
                 had_previous = destination.exists()
+                if not metadata_only and not (destination / SERVER_OUTPUT_REVISION_FILE).is_file():
+                    self._trim_book_cache_locked(reserve=1)
                 if had_previous:
                     os.replace(destination, rollback)
                 try:
                     os.replace(converted.output_dir, destination)
                     self._preserve_access_time(rollback, destination)
+                    if restore:
+                        (destination / _ACCESSED).touch()
                     updated = plan.record if restore else self.state_store.update_book_version(
                         plan.record.book_id,
                         plan.fingerprint,
@@ -1092,11 +1096,15 @@ class ServerLibraryManager:
                     )
                     if persisted.book_id != plan.record.book_id:
                         raise ValueError("PDF identity changed during conversion")
+                if not metadata_only and not (destination / PDF_OUTPUT_REVISION_FILE).is_file():
+                    self._trim_book_cache_locked(reserve=1)
                 if had_previous:
                     os.replace(destination, rollback)
                 os.replace(job_root, destination)
                 activated = True
                 self._preserve_access_time(rollback, destination)
+                if restore:
+                    (destination / _ACCESSED).touch()
                 updated = plan.record if restore else self.state_store.update_book_version(
                     plan.record.book_id,
                     plan.fingerprint,
@@ -1382,10 +1390,6 @@ class ServerLibraryManager:
         with self._commit_lock:
             self._trim_book_cache_locked()
 
-    def trim_search_index_cache(self) -> None:
-        """Trim derived search indexes to the configured LRU size."""
-        self.search_indexes.trim()
-
     def search_generation(self, book_id: str) -> Optional[SearchGeneration]:
         """Return the published EPUB cache identity used to validate an index."""
         with self._commit_lock:
@@ -1415,7 +1419,7 @@ class ServerLibraryManager:
             content_inode=stat_result.st_ino,
         )
 
-    def _trim_book_cache_locked(self) -> None:
+    def _trim_book_cache_locked(self, *, reserve: int = 0) -> None:
         book_root = self.public_dir / "book"
         records = {record.book_id: record for record in self.state_store.book_records()}
         limit = self.state_store.get_general_settings()["book_cache_limit"]
@@ -1434,15 +1438,20 @@ class ServerLibraryManager:
             if not (directory / revision).is_file():
                 continue
             access = directory / _ACCESSED
-            access_time = access.stat().st_mtime_ns if access.exists() else 0
+            try:
+                access_time = access.stat().st_mtime_ns
+            except FileNotFoundError:
+                access_time = 0
+            # A first open updates the cache marker before the reader can
+            # report progress. Both timestamps contribute to the same LRU order.
+            last_used = max(access_time, reading_recency.get(record.book_id, 0) * 10**9)
             candidates.append((
                 record.active,
-                reading_recency.get(record.book_id, 0),
-                access_time,
+                last_used,
                 record.book_id,
             ))
         self._cache_needs_trim = False
-        for _, _, _, book_id in sorted(candidates, reverse=True)[limit:]:
+        for _, _, book_id in sorted(candidates, reverse=True)[max(0, limit - reserve):]:
             if self._cache_readers[book_id]:
                 self._cache_needs_trim = True
                 continue
@@ -1538,8 +1547,6 @@ class ServerLibraryManager:
         except Exception as error:
             self.reporter.detail(f"Could not restore book cache {book_id}: {error}")
             raise BookCacheUnavailable("Book content is unavailable") from error
-        with self._commit_lock:
-            self._cache_needs_trim = True
 
     def _cache_valid(self, record: BookRecord) -> bool:
         directory = self.public_dir / "book" / record.book_id

@@ -5,6 +5,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from starlette.testclient import TestClient
 
@@ -139,12 +140,21 @@ class BookSearchIndexStoreTests(unittest.TestCase):
         first = store.path_for("alpha")
         os.utime(first, ns=(1, 1))
 
-        store.search(
-            "beta", "hello", generation, _Renderer([("B", "<p>hello</p>")])
-        )
+        second = store.path_for("beta")
+        replace = os.replace
+
+        def check_admission(source, destination):
+            if destination == second:
+                self.assertFalse(first.exists())
+            return replace(source, destination)
+
+        with mock.patch("epub_browser.book_search.os.replace", side_effect=check_admission):
+            store.search(
+                "beta", "hello", generation, _Renderer([("B", "<p>hello</p>")])
+            )
 
         self.assertFalse(first.exists())
-        self.assertTrue(store.path_for("beta").exists())
+        self.assertEqual(store.search("beta", "hello", generation, None)["total"], 1)
 
     def test_generation_change_rebuilds_stale_index(self):
         store = BookSearchIndexStore(self.root, limit=lambda: 5)
@@ -157,6 +167,54 @@ class BookSearchIndexStoreTests(unittest.TestCase):
         )
 
         self.assertEqual(payload["results"][0]["match"], "new")
+
+    def test_lru_defers_eviction_while_an_index_is_in_use(self):
+        store = BookSearchIndexStore(self.root, limit=lambda: 1)
+        generation = SearchGeneration("rev", "fp", 1, 2)
+        renderer = _Renderer([("A", "<p>hello</p>")])
+        store.search("alpha", "hello", generation, renderer)
+        first = store.path_for("alpha")
+        os.utime(first, ns=(1, 1))
+
+        with store.lease("alpha"):
+            store.search("beta", "hello", generation, renderer)
+            self.assertTrue(first.exists())
+            self.assertTrue(store.path_for("beta").exists())
+
+        self.assertFalse(first.exists())
+        self.assertEqual(store.search("beta", "hello", generation, None)["total"], 1)
+
+    def test_failed_index_build_keeps_the_existing_cache_entry(self):
+        store = BookSearchIndexStore(self.root, limit=lambda: 1)
+        generation = SearchGeneration("rev", "fp", 1, 2)
+        renderer = _Renderer([("A", "<p>hello</p>")])
+        store.search("alpha", "hello", generation, renderer)
+
+        with mock.patch.object(renderer, "chapter_content", side_effect=ValueError("invalid chapter")):
+            with self.assertRaisesRegex(ValueError, "invalid chapter"):
+                store.search("beta", "hello", generation, renderer)
+
+        self.assertEqual(store.search("alpha", "hello", generation, None)["total"], 1)
+        self.assertFalse(store.path_for("beta").exists())
+
+    def test_index_publish_uses_limit_changed_during_build(self):
+        limit = 3
+        store = BookSearchIndexStore(self.root, limit=lambda: limit)
+        generation = SearchGeneration("rev", "fp", 1, 2)
+        renderer = _Renderer([("A", "<p>hello</p>")])
+        store.search("alpha", "hello", generation, renderer)
+        store.search("beta", "hello", generation, renderer)
+
+        def chapter_content(index):
+            nonlocal limit
+            limit = 1
+            store.trim()
+            return {"title": "C", "content": "<p>hello</p>"}
+
+        with mock.patch.object(renderer, "chapter_content", side_effect=chapter_content):
+            store.search("gamma", "hello", generation, renderer)
+
+        self.assertEqual(set(self.root.glob("*.sqlite3")), {store.path_for("gamma")})
 
 
 class _BookSearchApiBase(unittest.TestCase):
@@ -211,6 +269,30 @@ class _BookSearchApiBase(unittest.TestCase):
 
 
 class BookSearchApiTests(_BookSearchApiBase):
+    def test_shrinking_search_cache_trims_existing_indexes_without_a_library_manager(self):
+        self.store.resolve_book(
+            self.public / "second.epub",
+            None,
+            "second-fingerprint",
+            {"title": "Second"},
+            preferred_book_id="second",
+        )
+        self._write_book("second", "<p>Hello again</p>")
+        self._login()
+        self.assertEqual(self.client.get("/api/books/book/search?q=hello").status_code, 200)
+        self.assertEqual(self.client.get("/api/books/second/search?q=hello").status_code, 200)
+        csrf = self.client.get("/api/session").json()["csrf_token"]
+
+        with mock.patch("epub_browser.book_search.build_book_search_index", wraps=build_book_search_index) as build:
+            response = self.client.put(
+                "/api/admin/general-settings",
+                json={"search_index_cache_limit": 1},
+                headers={"X-CSRF-Token": csrf},
+            )
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(self.client.get("/api/books/book/search?q=hello").status_code, 200)
+            build.assert_called_once()
+
     def test_requires_authentication(self):
         response = self.client.get("/api/books/book/search?q=hello")
 

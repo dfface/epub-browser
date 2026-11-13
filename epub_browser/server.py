@@ -3232,8 +3232,8 @@ window.location.assign(payload.redirect||'/');
             )
         if library_manager is not None and 'book_cache_limit' in changes:
             await run_io(library_manager.trim_book_cache)
-        if library_manager is not None and 'search_index_cache_limit' in changes:
-            await run_io(library_manager.trim_search_index_cache)
+        if 'search_index_cache_limit' in changes:
+            await run_io(search_service.indexes.trim)
         return general_settings_response(settings)
 
     async def admin_ai_user_access(request):
@@ -4838,6 +4838,7 @@ window.location.assign(payload.redirect||'/');
     var status = document.getElementById('bookPrepareStatus');
     var progress = document.getElementById('bookPrepareProgress');
     var retry = document.getElementById('bookPrepareRetry');
+    var openLink = document.getElementById('bookPrepareOpen');
     var i18n = window.EpubBrowserI18n;
     var timer;
     var attempt = 0;
@@ -4881,7 +4882,9 @@ window.location.assign(payload.redirect||'/');
             pending = false;
             window.clearTimeout(timer);
             if (xhr.status === 204) {{
-                window.location.reload();
+                // A concurrent reader can evict the book between these requests.
+                // Open it directly so the follow-up can restore and render under one pin.
+                window.location.replace(openLink.getAttribute('href') + window.location.hash);
                 return;
             }}
             progress.hidden = true;
@@ -4893,7 +4896,7 @@ window.location.assign(payload.redirect||'/');
 
     retry.addEventListener('click', prepare);
     prepare();
-    document.getElementById('bookPrepareOpen').hidden = true;
+    openLink.hidden = true;
 }}());
 </script></body></html>'''
         page = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
