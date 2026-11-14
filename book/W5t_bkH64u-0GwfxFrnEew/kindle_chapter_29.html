@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="format-detection" content="telephone=no">
+<title>附录 大洋邦新语要义 - 一九八四</title>
+<style>
+body{margin:0;padding:0;background-color:#fff!important;color:#111!important;font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.65}
+body.sepia{background-color:#f3e9d2!important;color:#3c2f1a!important}
+body.dark{background-color:#161616!important;color:#c9c9c9!important}
+/* Nested controls share an 8px corner inside 12px panels with a 4px inset. */
+.k-surface,#kRecent li:first-child a,#kCatalog a{border-radius:12px}
+.k-surface{box-sizing:border-box;border:1px solid #aaa;border-bottom-width:2px;background:#fff}
+body.dark .k-surface{background:#161616;border-color:#777}
+body.sepia .k-surface{background:#f3e9d2;border-color:#86795e}
+.k-control{display:inline-block;box-sizing:border-box;min-height:44px;padding:10px 14px;
+  color:inherit;background:transparent;border:1px solid #888;border-radius:8px;text-decoration:none;font:inherit}
+.k-dock{position:fixed;z-index:5;bottom:0;left:0;right:0;margin:0 auto;
+  max-width:720px;display:table;width:100%;height:58px;table-layout:fixed;padding:3px;border-radius:12px 12px 0 0;
+  font:16px/1.3 Arial,sans-serif}
+.k-dock>a{display:table-cell;height:49px;vertical-align:middle;text-align:center;color:inherit;
+  text-decoration:none;font-size:.85em;word-wrap:break-word;border:1px solid transparent;border-radius:8px}
+.k-dock [aria-current]{border-color:currentColor;font-weight:bold}
+#kFontSizeValue{display:inline-block;min-width:48px;text-align:center}
+.k-control:focus,.k-surface a:focus,.k-surface button:focus{outline:2px solid;outline-offset:2px}
+.k-header{padding:10px 16px;border-bottom:1px solid;line-height:1.4;font-family:Arial,sans-serif}
+.k-header a,.k-header button{display:inline-block;min-height:24px;padding:9px 0}
+.k-header button{float:right;background:none;border:0;color:inherit;font:inherit;text-decoration:underline}
+.k-cover{display:block;position:relative;box-sizing:border-box;overflow:hidden;border:1px solid #777;border-radius:3px;text-align:center}
+.k-cover img{position:absolute;top:0;right:0;bottom:0;left:0;max-width:100%;max-height:100%;margin:auto}
+.k-cover-placeholder:before{content:"";position:absolute;top:0;bottom:0;left:13%;border-left:1px solid #777}
+.k-cover-placeholder:after{content:"";position:absolute;top:32%;left:28%;right:16%;height:14%;border-top:1px solid #777;border-bottom:1px solid #777}
+/* Reader chrome shared by EPUB chapters and PDF image pages. */
+.k-reader-header{box-sizing:border-box;max-width:680px;margin:0 auto;padding:0 16px}
+.k-reader-header a,.k-reader-header button{display:inline-block;box-sizing:border-box;min-width:44px;min-height:44px;
+  line-height:1.3;margin:0;padding:12px 0;font:inherit;color:inherit;background:none;border:0;text-decoration:none}
+.k-reader-header button{float:right;font-weight:bold}
+.k-reader-header a{float:left;margin-right:14px}
+.k-reader-header .k-running-title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:12px 0;font-weight:normal}
+.k-reader-header:after{content:"";display:block;clear:both}
+.k-reader-header,.k-reader-footer,.k-reader-settings{font:15px/1.4 Arial,sans-serif}
+.k-reader-footer{text-align:center;overflow:hidden}
+.k-reader-footer button{display:none}
+#kSettingsBackdrop,.k-settings-backdrop{display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:transparent}
+.k-reader-settings{display:none;position:fixed;z-index:10;box-sizing:border-box;left:8px;right:8px;bottom:8px;
+  max-width:540px;max-height:82%;margin:0 auto;padding:10px 12px;text-align:left;overflow:auto}
+.k-reader-settings a,.k-reader-settings button{display:inline-block;box-sizing:border-box;min-height:44px;
+  padding:10px 12px;margin:3px;border:1px solid #888;color:inherit;background:none;font:inherit;text-decoration:none}
+.k-settings-heading{overflow:hidden}
+.k-settings-heading h2{display:inline-block;margin:12px 3px 6px;font-size:1.05em}
+.k-settings-heading button{float:right;min-width:44px;font-size:1.25em;line-height:1}
+.k-settings-modes{padding:6px 0}
+.k-settings-modes button{font-weight:bold}
+.k-settings-modes button[aria-pressed="true"]{color:#fff;background:#111;border-color:#111}
+body.dark .k-settings-modes button[aria-pressed="true"]{color:#111;background:#eee;border-color:#eee}
+.k-reader-settings .k-settings-links{border-top:1px solid #888;padding-top:6px}
+body[data-k-reader] .k-reader-header{position:absolute;top:0;left:0;right:0;height:45px;max-width:680px}
+body[data-k-reader] .k-reader-footer{position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;
+  height:48px;max-width:680px;margin:0 auto;border-top:1px solid #888}
+body[data-k-reader] .k-reader-footer .k-chapter-links{display:none}
+body[data-k-reader] .k-reader-footer button{display:block;box-sizing:border-box;width:18%;height:44px;
+  border:0;background:none;color:inherit;font:inherit;font-size:1.45em}
+body[data-k-reader] .k-reader-footer button:disabled{opacity:.4}
+#kReaderPosition,#kPdfPosition{display:inline-block;margin-top:13px}
+.k-reader-header a:focus,.k-reader-header button:focus,.k-reader-footer button:focus{
+  outline:2px solid;outline-offset:-2px}
+body.sepia .k-reader-footer,body.dark .k-reader-footer{border-color:#666}
+body.sepia .k-header,body.dark .k-header{border-color:#666}
+.k-header a{color:inherit;text-decoration:none;font-weight:bold;font-size:15px}
+.k-content{padding:22px 20px 32px;max-width:640px;margin:0 auto;word-wrap:break-word;line-height:1.7}
+body.sepia .k-content{color:#3c2f1a!important}
+body.dark .k-content{color:#c9c9c9!important}
+body[data-k-font="serif"] #kText,body[data-k-font="serif"] #kText *{font-family:Georgia,"Times New Roman",serif!important}
+body[data-k-font="sans"] #kText,body[data-k-font="sans"] #kText *{font-family:Arial,sans-serif!important}
+.k-content img{max-width:100%;height:auto}
+.k-content a{color:inherit;text-decoration:underline}
+.k-nav{overflow:hidden;border-top:1px solid #999;padding:12px 14px;max-width:640px;margin:0 auto}
+body.sepia .k-nav,body.dark .k-nav{border-color:#666}
+.k-nav a{color:inherit;text-decoration:none;padding:10px 14px;border:1px solid;font-family:Arial,sans-serif}
+.k-nav .prev{float:left}
+.k-nav .next{float:right}
+.k-toc{padding:4px 16px 30px;max-width:640px;margin:0 auto}
+.k-toc ul{list-style:none;margin:0;padding:0}
+.k-toc li{padding:5px 0;line-height:1.45}
+.k-toc li[class^="lvl-"] a{padding:9px 0;border-bottom:1px solid #888}
+.k-toc li.lvl-1{padding-left:16px}
+.k-toc li.lvl-2{padding-left:32px}
+.k-toc li.lvl-3{padding-left:48px}
+.k-toc a{color:inherit;text-decoration:none;display:block}
+.k-toc .sec{color:#666;font-size:14px}
+body.dark .k-toc .sec{color:#9a9a9a}
+
+
+.k-content img{height:auto}
+#kViewport{min-height:100px}
+body[data-k-reader] #kViewport{position:absolute;top:59px;bottom:61px;left:19px;right:19px;max-width:640px;
+  margin:auto;overflow:auto;min-height:0}
+body[data-k-reader="pages"] #kViewport{overflow:hidden}
+body[data-k-reader="pages"] #kText{margin:0;padding:0;overflow:visible;min-height:0;
+  -webkit-column-fill:auto;column-fill:auto}
+body[data-k-reader="pages"] #kText img{max-height:calc(100vh - 124px);object-fit:contain}
+#kTurnBack{float:left}
+#kTurnForward{float:right}
+body[data-k-reader] .k-content{padding:0 0 10px;min-height:85%;box-sizing:border-box}
+@media (max-width:360px){body[data-k-reader] #kViewport{left:14px;right:14px}}
+
+</style>
+<link class="eb" href="resources/OEBPS/Styles/stylesheet.css" rel="stylesheet" type="text/css" />
+        <link class="eb" href="resources/OEBPS/Styles/page_styles1.css" rel="stylesheet" type="text/css" />
+</head>
+<body class="light">
+<header class="k-header k-reader-header">
+    <a href="kindle.html#chapter-29" data-i18n="contents">Table of contents</a>
+    <button type="button" id="kSettingsToggle" onclick="kToggleSettings()" aria-controls="kSettings"
+            aria-expanded="false" data-i18n-aria-label="settings" aria-label="Settings">Aa</button><!-- i18n-allow-literal: stable data identifier -->
+    <span class="k-running-title" lang="zh">附录 大洋邦新语要义</span>
+</header>
+<main id="kViewport" data-book="W5t_bkH64u-0GwfxFrnEew" data-chapter="29">
+    <div class="k-content" id="kText" lang="zh">
+        
+  <h2 class="calibre5" id="calibre_pb_0">附录　大洋邦新语要义</h2>
+
+  <p class="normal">“新语”是为了满足“英社”（Ingsoc）或旧称英国社会主义意识形态的需要而设计出来的官方语言。到了一九八四年，相信还没有人采用新语作为唯一的沟通工具，不论是说话也好，书写也好。不错，《泰晤士报》的社论是以新语撰写，但那是只有专家才写得出来的大手笔。估计到了二〇五〇年吧，新语终会取代旧语（或者我们该称为标准英语）。在这期间，新语发展稳健，各党员在日常的言谈中越来越倾向于使用新语的词汇和语法结构。一九八四年流通的新语版本（已收录在第九和第十版的新语辞典中），只是一个试用版，因为里面出现不少将来一定会禁止使用的冗词和过时的字眼。现在我们要讨论的，是已臻完美、收在第十一版新语辞典中的确定版本。</p>
+
+  <p class="normal">新语的目标，不单在为英社信徒提供一种适合他们表达自己的世界观和思想习惯的媒介，更因此令其他的思想方式根本无法运作。新语一旦全面采用后，旧语就彻底被遗忘。那时离经叛道的思想，即是说偏离英社原理的思想，根本是无法想象的事——因为思想还需要依赖文字来表达。新语的词汇结构准确，而且定义常见幽微精妙之处，各党员表达自己的思想时，也希望能如此得心应手。这些定义既排除所有为人误解的地方，因此亦不可能通过旁门左道取得其他的结论。确定版新语能取得这种成果，靠的是创造新词，但用得最多的法子是删词。除了不合时宜的全删外，剩下来的词汇，意义稍有偏离正统的都一一改正，杜绝任何产生歧义的可能。兹举一例。在新语中，“free”这个词未删，但用法只限于“This dog is free from lice”（这狗身上没有虱子）或“This field is free from weeds”（这块田没有杂草）这类表述句子中。在新语中，“free”再无旧语中自由的含义，如“politically free”（政治上的自由）或“intellectually free”（知识上的自由），因为政治上的自由和知识上的自由实际上不存在，观念上也不存在，因此无以名之。异端邪说的词语要禁用，但词汇的删减却是推广新语的分内事：只有删无可删的词才会保留下来。新语的宗旨不在扩大而是缩小思想的范围。把词语的选择<b class="calibre8">减到</b>最低限度，也间接地在这方面帮了大忙。</p>
+
+  <p class="normal">新语以目前我们所使用的英语为基础，虽然不少新语的句子，即使没有混合新创出来的词语，也不易为今天说英语的人看得懂。新语的词汇分成三个截然不同的组别：甲组、乙组（亦称复合词）和丙组。各组分别讨论较容易处理，但新语的语法特色将集中在甲组中讨论，因为乙组和丙组涉及的语法规则问题与在甲组讨论的相同。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal"><b class="calibre8">甲组词汇</b>。此组词汇以日常生活用词组成，诸如“吃”、“饮”、“工作”、“穿衣”、“上楼梯和下楼梯”、“乘车”、“养花”、“做饭”等等。新语的词汇几乎全是我们现有的词语，像“打”、“跑”、“狗”、“树”、“糖”、“房子”、“田野”等等。但相对于今天我们使用的英语词汇，新语词汇量一来少得可以，二来语义严格限定，难生岐义。语义上凡见模棱两可、含糊不清的地方都已一一清除。新语要尽可能做到的，是使用甲组中的词清清楚楚地表达大家习知的<b class="calibre8">单一</b>观念。看来用甲组词汇从事文艺创作是不大可能了，也难用来讨论政治的或哲学的问题。甲组词汇只用来表达简单的、目标明确的思想，通常与有形的实物或身体动作有关。</p>
+
+  <p class="normal">新语语法有两大特色。第一个特色是几乎所有词类（parts of speech）的功能都可以互相交换。新语中任何一个词（原则上甚至连抽象的词如“if”、“when”也算在内）都可作动词、名词、形容词或副词使用。在动词和名词的模式之间，如果词根相同，就绝不会起变化，这条规则有助于废除不少早已过时的形式。就拿“thought”（思想）这个词来说吧，在新语中是不存在的，代之而起的是“think”（思想），既是名词，也是动词。这跟词源学没有什么关系。有时保留下来的是名词原来的面貌，有时则是动词。即使一个名词和一个动词在意思上有相近之处，但如果在词源上实无关联，其中的一个——是名词也好、动词也好——就得消失。譬如说，“cut”（切割）这个词是不存在的，因为其意义已被“knife”（刀）这个名词和动词混合体所涵盖了。要作形容词使用，只消在混合体后加上后缀“-ful”不就成了？副词呢，后缀加上！“-wise”。例子如下：“speedful”就是“rapid”（快），“speedwise”等于“quickly”（快）。我们今天使用的一些形容词，像“good”（好）、“strong”（强）、“big”（大）、“black”（黑）、“soft”（软），会保留下来，但总数不多。实际上也用不着，因为几乎所有形容词都可以通过在名词和动词混合体后加个后缀就可变化出来。所有现存的副词都消失了，只有几个例外：那些本来就以“-wise”作词尾的。以“-wise”作后缀的副词改变不了。作为副词用的“well”（好），已由“goodwise”取代。</p>
+
+  <p class="normal">除此之外，任何词语——原则上任何出现在新语中的词类都不例外——只要在前面加上“un-”这个前缀都可变成否定意义。要加重词气，可加前缀“plus-”。或要再升一级，可用“doubleplus-”。譬如说，“uncold”（不冷）就是“暖”，那么“pluscold”和“doublepluscold”分别是“very cold”（很冷）和“superlatively cold”（极冷）。前置词缀（prepositional affixes）的使用，几乎可以修正我们日常英语中差不多每一个词的意思。这些词缀包括：“ante-”，“post-”、“up-”和“down-”等等。我们不难看出，这个前置词缀法一经使用，常用的词汇就大大减少。既然已经有“good”（好）这个词，“bad”（坏）这个词就用不着了；需要说出来的意思，用“ungood”来表达不是一样？不，应该说更好。面对两个意思完全相反的词，你只消决定删除哪一个就成。举例来说吧，“dark”（暗）这个词，就可由“unlight”（不亮）代替，而“light”（明亮）可以由“undark”（不暗）代替。这是自己可以作主的选择。</p>
+
+  <p class="normal">新语语法的第二个特色是规则固定不变。除了下面提到的几个例外，所有词形的变化都依随同样的规则。这就是说所有动词的过去式和过去分词并无区别，都是以“-ed”结尾。“Steal”的过去式是“stealed”，“think”的过去式是“thinked”。这规则在新语中实施后，旧语中的词汇如“swam”、“gave”、“brought”、“spoken”、“taken”等，都淘汰了，分别以“swimed”、“gived”、“bringed”、“speaked”、“taked”等的新面目出现。要把名词改为复数，在后面加上“s”，或看个别情形而定，加上“es”就成。“Man”、“ox”、“life”在新语中的复数是：“mans”、“oxes”、“lifes”。形容词的等级比较一律以“-er”、“-est”来表示，如“good”、“gooder”、“goodest”。旧制不规则的比较级形式如“more”和“most”全面废止。</p>
+
+  <p class="normal">词语类型中唯一可以不规则变化的是代名词、关系代词、指示形容词和助词。这些词类，除了“whom”一词因属多余已被删除外，其余的都可以保留原来的用法。“Shall”和“should”这两种时态亦已废除，因功用已在“will”和“would”的范围涵盖之内。由于要使演讲的人容易措辞和说话不拖泥带水，词的创造有时难免偏离常规。任何发音困难或听来易生误解的词，事实已证明是“坏”词，因此有时为了听来悦耳，就会加插一些多余的字母，或让过时的词形结构保留下来。这些问题将会在谈论乙组的词汇时引发出来。下文将会说明我们<b class="calibre8">为什么</b>这么重视发音的因素了。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal"><b class="calibre8">乙组词汇。</b>此组词汇的结构均有明显的政治目的。不但每个词都带有政治意识，词的本身更可以让使用者发音时感到无比舒畅。只有完全熟悉英社的政情党规的人才能正确使用这些词汇。在某些情形下，乙组的词语可以翻译成旧语，甚至可以译为以甲组词汇组成的文章，但免不了要加上长长的一段文字作解释，更不用说难以照顾到在原文中弦外之音的层面了。乙组的词语或可看作是一种文字速记，能用几个音节就把一篮子的主意紧紧包容起来。乙组的词汇，实在比一般语言更准确、更有活力。</p>
+
+  <p class="normal">乙组的词汇都是复合词，由两三个词或词的某一部分基于方便发音的原则组合起来。<sup class="calibre7"><a class="duokan-footnote" href="../Text/part0028.html#fn1" id="fnref1"><img alt="" class="exs" src="resources/OEBPS/Images/00003.jpeg" width="64" height="85" /></a></sup>这些结合起来的词总是名词、动词兼用，以现有的规则作词形变化。举例来说，“goodthink”这个词，粗浅的意思是“orthodoxy”（正统）。若有人把它看作动词的话，那就等于说“to think in an orthodox manner”（思想正统）。此词的形式变化如下：名词、动词：“goodthink”；过去式和过去分词：“goodthinked”；现在分词：“goodthinking”；形容词：“goodthinkful”；副词：“goodthinkwise”；动名词：“goodthinker”。</p>
+
+  <p class="normal">乙组词汇的结构并非根据任何词源学的原则。词语的组件可取自词类中任何一部分，既可随意安插，亦可为了方便发音而轻易移位，只消让人看得出这种组合的由来便成。且看“crimethink”（思想罪行）这个词，“think”是放在第二位的。但在“thinkpol”（思想警察）中，它在首位，而构成这个词的第二个单元“police”的第二个音节就省略了。由于谐音不易得，乙组词汇的“配件”组合不像甲组那么有规律。举例来说，“Minitrue”、“Minipax”和“Miniluv”这三个词的形容词格式原来是“Minitruthful”、“Minipeaceful”和“Minilovely”，但一来“-trueful”、“-paxful”和“-loveful”的形式怪怪的，二来读来有点聱牙。但原则上，所有乙组的词都可以“变形”，都可以按照既定的原则来变。</p>
+
+  <p class="normal">乙组中有些词极为玄妙，除非你对新语研究有素，否则难明所指。试看《泰晤士报》社论中一个典型的句子：“Oldthinkers unbellyfeel Ingsoc”。我们能想到以最短的旧语翻译过来的话是：“Those whose ideas were formed before the Revolution cannot have a full emotional understanding of the principles of English Socialism”（在革命前思想已定型的人无法对英国社会主义原理有全面的和感性的理解）。但这句译文显然有不足之处。首先，要透彻地理解上面这句新语的含义，你应对英社的本质有通盘的了解。还有一点，只有一个全面浸淫于英社思想的人才会感受到“bellyfeel”这个词震人心弦的威力。“Bellyfeel”意味着对一种思想盲目的、热烈的拥抱。这种境界，今天实难想象。“Oldthink”这个词也不能望文生义，因为词义本身跟“邪恶”与“堕落”的观念夹缠不清。但新语中有些词语的功能不是为了表达而是为了摧毁词的意义，“oldthink”正是其中的一个例子。这类词汇数目不多，它们的内涵不断膨胀，得用大量的词句来释义。等到一个可以涵盖全部语境的词出现时，这些曾经用作释义的词句就可以从人间蒸发了。新语辞典的编纂者面对的最大困难，不是创新词，而是创了新词后搞清楚它们究竟是什么意思。这也是说，搞清楚它们出现后可以删除的旧语的幅度多大。</p>
+
+  <p class="normal">我们在“free”的例子中看到，为了方便，一些曾经有异端指向的词经过修正后，还是保留下来。但不少其他词诸如“honor”（荣誉）、“justice”（正义）、“morality”（道德）、“internationalism”（国际主义）、“democracy”（民主）、“science”（科学）、“religion”（宗教）等，都一一清除了。这些词的意义都涵盖在几个容量无限的综合词汇中，也正因如此最后被除了名。譬如说，所有环绕着“自由”和“平等”这两个观念组成的词汇，都可以用一个词概括：“crimethink”（思想罪行）。所有因“客观”和“理性”这两个观念引发出来的词，都可以概括成一个词：“oldthink”（旧思）。定义越准确越易生枝节。一个党员只消像古代希伯来人那样看人生，就符合了标准。也不知是什么原因，那时的希伯来人相信，除了他们以外，其他人崇拜的都是“假神祇”。党员不必知道这些假神祇名叫“Baal”、“Osiris”、“Moloch”、“Ashtaroth”等等。也许他所知越少，越能保持自己思想的正统。他知道耶和华是谁，也知道什么是“十诫”。他因此知道，所有名称不同、特性有异的神祇都是冒牌的。党员跟希伯来人有点相似的是，他知道什么是正确的行为，而且在极其模糊和笼统的范围内，知道可以“越分”的程度有多大。举例说，他的性生活完全受制于两个新语的语境：“sexcrime”（不道德的性行为）和“goodsex”（贞洁）。“Sexcrime”概括所有不规矩的性行为，包括通奸、苟合、同性恋和其他性变态花样。还有一点，正常的为性交而性交也是一种“sexcrime”。我们不必在这里一一罗列，反正所有违规的都是罪行，原则上都犯了死罪。丙组词汇以科学和技术专门名词组成，理应因利乘便在这里给某些有偏差的性行为厘定专门术语，只是就平民百姓而言，实在无此需要。他们知道什么是“goodsex”，那就是夫妇间为生儿育女而性交，但女方不能感受肉体上的快乐，离此正道就是“sexcrime”。你很难依据新语来判断什么是离经叛道的思想，你只能靠直觉。在此范围外的语言表述根本不存在。</p>
+
+  <p class="normal">在乙组中出现的词汇，没有一个是意识形态暧昧不明的。不少名词用的都是委婉语。就拿“joycamp”和“Minipax”这两个词来说吧，字面意思跟实情差不多完全相反。“Joycamp”看来是“幸福营”，其实是“劳改营”。“Minipax”是旧语中的“和平部”，其实是“作战部”。另一方面，新语有些词汇公然而又轻蔑地道出对大洋邦真面目的认识。“Prolefeed”是其中一个例子，拆成“prole”和“feed”来看，可知此新语的意思是“无产阶级的养料”，实情是党给无产者大众提供的垃圾娱乐和虚假新闻。其余的词的意思也是模棱两可：用于党的时候含义是“好的”，说到党的敌人时是“坏的”。此外还有不少初看像是缩写的词，其意识形态的指向不是由内容来决定，而要看词的结构。</p>
+
+  <p class="normal">所有与政治有关或可能有关的词汇都尽量放在乙组。每一个机构、学说、国家、制度、公共大厦的名字，例必缩短到方便辨识的形式，也就是一个可以保留其原来意思，发音容易、音节最少的词。譬如说，温斯顿·史密斯在真理部工作的单位记录科称作“Recdep”，而子虚科名为“Ficdep”，电视科就是“Teledep”，依此类推。这种设计并非单单为了节省时间。早在二十世纪初期，缩略语的使用已成政治语言的一个特色。值得注意的是，最倾向于使用这类缩略语的是极权主义国家和极权主义组织。以下几个是显例：“Nazi”（纳粹分子），“Gestapo”（盖世太保），“Comintern”（第三国际），“Inprecorr”（国际新闻通讯），“Agitprop”（宣传鼓动）。起初人们使用这种缩略语好像是出于本能，但作为新语来使用时，这些词是有明确目的的。造词的党人认识到，你缩短一个名字，同时也会收窄和改变它的含义，削去原来依附着它的诸多联想。譬如说“Communist International”这个词，一提到它眼前就会出现一幅普世兄弟爱的复合图，就会想到红旗、路障、马克思和巴黎公社。相对来讲，“Comintern”这词只教人想到一个组织严密的政党和一套头头是道的教条。“Comintern”指涉的事情易于辨识，目的也有限，就像椅子或桌子那么容易辨识。你几乎可以不用思考地把“Comintern”这个词念出来，可是“Communist International”这名词，你总得稍为停顿一下才能念出来。基于相同的道理，一个像“Minitrue”这样的缩略语所引起的联想不但少于“Ministry of Truth”，而且还较易控制。这既解释了为什么缩略语这么流行，亦可因此明白为什么新语对每个词都要求可以轻易发音，严谨得近乎吹毛求疵。</p>
+
+  <p class="normal">新语对谐音的重视，仅次于词义是否正确。为了需要，语法的常规可以牺牲。这也是合理的事，因为政治目标至高无上，新语用的词除意义正确外，更应简短，可以快速背诵，使言说者发言时脑中的回响减至最低限度。乙组所收的词汇，正因互相看来极为相似反而更见威力。“Goodthink”、“Minipax”、“prolefeed”、“sexcrime”、“joycamp”、“Ingsoc”、“bellyfeel”、“thinkpol”——这些词，还有其他难以计算的，都有一个共同点：几乎都是双音节或三音节，重音不分彼此地落在第一节和最后一节上。这些词有利于形成含混不清、断断续续、单调乏味的说话风格。这正是新语的本意，目的是尽可能使言语跟个人的清醒意识相隔开来，特别是关乎意识形态取舍问题的那种言语。在日常生活中，一个人开口说话前总会稍顿一下，或者说需要沉思一下。但一个党员受命对一个政治的或伦理的问题下判断发言时，应有能量像机枪发射子弹那么自然地发射出正确的见解。他本来就训练有素，掌握着的新语可说是万无一失的工具。这些词语听来刺耳，形式看来有点刻意求丑，但这倒是跟英社精神非常协调。新语的结构让党员发言时有个依靠。</p>
+
+  <p class="normal">词汇少、用词没有什么选择倒是好事。跟我们今天运用的英语相比，新语的词汇本来就相当贫乏，更不断有删除原有词汇的方法出现。说来也有点奇怪，新语跟其他语言的不同之处是词汇不是随着岁月而增加，反而是逐年减少。但这实在不是坏事，因为选择的范围越少，引发遐思的诱惑也因应减少。希望达到的至善之境是这样的：言者的发言都用喉音传达，不需通过脑神经。新语名正言顺地把“duckspeak”这个词收了进去，意思是说话“quack like a duck”，嘎嘎不休地像只鸭子。像乙组中不少其他词一样，“duckspeak”的意义也是模棱两可的。如果“嘎嘎”出来的见解正确，那“duckspeak”的语义就是正面的，值得称赞的。如果《泰晤士报》提到党内某演说家时称他为“doubleplusgood duckspeaker”，那就表示对他的表现热烈的恭维。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal"><b class="calibre8">丙组词汇。</b>丙组全以科技专门术语组成，可视为甲组和乙组的增补篇。这些词语跟我们今天使用的科学名词相似，也以同样的词源拼合，但一如处理其他词汇的程序一样，词义必须严格限定，删去所有不当的联想。在语法规则方面，此组词语与前二组无异。没有几个丙组的词语会在日常用语或政治言论中出现。任何从事科学工作的专家或技术人员，都会在特别为他们行业制定的词汇表中找到自己要用的词，但没有几个人对列在别组的词汇有什么认识。只有极少的几个词会在甲、乙、丙三组词汇中同时出现。科学作为一种思想习惯或思想方法——这种任何科学派系都会拥有的基本功能，却不会在列出的三个词汇表中找到任何有关的解说。事实上根本没有“科学”这个词，因为所有可能想出来有关科学的含义都清清楚楚地包含在“英社”这个词里面。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">从上面的介绍可以看出，想以新语发表一些层次稍高的歪论，是几乎不可能的事。当然，你也许还可用新语来发表层次极低的异端邪说，亵渎神明。举例来说吧，你可用新语说“Big Brother is ungood”（老大哥不好），但在一个思想正统的人听来，这句话本身自相矛盾，也无法以理性文字解释，因为需要引用的词根本不存在。任何对英社有敌意的念头，因此只能是个没有文字描述的念头。既然无以名之，非要提及不可时也只能笼笼统统地一笔带过。这些异端邪说一起受到谴责，但为什么是异端邪说却没有明文交代。实情是，新语本身不能用来追求不正当的目标，除非不惜以身试法把其中一些字句翻译为旧语。举例来说，“All mans are equal”（人人生而平等）可以说是一个新语句子，但其有违常理之处一如旧语说“All men are redhaired”（人人生而红发）之难言之成理。用新语说“All mans are equal”并无语法上的错误，但有违常识之处显而易见：人的身形、体重和气力怎可能完全“平等”？既然政治平等的观念已不存在，“equal”这个词的次要定义亦因此删除。在一九八四年，旧语还是日常的沟通工具。理论上说，使用新语词汇的人说不定还会记得这些新语在旧语中的本来面目。但实际上，任何在“doublethink”（双重思想）方面有根底的人都可以避免这种错误。再说，两三代以后，连这种失误的可能性也没有了。一个使用新语作为唯一语言而长大的人，绝不可能知道“equal”这个词的第二义曾经是政治平等，或“free”的旧义是“intellectually free”（知识上的自由）。这正如不知国际象棋为何物的人不会知道“queen”（后）和“rook”（车）分别扮演的是什么角色的道理一样。使用新语长大的人说不定都失去了犯罪和犯过错的能力，因为这些罪恶都无以名之，因此无法识认，也因此无法想象。可以预见的是，随着时间的流逝，新语最为显著的特色会越来越显彰：词汇越来越少、词义越来越死板、利用它作不轨用途的机会也越小。</p>
+
+  <p class="normal">旧语彻头彻尾为新语取代后，通往从前的环节也切断了。历史早已改写，但旧时的文学作品片段犹在，散置四方，虽经审查，但不彻底，可供旧语能力未失的人阅读。但在未来的日子中，这些文学片段即使幸存，已变得不知所云，因此译无可译了。任何旧语文字要翻译成新语都难实现，除非要翻译的段落是技术性的操作说明，或日常生活状况的叙述，或显露了正统思想（在新语词汇中叫“goodthinkful”）痕迹的描述。事实上这等于说没有任何约于一九六〇年前成书的作品可以全数翻译过来。革命前的文学作品只能作意识形态的翻译——这是说在文字上和意义上作改动。就拿知名的《独立宣言》来说吧：</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="kt1">吾人坚信下列真理不证自明：人人生而平等，具有造物主所赐予某些无可剥夺之权利，其中包括生命、自由和追求幸福之权利。为了取得这些权利，人民于是成立了政府。政府的权力来自人民的认可。本此，任何政体一旦对这些目标造成损害，人民自有权利改变之或罢免之，再而成立新政府……</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <p class="normal">要把这段文字译成新语而又要保存其原有的意思，是近乎不可能的事。最接近的做法是用“crimethink”（思想罪行）这个词把这段文字概括起来。要全文译出，只有采取意识形态翻译法，到时杰斐逊的话都变为对独裁政府的歌颂了。</p>
+
+  <p class="normal">实在已有不少旧文学作品经过这样的处理了。某些历史人物的作品因为名气大而留存下来，但他们的成就已跟英社的思想体系混为一谈。这些人物中有莎士比亚、弥尔顿、斯威夫特、拜伦、狄更斯和其他一些作家。他们的作品正在翻译中。一待工作完成后，他们文字的原来面目以及所有旧文学遗存下来的痕迹都会灰飞烟灭。翻译这些作品的工作艰巨而缓慢，因此不能期望能在二十一世纪的第一个或第二个十年完成。此外还有不少实用性文字——诸如不可或缺的工艺手册等——需要以同样的方针去处理。正是为了给翻译工作充裕的准备时间，才会把落实新语使用的时间定为二〇五〇年那么晚。</p>
+
+  <p class="normal">&nbsp;</p>
+
+  <div class="calibre1">
+    <hr class="xian" />
+  </div>
+
+  <ol class="duokan-footnote-content">
+    <li class="duokan-footnote-item" id="fn1" value="1">
+      <p class="fn"><a class="calibre9" href="../Text/part0028.html#fnref1">◎</a>&nbsp;像speakwrite这类复合词，甲组词汇中当然有载，但这只能算是缩写，本身没有特殊意识形态色彩。——作者注</p>
+    </li>
+  </ol>
+
+    </div>
+</main>
+<footer class="k-reader-footer" id="kEnd">
+    <nav class="k-nav k-chapter-links"><a id="kPrev" class="prev" href="kindle_chapter_28.html" accesskey="p" data-i18n="previous">‹ Prev</a></nav>
+    <button type="button" id="kTurnBack" onclick="kTurnPage(-1)" data-i18n-aria-label="previousPage" aria-label="Previous page">‹</button>
+    <button type="button" id="kTurnForward" onclick="kTurnPage(1)" data-i18n-aria-label="nextPage" aria-label="Next page">›</button>
+    <span id="kReaderPosition" role="status" aria-live="polite">30/30</span>
+</footer>
+<div id="kSettingsBackdrop" onclick="kToggleSettings()" aria-hidden="true"></div>
+<div class="k-reader-settings k-surface" id="kSettings" role="dialog" aria-modal="true" aria-labelledby="kSettingsTitle">
+    <div class="k-settings-heading">
+        <h2 id="kSettingsTitle" data-i18n="settings">Settings</h2>
+        <button class="k-control" type="button" onclick="kToggleSettings()" data-i18n-aria-label="done" aria-label="Close settings">×</button>
+    </div>
+    <div class="k-settings-appearance">
+        <button class="k-control" type="button" onclick="kTheme()" accesskey="t" data-i18n="theme">Theme</button>
+        <button class="k-control" type="button" onclick="kFont(-1)" data-i18n="decreaseFont">A-</button>
+        <output id="kFontSizeValue"></output>
+        <button class="k-control" type="button" onclick="kFont(1)" data-i18n="increaseFont">A+</button>
+    </div>
+    <div class="k-settings-modes">
+        <button class="k-control" type="button" id="kReadingMode" onclick="kToggleReadingMode()" aria-pressed="true"
+                data-i18n="pageMode">Use page-turning mode</button>
+        <button class="k-control" type="button" id="kClickScroll" onclick="kToggleClickScroll()" aria-pressed="true"
+                data-i18n="tapTurn">Click to turn page</button>
+    </div>
+    <div class="k-settings-links">
+        <a class="k-control" href="kindle_chapter_28.html" accesskey="p" data-i18n="previous">‹ Prev</a>
+        
+    </div>
+</div>
+<script>
+
+function getCookie(key) {
+  var cookies = document.cookie.split('; ');
+  for (var i = 0; i < cookies.length; i++) {
+    var parts = cookies[i].split('=');
+    if (parts[0] === key) {
+      try { return decodeURIComponent(parts.slice(1).join('=')); } catch (error) { return null; }
+    }
+  }
+  return null;
+}
+function setCookie(key, value, days) {
+  var expires = '';
+  if (days) {
+    var date = new Date();
+    date.setTime(date.getTime() + days * 86400000);
+    expires = '; expires=' + date.toUTCString();
+  }
+  document.cookie = key + '=' + encodeURIComponent(value) + expires + '; path=/; SameSite=Lax';
+}
+function kHistoryKey() {
+  var root = window.location.pathname.replace(/(?:book\/[^/]+\/)?[^/]+$/, '');
+  return 'kindle_recent_' + encodeURIComponent(root);
+}
+function kRememberBook(book) {
+  var key = kHistoryKey();
+  var saved = (getCookie(key) || '').split(',');
+  var recent = [book];
+  for (var i = 0; i < saved.length && recent.length < 12; i++) {
+    if (saved[i] && recent.indexOf(saved[i]) < 0) recent.push(saved[i]);
+  }
+  setCookie(key, recent.join(','), 365);
+}
+var K_THEMES = ['light', 'sepia', 'dark'];
+var K_FONT_SIZES = [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 42, 48];
+function kMarkChoice(attribute, value) {
+  var choices = document.querySelectorAll('[' + attribute + ']');
+  for (var i = 0; i < choices.length; i++) {
+    choices[i].setAttribute('aria-pressed', choices[i].getAttribute(attribute) === value ? 'true' : 'false');
+  }
+}
+function applyTheme(theme) {
+  if (K_THEMES.indexOf(theme) === -1) theme = 'light';
+  document.body.className = theme;
+  kMarkChoice('data-k-theme', theme);
+}
+function kSelectTheme(theme) {
+  setCookie('kindle_theme', theme, 365);
+  applyTheme(theme);
+}
+function kApplyFontChoice(choice) {
+  if (choice !== 'serif' && choice !== 'sans') choice = 'book';
+  document.body.setAttribute('data-k-font', choice);
+  kMarkChoice('data-k-font-choice', choice);
+}
+function kSelectFont(choice) {
+  setCookie('kindle_font_family', choice, 365);
+  kApplyFontChoice(choice);
+  if (window.kReaderRelayout) window.kReaderRelayout();
+}
+function applyFont(size) {
+  var text = document.getElementById('kText');
+  if (!text) return;
+  var pixels = K_FONT_SIZES[size - 1] || K_FONT_SIZES[2];
+  text.style.setProperty('font-size', pixels + 'px', 'important');
+  var value = document.getElementById('kFontSizeValue');
+  if (value) value.textContent = pixels + ' px';
+}
+function kTheme() {
+  var current = getCookie('kindle_theme') || 'light';
+  var index = -1;
+  for (var i = 0; i < K_THEMES.length; i++) {
+    if (K_THEMES[i] === current) { index = i; break; }
+  }
+  if (index < 0) { index = 0; }
+  var next = K_THEMES[(index + 1) % K_THEMES.length];
+  kSelectTheme(next);
+}
+function kFont(delta) {
+  var size = parseInt(getCookie('kindle_font_size') || '3', 10);
+  if (isNaN(size)) { size = 3; }
+  size = Math.max(1, Math.min(K_FONT_SIZES.length, size + delta));
+  setCookie('kindle_font_size', String(size), 365);
+  applyFont(size);
+  if (window.kReaderRelayout) window.kReaderRelayout();
+}
+(function () {
+  applyTheme(getCookie('kindle_theme') || 'light');
+  kApplyFontChoice(getCookie('kindle_font_family'));
+  var size = parseInt(getCookie('kindle_font_size') || '3', 10);
+  if (isNaN(size)) { size = 3; }
+  applyFont(size);
+})();
+// Keep the reader layout and tap navigation as independent preferences.
+function kClickScrollOn() {
+  return getCookie('kindle_click_scroll') !== 'off';
+}
+function kPagedMode() {
+  var mode = getCookie('kindle_reading_mode');
+  return mode ? mode === 'pages' : kClickScrollOn();
+}
+function kToggleClickScroll() {
+  // Preserve the old layout when moving from the legacy combined setting.
+  if (!getCookie('kindle_reading_mode')) {
+    setCookie('kindle_reading_mode', kPagedMode() ? 'pages' : 'scroll', 365);
+  }
+  setCookie('kindle_click_scroll', kClickScrollOn() ? 'off' : 'on', 365);
+  kSyncReaderToggles();
+}
+function kToggleReadingMode() {
+  setCookie('kindle_reading_mode', kPagedMode() ? 'scroll' : 'pages', 365);
+  kSyncReaderToggles();
+  if (window.kReaderRelayout) window.kReaderRelayout();
+}
+function kSyncReaderToggles() {
+  var tap = document.getElementById('kClickScroll');
+  var mode = document.getElementById('kReadingMode');
+  if (tap) tap.setAttribute('aria-pressed', kClickScrollOn() ? 'true' : 'false');
+  if (mode) mode.setAttribute('aria-pressed', kPagedMode() ? 'true' : 'false');
+}
+function kSettingsOpen() {
+  var settings = document.getElementById('kSettings');
+  return settings && settings.style.display === 'block';
+}
+function kToggleSettings() {
+  var settings = document.getElementById('kSettings');
+  var backdrop = document.getElementById('kSettingsBackdrop');
+  var toggle = document.getElementById('kSettingsToggle');
+  if (!settings || !backdrop || !toggle) return;
+  var open = !kSettingsOpen();
+  settings.style.display = backdrop.style.display = open ? 'block' : 'none';
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) settings.getElementsByTagName('button')[0].focus();
+  else toggle.focus();
+}
+function kIsTurnNode(node) {
+  while (node && node !== document.body) {
+    var tag = String(node.tagName || '').toUpperCase();
+    if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return true;
+    node = node.parentNode;
+  }
+  return false;
+}
+function kClickTurn(e) {
+  var ev = e || window.event;
+  if (!ev) return;
+  if (kSettingsOpen() || !kClickScrollOn() || !window.kTurnPage) return;
+  var viewport = document.getElementById('kViewport');
+  var target = ev.target || ev.srcElement;
+  if (!viewport || !target || !viewport.contains(target) || kIsTurnNode(target)) return;
+  if (window.getSelection && String(window.getSelection())) return;
+  var bounds = viewport.getBoundingClientRect();
+  var width = bounds.right - bounds.left;
+  if (width <= 0) return;
+  var x = ev.clientX - bounds.left;
+  if (x < width / 3) window.kTurnPage(-1);
+  else if (x > width * 2 / 3) window.kTurnPage(1);
+}
+(function () {
+  kSyncReaderToggles();
+  document.onclick = kClickTurn;
+})();
+
+
+(function () {
+  var dictionaries = {"en": {"continueReading": "Continue reading", "openFullReader": "Open full reader", "previous": "\u2039 Prev", "next": "Next \u203a", "theme": "Theme", "tapTurn": "Click to turn page", "library": "Library", "contents": "Table of contents", "settings": "Settings", "done": "Close settings", "pageMode": "Use page-turning mode", "startReading": "Start reading", "previousPage": "Previous page", "nextPage": "Next page", "pdfBadge": "PDF", "pdfUnsupported": "This PDF book can't be opened in Kindle mode yet.", "zoomIn": "Zoom in", "zoomOut": "Zoom out", "fitWidth": "Fit width", "fitPage": "Fit page", "goToPage": "Go to page", "jump": "Jump", "pageOf": "Page {number} of {total}", "page": "Page {number}", "noContents": "This PDF has no table of contents", "noContentsBook": "This book has no table of contents", "goToChapter": "Go to chapter", "pageLoadError": "This page could not be loaded. Please try again."}, "zh-CN": {"continueReading": "\u7ee7\u7eed\u9605\u8bfb", "openFullReader": "\u6253\u5f00\u5b8c\u6574\u9605\u8bfb\u5668", "previous": "\u2039 \u4e0a\u4e00\u7ae0", "next": "\u4e0b\u4e00\u7ae0 \u203a", "theme": "\u4e3b\u9898", "tapTurn": "\u70b9\u51fb\u7ffb\u9875", "library": "\u4e66\u5e93", "contents": "\u76ee\u5f55", "settings": "\u8bbe\u7f6e", "done": "\u5173\u95ed\u8bbe\u7f6e", "pageMode": "\u4f7f\u7528\u7ffb\u9875\u6a21\u5f0f", "startReading": "\u5f00\u59cb\u9605\u8bfb", "previousPage": "\u4e0a\u4e00\u9875", "nextPage": "\u4e0b\u4e00\u9875", "pdfBadge": "PDF", "pdfUnsupported": "\u8fd9\u672c\u4e66\u7684 PDF \u6682\u65f6\u65e0\u6cd5\u5728 Kindle \u6a21\u5f0f\u4e0b\u6253\u5f00\u3002", "zoomIn": "\u653e\u5927", "zoomOut": "\u7f29\u5c0f", "fitWidth": "\u9002\u5408\u5bbd\u5ea6", "fitPage": "\u9002\u5408\u9875\u9762", "goToPage": "\u8df3\u8f6c\u5230\u9875", "jump": "\u8df3\u8f6c", "pageOf": "\u7b2c {number} \u9875\uff0c\u5171 {total} \u9875", "page": "\u7b2c {number} \u9875", "noContents": "\u6b64 PDF \u6ca1\u6709\u76ee\u5f55", "noContentsBook": "\u6b64\u4e66\u7c4d\u6ca1\u6709\u76ee\u5f55", "goToChapter": "\u8df3\u8f6c\u5230\u7ae0\u8282", "pageLoadError": "\u9875\u9762\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u3002"}, "zh-TW": {"continueReading": "\u7e7c\u7e8c\u95b1\u8b80", "openFullReader": "\u958b\u555f\u5b8c\u6574\u95b1\u8b80\u5668", "previous": "\u2039 \u4e0a\u4e00\u7ae0", "next": "\u4e0b\u4e00\u7ae0 \u203a", "theme": "\u4e3b\u984c", "tapTurn": "\u9ede\u9078\u7ffb\u9801", "library": "\u66f8\u5eab", "contents": "\u76ee\u9304", "settings": "\u8a2d\u5b9a", "done": "\u95dc\u9589\u8a2d\u5b9a", "pageMode": "\u4f7f\u7528\u7ffb\u9801\u6a21\u5f0f", "startReading": "\u958b\u59cb\u95b1\u8b80", "previousPage": "\u4e0a\u4e00\u9801", "nextPage": "\u4e0b\u4e00\u9801", "pdfBadge": "PDF", "pdfUnsupported": "\u9019\u672c\u66f8\u7684 PDF \u66ab\u6642\u7121\u6cd5\u5728 Kindle \u6a21\u5f0f\u4e0b\u958b\u555f\u3002", "zoomIn": "\u653e\u5927", "zoomOut": "\u7e2e\u5c0f", "fitWidth": "\u7b26\u5408\u5bec\u5ea6", "fitPage": "\u7b26\u5408\u9801\u9762", "goToPage": "\u8df3\u81f3\u9801\u9762", "jump": "\u8df3\u8e8d", "pageOf": "\u7b2c {number} \u9801\uff0c\u5171 {total} \u9801", "page": "\u7b2c {number} \u9801", "noContents": "\u6b64 PDF \u6c92\u6709\u76ee\u9304", "noContentsBook": "\u6b64\u66f8\u7c4d\u6c92\u6709\u76ee\u9304", "goToChapter": "\u8df3\u81f3\u7ae0\u7bc0", "pageLoadError": "\u9801\u9762\u8f09\u5165\u5931\u6557\uff0c\u8acb\u91cd\u8a66\u3002"}, "ko": {"continueReading": "\uacc4\uc18d \uc77d\uae30", "openFullReader": "\uc804\uccb4 \ub9ac\ub354 \uc5f4\uae30", "previous": "\u2039 \uc774\uc804", "next": "\ub2e4\uc74c \u203a", "theme": "\ud14c\ub9c8", "tapTurn": "\ud074\ub9ad\ud558\uc5ec \ud398\uc774\uc9c0\ub97c \ub118\uae30\uc138\uc694", "library": "\ub77c\uc774\ube0c\ub7ec\ub9ac", "contents": "\ubaa9\ucc28", "settings": "\uc124\uc815", "done": "\uc124\uc815 \ub2eb\uae30", "pageMode": "\ud398\uc774\uc9c0 \ub118\uae40 \ubaa8\ub4dc \uc0ac\uc6a9", "startReading": "\uc77d\uae30 \uc2dc\uc791", "previousPage": "\uc774\uc804 \ud398\uc774\uc9c0", "nextPage": "\ub2e4\uc74c \ud398\uc774\uc9c0", "pdfBadge": "PDF", "pdfUnsupported": "\uc774 PDF\ub294 \uc544\uc9c1 Kindle \ubaa8\ub4dc\uc5d0\uc11c \uc5f4 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.", "zoomIn": "\ud655\ub300", "zoomOut": "\ucd95\uc18c", "fitWidth": "\ub108\ube44\uc5d0 \ub9de\ucda4", "fitPage": "\ud398\uc774\uc9c0\uc5d0 \ub9de\ucda4", "goToPage": "\ud398\uc774\uc9c0\ub85c \uc774\ub3d9", "jump": "\uc774\ub3d9", "pageOf": "\uc804\uccb4 {total}\ud398\uc774\uc9c0 \uc911 {number}\ud398\uc774\uc9c0", "page": "{number}\ud398\uc774\uc9c0", "noContents": "\uc774 PDF\uc5d0\ub294 \ubaa9\ucc28\uac00 \uc5c6\uc2b5\ub2c8\ub2e4", "noContentsBook": "\uc774 \ucc45\uc5d0\ub294 \ubaa9\ucc28\uac00 \uc5c6\uc2b5\ub2c8\ub2e4", "goToChapter": "\uc7a5\uc73c\ub85c \uc774\ub3d9", "pageLoadError": "\ud398\uc774\uc9c0\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4. \ub2e4\uc2dc \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694."}, "ja": {"continueReading": "\u7d9a\u304d\u3092\u8aad\u3080", "openFullReader": "\u30d5\u30eb\u30ea\u30fc\u30c0\u30fc\u3092\u958b\u304f", "previous": "\u2039 \u524d\u3078", "next": "\u6b21\u3078 \u203a", "theme": "\u30c6\u30fc\u30de", "tapTurn": "\u30af\u30ea\u30c3\u30af\u3057\u3066\u30da\u30fc\u30b8\u3092\u3081\u304f\u308b", "library": "\u30e9\u30a4\u30d6\u30e9\u30ea", "contents": "\u76ee\u6b21", "settings": "\u8a2d\u5b9a", "done": "\u8a2d\u5b9a\u3092\u9589\u3058\u308b", "pageMode": "\u30da\u30fc\u30b8\u3081\u304f\u308a\u30e2\u30fc\u30c9\u3092\u4f7f\u7528\u3059\u308b", "startReading": "\u8aad\u307f\u59cb\u3081\u307e\u3059", "previousPage": "\u524d\u306e\u30da\u30fc\u30b8", "nextPage": "\u6b21\u306e\u30da\u30fc\u30b8", "pdfBadge": "PDF", "pdfUnsupported": "\u3053\u306e PDF \u306f\u307e\u3060 Kindle \u30e2\u30fc\u30c9\u3067\u958b\u3051\u307e\u305b\u3093\u3002", "zoomIn": "\u62e1\u5927", "zoomOut": "\u7e2e\u5c0f", "fitWidth": "\u5e45\u306b\u5408\u308f\u305b\u308b", "fitPage": "\u30da\u30fc\u30b8\u306b\u5408\u308f\u305b\u308b", "goToPage": "\u30da\u30fc\u30b8\u3078\u79fb\u52d5", "jump": "\u30b8\u30e3\u30f3\u30d7", "pageOf": "{total}\u30da\u30fc\u30b8\u4e2d{number}\u30da\u30fc\u30b8", "page": "{number}\u30da\u30fc\u30b8", "noContents": "\u3053\u306e PDF \u306b\u306f\u76ee\u6b21\u304c\u3042\u308a\u307e\u305b\u3093", "noContentsBook": "\u3053\u306e\u672c\u306b\u306f\u76ee\u6b21\u304c\u3042\u308a\u307e\u305b\u3093", "goToChapter": "\u7ae0\u3078\u79fb\u52d5", "pageLoadError": "\u30da\u30fc\u30b8\u3092\u8aad\u307f\u8fbc\u3081\u307e\u305b\u3093\u3067\u3057\u305f\u3002\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002"}, "es": {"continueReading": "Continuar leyendo", "openFullReader": "Abrir el lector completo", "previous": "\u2039 Anterior", "next": "Siguiente \u203a", "theme": "Tema", "tapTurn": "Haz clic para pasar de p\u00e1gina", "library": "Biblioteca", "contents": "\u00cdndice", "settings": "Ajustes", "done": "Cerrar los ajustes", "pageMode": "Usar el modo de paginaci\u00f3n", "startReading": "Empezar a leer", "previousPage": "P\u00e1gina anterior", "nextPage": "P\u00e1gina siguiente", "pdfBadge": "PDF", "pdfUnsupported": "Este PDF a\u00fan no se puede abrir en modo Kindle.", "zoomIn": "Acercar", "zoomOut": "Alejar", "fitWidth": "Ajustar al ancho", "fitPage": "Ajustar a la p\u00e1gina", "goToPage": "Ir a la p\u00e1gina", "jump": "Ir", "pageOf": "P\u00e1gina {number} de {total}", "page": "P\u00e1gina {number}", "noContents": "Este PDF no tiene \u00edndice", "noContentsBook": "Este libro no tiene \u00edndice", "goToChapter": "Ir al cap\u00edtulo", "pageLoadError": "No se pudo cargar la p\u00e1gina. Int\u00e9ntalo de nuevo."}, "de": {"continueReading": "Weiterlesen", "openFullReader": "Vollst\u00e4ndigen Reader \u00f6ffnen", "previous": "\u2039 Zur\u00fcck", "next": "Weiter \u203a", "theme": "Design", "tapTurn": "Zum Umbl\u00e4ttern klicken", "library": "Bibliothek", "contents": "Inhaltsverzeichnis", "settings": "Einstellungen", "done": "Einstellungen schlie\u00dfen", "pageMode": "Seitenmodus verwenden", "startReading": "Lesen beginnen", "previousPage": "Vorherige Seite", "nextPage": "N\u00e4chste Seite", "pdfBadge": "PDF", "pdfUnsupported": "Dieses PDF kann im Kindle-Modus noch nicht ge\u00f6ffnet werden.", "zoomIn": "Vergr\u00f6\u00dfern", "zoomOut": "Verkleinern", "fitWidth": "An Breite anpassen", "fitPage": "An Seite anpassen", "goToPage": "Zu Seite springen", "jump": "Springen", "pageOf": "Seite {number} von {total}", "page": "Seite {number}", "noContents": "Dieses PDF hat kein Inhaltsverzeichnis", "noContentsBook": "Dieses Buch hat kein Inhaltsverzeichnis", "goToChapter": "Zu Kapitel springen", "pageLoadError": "Die Seite konnte nicht geladen werden. Bitte versuche es erneut."}, "fr": {"continueReading": "Reprendre la lecture", "openFullReader": "Ouvrir le lecteur complet", "previous": "\u2039 Pr\u00e9c\u00e9dent", "next": "Suivant \u203a", "theme": "Th\u00e8me", "tapTurn": "Cliquez pour tourner la page", "library": "Biblioth\u00e8que", "contents": "Table des mati\u00e8res", "settings": "R\u00e9glages", "done": "Fermer les r\u00e9glages", "pageMode": "Utiliser le mode pagination", "startReading": "Commencer la lecture", "previousPage": "Page pr\u00e9c\u00e9dente", "nextPage": "Page suivante", "pdfBadge": "PDF", "pdfUnsupported": "Ce PDF ne peut pas encore \u00eatre ouvert en mode Kindle.", "zoomIn": "Agrandir", "zoomOut": "R\u00e9duire", "fitWidth": "Ajuster \u00e0 la largeur", "fitPage": "Ajuster \u00e0 la page", "goToPage": "Aller \u00e0 la page", "jump": "Aller \u00e0", "pageOf": "Page {number} sur {total}", "page": "Page n\u00ba {number}", "noContents": "Ce PDF n'a pas de table des mati\u00e8res", "noContentsBook": "Ce livre n'a pas de table des mati\u00e8res", "goToChapter": "Aller au chapitre", "pageLoadError": "Impossible de charger la page. Veuillez r\u00e9essayer."}, "ru": {"continueReading": "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c \u0447\u0442\u0435\u043d\u0438\u0435", "openFullReader": "\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u043e\u043b\u043d\u044b\u0439 \u0447\u0438\u0442\u0430\u0442\u0435\u043b\u044c", "previous": "\u2039 \u041d\u0430\u0437\u0430\u0434", "next": "\u0414\u0430\u043b\u0435\u0435 \u203a", "theme": "\u0422\u0435\u043c\u0430", "tapTurn": "\u0429\u0451\u043b\u043a\u043d\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u043f\u0435\u0440\u0435\u043b\u0438\u0441\u0442\u043d\u0443\u0442\u044c", "library": "\u0411\u0438\u0431\u043b\u0438\u043e\u0442\u0435\u043a\u0430", "contents": "\u041e\u0433\u043b\u0430\u0432\u043b\u0435\u043d\u0438\u0435", "settings": "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438", "done": "\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438", "pageMode": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u043f\u043e\u0441\u0442\u0440\u0430\u043d\u0438\u0447\u043d\u044b\u0439 \u0440\u0435\u0436\u0438\u043c", "startReading": "\u041d\u0430\u0447\u0430\u0442\u044c \u0447\u0442\u0435\u043d\u0438\u0435", "previousPage": "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430", "nextPage": "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430", "pdfBadge": "PDF", "pdfUnsupported": "\u042d\u0442\u043e\u0442 PDF \u043f\u043e\u043a\u0430 \u043d\u0435\u043b\u044c\u0437\u044f \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u0432 \u0440\u0435\u0436\u0438\u043c\u0435 Kindle.", "zoomIn": "\u0423\u0432\u0435\u043b\u0438\u0447\u0438\u0442\u044c", "zoomOut": "\u0423\u043c\u0435\u043d\u044c\u0448\u0438\u0442\u044c", "fitWidth": "\u041f\u043e \u0448\u0438\u0440\u0438\u043d\u0435", "fitPage": "\u041f\u043e \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435", "goToPage": "\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435", "jump": "\u041f\u0435\u0440\u0435\u0439\u0442\u0438", "pageOf": "\u0421\u0442\u0440\u0430\u043d\u0438\u0446\u0430 {number} \u0438\u0437 {total}", "page": "\u0421\u0442\u0440\u0430\u043d\u0438\u0446\u0430 {number}", "noContents": "\u0412 \u044d\u0442\u043e\u043c PDF \u043d\u0435\u0442 \u043e\u0433\u043b\u0430\u0432\u043b\u0435\u043d\u0438\u044f", "noContentsBook": "\u0412 \u044d\u0442\u043e\u0439 \u043a\u043d\u0438\u0433\u0435 \u043d\u0435\u0442 \u043e\u0433\u043b\u0430\u0432\u043b\u0435\u043d\u0438\u044f", "goToChapter": "\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a \u0433\u043b\u0430\u0432\u0435", "pageLoadError": "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437."}, "it": {"continueReading": "Continua a leggere", "openFullReader": "Apri il lettore completo", "previous": "\u2039 Precedente", "next": "Successivo \u203a", "theme": "Tema", "tapTurn": "Fai clic per cambiare pagina", "library": "Biblioteca", "contents": "Indice", "settings": "Impostazioni", "done": "Chiudi le impostazioni", "pageMode": "Usa la modalit\u00e0 paginazione", "startReading": "Inizia a leggere", "previousPage": "Pagina precedente", "nextPage": "Pagina successiva", "pdfBadge": "PDF", "pdfUnsupported": "Questo PDF non pu\u00f2 ancora essere aperto in modalit\u00e0 Kindle.", "zoomIn": "Ingrandisci", "zoomOut": "Riduci", "fitWidth": "Adatta alla larghezza", "fitPage": "Adatta alla pagina", "goToPage": "Vai alla pagina", "jump": "Vai", "pageOf": "Pagina {number} di {total}", "page": "Pagina {number}", "noContents": "Questo PDF non ha un indice", "noContentsBook": "Questo libro non ha un indice", "goToChapter": "Vai al capitolo", "pageLoadError": "Impossibile caricare la pagina. Riprova."}, "pt-BR": {"continueReading": "Continuar lendo", "openFullReader": "Abrir o leitor completo", "previous": "\u2039 Anterior", "next": "Pr\u00f3ximo \u203a", "theme": "Tema", "tapTurn": "Clique para virar a p\u00e1gina", "library": "Biblioteca", "contents": "Sum\u00e1rio", "settings": "Configura\u00e7\u00f5es", "done": "Fechar configura\u00e7\u00f5es", "pageMode": "Usar modo de pagina\u00e7\u00e3o", "startReading": "Come\u00e7ar a ler", "previousPage": "P\u00e1gina anterior", "nextPage": "Pr\u00f3xima p\u00e1gina", "pdfBadge": "PDF", "pdfUnsupported": "Este PDF ainda n\u00e3o pode ser aberto no modo Kindle.", "zoomIn": "Ampliar", "zoomOut": "Reduzir", "fitWidth": "Ajustar \u00e0 largura", "fitPage": "Ajustar \u00e0 p\u00e1gina", "goToPage": "Ir para a p\u00e1gina", "jump": "Ir", "pageOf": "P\u00e1gina {number} de {total}", "page": "P\u00e1gina {number}", "noContents": "Este PDF n\u00e3o tem sum\u00e1rio", "noContentsBook": "Este livro n\u00e3o tem sum\u00e1rio", "goToChapter": "Ir para o cap\u00edtulo", "pageLoadError": "N\u00e3o foi poss\u00edvel carregar a p\u00e1gina. Tente novamente."}, "ar": {"continueReading": "\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u0642\u0631\u0627\u0621\u0629", "openFullReader": "\u0641\u062a\u062d \u0627\u0644\u0642\u0627\u0631\u0626 \u0627\u0644\u0643\u0627\u0645\u0644", "previous": "\u2039 \u0627\u0644\u0633\u0627\u0628\u0642", "next": "\u0627\u0644\u062a\u0627\u0644\u064a \u203a", "theme": "\u0627\u0644\u0633\u0645\u0629", "tapTurn": "\u0627\u0646\u0642\u0631 \u0644\u062a\u0642\u0644\u064a\u0628 \u0627\u0644\u0635\u0641\u062d\u0629", "library": "\u0627\u0644\u0645\u0643\u062a\u0628\u0629", "contents": "\u062c\u062f\u0648\u0644 \u0627\u0644\u0645\u062d\u062a\u0648\u064a\u0627\u062a", "settings": "\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a", "done": "\u0625\u063a\u0644\u0627\u0642 \u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a", "pageMode": "\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0648\u0636\u0639 \u062a\u0642\u0644\u064a\u0628 \u0627\u0644\u0635\u0641\u062d\u0627\u062a", "startReading": "\u0627\u0628\u062f\u0623 \u0627\u0644\u0642\u0631\u0627\u0621\u0629", "previousPage": "\u0627\u0644\u0635\u0641\u062d\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629", "nextPage": "\u0627\u0644\u0635\u0641\u062d\u0629 \u0627\u0644\u062a\u0627\u0644\u064a\u0629", "pdfBadge": "PDF", "pdfUnsupported": "\u0644\u0627 \u064a\u0645\u0643\u0646 \u0641\u062a\u062d \u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 PDF \u0641\u064a \u0648\u0636\u0639 Kindle \u0628\u0639\u062f.", "zoomIn": "\u062a\u0643\u0628\u064a\u0631", "zoomOut": "\u062a\u0635\u063a\u064a\u0631", "fitWidth": "\u0645\u0644\u0627\u0621\u0645\u0629 \u0627\u0644\u0639\u0631\u0636", "fitPage": "\u0645\u0644\u0627\u0621\u0645\u0629 \u0627\u0644\u0635\u0641\u062d\u0629", "goToPage": "\u0627\u0644\u0627\u0646\u062a\u0642\u0627\u0644 \u0625\u0644\u0649 \u0627\u0644\u0635\u0641\u062d\u0629", "jump": "\u0627\u0646\u062a\u0642\u0627\u0644", "pageOf": "\u0627\u0644\u0635\u0641\u062d\u0629 {number} \u0645\u0646 {total}", "page": "\u0627\u0644\u0635\u0641\u062d\u0629 {number}", "noContents": "\u0644\u0627 \u064a\u062d\u062a\u0648\u064a \u0645\u0644\u0641 PDF \u0647\u0630\u0627 \u0639\u0644\u0649 \u062c\u062f\u0648\u0644 \u0645\u062d\u062a\u0648\u064a\u0627\u062a", "noContentsBook": "\u0644\u0627 \u064a\u062d\u062a\u0648\u064a \u0647\u0630\u0627 \u0627\u0644\u0643\u062a\u0627\u0628 \u0639\u0644\u0649 \u062c\u062f\u0648\u0644 \u0645\u062d\u062a\u0648\u064a\u0627\u062a", "goToChapter": "\u0627\u0644\u0627\u0646\u062a\u0642\u0627\u0644 \u0625\u0644\u0649 \u0627\u0644\u0641\u0635\u0644", "pageLoadError": "\u062a\u0639\u0630\u0651\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0635\u0641\u062d\u0629. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."}, "id": {"continueReading": "Lanjutkan membaca", "openFullReader": "Buka pembaca lengkap", "previous": "\u2039 Sebelumnya", "next": "Berikutnya \u203a", "theme": "Tema", "tapTurn": "Klik untuk membalik halaman", "library": "Perpustakaan", "contents": "Daftar isi", "settings": "Pengaturan", "done": "Tutup pengaturan", "pageMode": "Gunakan mode halaman", "startReading": "Mulai membaca", "previousPage": "Halaman sebelumnya", "nextPage": "Halaman berikutnya", "pdfBadge": "PDF", "pdfUnsupported": "PDF ini belum dapat dibuka dalam mode Kindle.", "zoomIn": "Perbesar", "zoomOut": "Perkecil", "fitWidth": "Sesuaikan lebar", "fitPage": "Sesuaikan halaman", "goToPage": "Buka halaman", "jump": "Lompat", "pageOf": "Halaman {number} dari {total}", "page": "Halaman {number}", "noContents": "PDF ini tidak memiliki daftar isi", "noContentsBook": "Buku ini tidak memiliki daftar isi", "goToChapter": "Buka bab", "pageLoadError": "Halaman tidak dapat dimuat. Silakan coba lagi."}, "hi": {"continueReading": "\u092a\u0922\u093c\u0928\u093e \u091c\u093e\u0930\u0940 \u0930\u0916\u0947\u0902", "openFullReader": "\u092a\u0942\u0930\u094d\u0923 \u0930\u0940\u0921\u0930 \u0916\u094b\u0932\u0947\u0902", "previous": "\u2039 \u092a\u093f\u091b\u0932\u093e", "next": "\u0905\u0917\u0932\u093e \u203a", "theme": "\u0925\u0940\u092e", "tapTurn": "\u092a\u0943\u0937\u094d\u0920 \u092a\u0932\u091f\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0915\u094d\u0932\u093f\u0915 \u0915\u0930\u0947\u0902", "library": "\u092a\u0941\u0938\u094d\u0924\u0915\u093e\u0932\u092f", "contents": "\u0935\u093f\u0937\u092f-\u0938\u0942\u091a\u0940", "settings": "\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938", "done": "\u0938\u0947\u091f\u093f\u0902\u0917 \u092c\u0902\u0926 \u0915\u0930\u0947\u0902", "pageMode": "\u092a\u0943\u0937\u094d\u0920 \u092a\u0932\u091f\u0928\u0947 \u0915\u093e \u092e\u094b\u0921 \u0907\u0938\u094d\u0924\u0947\u092e\u093e\u0932 \u0915\u0930\u0947\u0902", "startReading": "\u092a\u0922\u093c\u0928\u093e \u0936\u0941\u0930\u0942 \u0915\u0930\u0947\u0902", "previousPage": "\u092a\u093f\u091b\u0932\u093e \u092a\u0943\u0937\u094d\u0920", "nextPage": "\u0905\u0917\u0932\u093e \u092a\u0943\u0937\u094d\u0920", "pdfBadge": "PDF", "pdfUnsupported": "\u092f\u0939 PDF \u0905\u092d\u0940 Kindle \u092e\u094b\u0921 \u092e\u0947\u0902 \u0928\u0939\u0940\u0902 \u0916\u094b\u0932\u093e \u091c\u093e \u0938\u0915\u0924\u093e\u0964", "zoomIn": "\u091c\u093c\u0942\u092e \u0907\u0928", "zoomOut": "\u091c\u093c\u0942\u092e \u0906\u0909\u091f", "fitWidth": "\u091a\u094c\u0921\u093c\u093e\u0908 \u092e\u0947\u0902 \u092b\u093f\u091f \u0915\u0930\u0947\u0902", "fitPage": "\u092a\u0943\u0937\u094d\u0920 \u092e\u0947\u0902 \u092b\u093f\u091f \u0915\u0930\u0947\u0902", "goToPage": "\u092a\u0943\u0937\u094d\u0920 \u092a\u0930 \u091c\u093e\u090f\u0901", "jump": "\u091c\u093e\u090f\u0901", "pageOf": "{total} \u092e\u0947\u0902 \u0938\u0947 \u092a\u0943\u0937\u094d\u0920 {number}", "page": "\u092a\u0943\u0937\u094d\u0920 {number}", "noContents": "\u0907\u0938 PDF \u092e\u0947\u0902 \u0915\u094b\u0908 \u0935\u093f\u0937\u092f-\u0938\u0942\u091a\u0940 \u0928\u0939\u0940\u0902 \u0939\u0948", "noContentsBook": "\u0907\u0938 \u092a\u0941\u0938\u094d\u0924\u0915 \u092e\u0947\u0902 \u0915\u094b\u0908 \u0935\u093f\u0937\u092f-\u0938\u0942\u091a\u0940 \u0928\u0939\u0940\u0902 \u0939\u0948", "goToChapter": "\u0905\u0927\u094d\u092f\u093e\u092f \u092a\u0930 \u091c\u093e\u090f\u0902", "pageLoadError": "\u092a\u0943\u0937\u094d\u0920 \u0932\u094b\u0921 \u0928\u0939\u0940\u0902 \u0939\u094b \u0938\u0915\u093e\u0964 \u0915\u0943\u092a\u092f\u093e \u092a\u0941\u0928\u0903 \u092a\u094d\u0930\u092f\u093e\u0938 \u0915\u0930\u0947\u0902\u0964"}, "vi": {"continueReading": "\u0110\u1ecdc ti\u1ebfp", "openFullReader": "M\u1edf tr\u00ecnh \u0111\u1ecdc \u0111\u1ea7y \u0111\u1ee7", "previous": "\u2039 Tr\u01b0\u1edbc", "next": "Ti\u1ebfp \u203a", "theme": "Ch\u1ee7 \u0111\u1ec1", "tapTurn": "Nh\u1ea5p \u0111\u1ec3 l\u1eadt trang", "library": "Th\u01b0 vi\u1ec7n", "contents": "M\u1ee5c l\u1ee5c", "settings": "C\u00e0i \u0111\u1eb7t", "done": "\u0110\u00f3ng c\u00e0i \u0111\u1eb7t", "pageMode": "D\u00f9ng ch\u1ebf \u0111\u1ed9 l\u1eadt trang", "startReading": "B\u1eaft \u0111\u1ea7u \u0111\u1ecdc", "previousPage": "Trang tr\u01b0\u1edbc", "nextPage": "Trang sau", "pdfBadge": "PDF", "pdfUnsupported": "Ch\u01b0a th\u1ec3 m\u1edf PDF n\u00e0y trong ch\u1ebf \u0111\u1ed9 Kindle.", "zoomIn": "Ph\u00f3ng to", "zoomOut": "Thu nh\u1ecf", "fitWidth": "V\u1eeba chi\u1ec1u r\u1ed9ng", "fitPage": "V\u1eeba trang", "goToPage": "\u0110i \u0111\u1ebfn trang", "jump": "Chuy\u1ec3n \u0111\u1ebfn", "pageOf": "Trang {number} / {total}", "page": "Trang {number}", "noContents": "PDF n\u00e0y kh\u00f4ng c\u00f3 m\u1ee5c l\u1ee5c", "noContentsBook": "S\u00e1ch n\u00e0y kh\u00f4ng c\u00f3 m\u1ee5c l\u1ee5c", "goToChapter": "\u0110\u1ebfn ch\u01b0\u01a1ng", "pageLoadError": "Kh\u00f4ng th\u1ec3 t\u1ea3i trang. Vui l\u00f2ng th\u1eed l\u1ea1i."}, "th": {"continueReading": "\u0e2d\u0e48\u0e32\u0e19\u0e15\u0e48\u0e2d", "openFullReader": "\u0e40\u0e1b\u0e34\u0e14\u0e42\u0e1b\u0e23\u0e41\u0e01\u0e23\u0e21\u0e2d\u0e48\u0e32\u0e19\u0e41\u0e1a\u0e1a\u0e40\u0e15\u0e47\u0e21", "previous": "\u2039 \u0e01\u0e48\u0e2d\u0e19\u0e2b\u0e19\u0e49\u0e32", "next": "\u0e16\u0e31\u0e14\u0e44\u0e1b \u203a", "theme": "\u0e18\u0e35\u0e21", "tapTurn": "\u0e04\u0e25\u0e34\u0e01\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e1e\u0e25\u0e34\u0e01\u0e2b\u0e19\u0e49\u0e32", "library": "\u0e2b\u0e49\u0e2d\u0e07\u0e2a\u0e21\u0e38\u0e14", "contents": "\u0e2a\u0e32\u0e23\u0e1a\u0e31\u0e0d", "settings": "\u0e01\u0e32\u0e23\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32", "done": "\u0e1b\u0e34\u0e14\u0e01\u0e32\u0e23\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32", "pageMode": "\u0e43\u0e0a\u0e49\u0e42\u0e2b\u0e21\u0e14\u0e1e\u0e25\u0e34\u0e01\u0e2b\u0e19\u0e49\u0e32", "startReading": "\u0e40\u0e23\u0e34\u0e48\u0e21\u0e2d\u0e48\u0e32\u0e19", "previousPage": "\u0e2b\u0e19\u0e49\u0e32\u0e01\u0e48\u0e2d\u0e19", "nextPage": "\u0e2b\u0e19\u0e49\u0e32\u0e16\u0e31\u0e14\u0e44\u0e1b", "pdfBadge": "PDF", "pdfUnsupported": "\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e40\u0e1b\u0e34\u0e14 PDF \u0e40\u0e25\u0e48\u0e21\u0e19\u0e35\u0e49\u0e43\u0e19\u0e42\u0e2b\u0e21\u0e14 Kindle \u0e44\u0e14\u0e49", "zoomIn": "\u0e02\u0e22\u0e32\u0e22", "zoomOut": "\u0e22\u0e48\u0e2d", "fitWidth": "\u0e1e\u0e2d\u0e14\u0e35\u0e04\u0e27\u0e32\u0e21\u0e01\u0e27\u0e49\u0e32\u0e07", "fitPage": "\u0e1e\u0e2d\u0e14\u0e35\u0e2b\u0e19\u0e49\u0e32", "goToPage": "\u0e44\u0e1b\u0e17\u0e35\u0e48\u0e2b\u0e19\u0e49\u0e32", "jump": "\u0e44\u0e1b\u0e17\u0e35\u0e48", "pageOf": "\u0e2b\u0e19\u0e49\u0e32 {number} \u0e08\u0e32\u0e01 {total}", "page": "\u0e2b\u0e19\u0e49\u0e32 {number}", "noContents": "PDF \u0e19\u0e35\u0e49\u0e44\u0e21\u0e48\u0e21\u0e35\u0e2a\u0e32\u0e23\u0e1a\u0e31\u0e0d", "noContentsBook": "\u0e2b\u0e19\u0e31\u0e07\u0e2a\u0e37\u0e2d\u0e40\u0e25\u0e48\u0e21\u0e19\u0e35\u0e49\u0e44\u0e21\u0e48\u0e21\u0e35\u0e2a\u0e32\u0e23\u0e1a\u0e31\u0e0d", "goToChapter": "\u0e44\u0e1b\u0e17\u0e35\u0e48\u0e1a\u0e17", "pageLoadError": "\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e42\u0e2b\u0e25\u0e14\u0e2b\u0e19\u0e49\u0e32\u0e19\u0e35\u0e49\u0e44\u0e14\u0e49 \u0e42\u0e1b\u0e23\u0e14\u0e25\u0e2d\u0e07\u0e2d\u0e35\u0e01\u0e04\u0e23\u0e31\u0e49\u0e07"}, "ms": {"continueReading": "Teruskan membaca", "openFullReader": "Buka pembaca penuh", "previous": "\u2039 Sebelum", "next": "Seterusnya \u203a", "theme": "Tema", "tapTurn": "Klik untuk menyelak halaman", "library": "Perpustakaan", "contents": "Isi kandungan", "settings": "Tetapan", "done": "Tutup tetapan", "pageMode": "Gunakan mod selak halaman", "startReading": "Mula membaca", "previousPage": "Halaman sebelumnya", "nextPage": "Halaman seterusnya", "pdfBadge": "PDF", "pdfUnsupported": "PDF ini belum boleh dibuka dalam mod Kindle.", "zoomIn": "Zum masuk", "zoomOut": "Zum keluar", "fitWidth": "Muat lebar", "fitPage": "Muat halaman", "goToPage": "Pergi ke halaman", "jump": "Pergi", "pageOf": "Halaman {number} daripada {total}", "page": "Halaman {number}", "noContents": "PDF ini tiada jadual kandungan", "noContentsBook": "Buku ini tiada jadual kandungan", "goToChapter": "Pergi ke bab", "pageLoadError": "Halaman tidak dapat dimuatkan. Sila cuba lagi."}};
+  var keys = Object.keys(dictionaries);
+  var listeners = [];
+  var active;
+  function normalize(value) {
+    var code = (value || '').toLowerCase().replace(/_/g, '-');
+    var base = code.split('-')[0];
+    if (base === 'zh') return /^zh-(tw|hk|mo|hant)/.test(code) ? 'zh-TW' : 'zh-CN';
+    if (base === 'pt') return 'pt-BR';
+    for (var i = 0; i < keys.length; i++) if (keys[i] === base) return base;
+    return '';
+  }
+  window.kTranslate = function (key) { return dictionaries[active][key]; };
+  window.kOnLocaleChange = function (callback) { listeners.push(callback); };
+  window.kLocalize = function (root) {
+    var elements = (root || document).querySelectorAll('[data-i18n],[data-i18n-aria-label],[data-i18n-placeholder]');
+    for (var i = 0; i < elements.length; i++) {
+      var element = elements[i];
+      var message = kTranslate(element.getAttribute('data-i18n'));
+      if (typeof message === 'string') element.textContent = message;
+      var attributes = ['aria-label', 'placeholder'];
+      for (var j = 0; j < attributes.length; j++) {
+        var text = kTranslate(element.getAttribute('data-i18n-' + attributes[j]));
+        if (typeof text === 'string') {
+          text = text.replace('{number}', element.getAttribute('data-page') || '')
+                     .replace('{total}', element.getAttribute('data-total') || '');
+          element.setAttribute(attributes[j], text);
+        }
+      }
+    }
+  };
+  function apply(locale) {
+    active = locale;
+    document.documentElement.lang = locale;
+    var select = document.getElementById('kLanguage');
+    if (select) select.value = locale;
+    var chrome = document.querySelectorAll('[data-k-ui-language]');
+    for (var i = 0; i < chrome.length; i++) chrome[i].lang = locale;
+    kLocalize(document);
+    for (var j = 0; j < listeners.length; j++) listeners[j]();
+  }
+  window.kSetLocale = function (locale) {
+    locale = normalize(locale);
+    if (!locale) return;
+    setCookie('epub_browser_locale', locale, 365);
+    apply(locale);
+  };
+  function sync() {
+    var fallback = false ? initial : (navigator.language || navigator.userLanguage);
+    apply(normalize(getCookie('epub_browser_locale')) || normalize(fallback) || 'en');
+  }
+  var initial = document.documentElement.lang;
+  var previousPageShow = window.onpageshow;
+  sync();
+  window.onpageshow = function (event) {
+    if (event && event.persisted) sync();
+    if (previousPageShow) previousPageShow(event);
+  };
+})();
+
+
+(function () {
+  var viewport = document.getElementById('kViewport');
+  var text = document.getElementById('kText');
+  var previous = document.getElementById('kPrev');
+  var next = document.getElementById('kNext');
+  var back = document.getElementById('kTurnBack');
+  var forward = document.getElementById('kTurnForward');
+  var position = document.getElementById('kReaderPosition');
+  var chapter = viewport.getAttribute('data-chapter');
+  var cookie = 'kindle_pos_' + viewport.getAttribute('data-book');
+  var chapterLabel = position.textContent;
+  var columnGap = 28;
+  var columnsSupported = 'webkitColumnWidth' in text.style || 'columnWidth' in text.style;
+  var paged = false;
+  var interacted = false;
+  var saveTimer;
+  var page = 0;
+  var pageCount = 1;
+  var stride = 1;
+  var end = 0;
+  function positionRatio() {
+    return end ? (paged ? viewport.scrollLeft : viewport.scrollTop) / end : 0;
+  }
+  function measure() {
+    if (paged) {
+      stride = viewport.clientWidth + columnGap;
+      end = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+      pageCount = Math.round(end / stride) + 1;
+    } else {
+      var line = parseFloat(window.getComputedStyle(text).lineHeight) || 24;
+      stride = Math.max(1, viewport.clientHeight - line);
+      end = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+      pageCount = Math.ceil(end / stride) + 1;
+    }
+  }
+  function updatePosition() {
+    var offset = paged ? viewport.scrollLeft : viewport.scrollTop;
+    page = offset >= end - 1 ? pageCount - 1 : Math.round(offset / stride);
+    var label = chapterLabel + ' · ' + (page + 1) + '/' + pageCount;
+    if (position.textContent !== label) position.textContent = label;
+    back.disabled = !previous && page === 0;
+    forward.disabled = !next && page >= pageCount - 1;
+  }
+  function jump(index) {
+    var offset = Math.max(0, Math.min(end, index * stride));
+    if (paged) viewport.scrollLeft = offset;
+    else viewport.scrollTop = offset;
+    updatePosition();
+  }
+  function save() {
+    if (saveTimer) window.clearTimeout(saveTimer);
+    setCookie(cookie, chapter + ':' + positionRatio().toFixed(5), 365);
+  }
+  function turn(dir) {
+    if (kSettingsOpen()) return;
+    interacted = true;
+    if (paged ? page + dir >= 0 && page + dir < pageCount
+        : ((dir < 0 && viewport.scrollTop > 0) || (dir > 0 && viewport.scrollTop < end - 1))) {
+      if (paged) jump(page + dir);
+      else viewport.scrollTop += dir * stride;
+      updatePosition();
+      save();
+      return;
+    }
+    var link = dir < 0 ? previous : next;
+    if (link) {
+      save();
+      window.location.href = link.href + (dir < 0 ? '#kEnd' : '');
+    }
+  }
+  function layout(ratio) {
+    paged = columnsSupported && kPagedMode() && window.getComputedStyle(viewport).direction !== "rtl";
+    document.body.setAttribute('data-k-reader', paged ? 'pages' : 'scroll');
+    text.style.height = paged ? viewport.clientHeight + 'px' : '';
+    text.style.width = paged ? viewport.clientWidth + 'px' : '';
+    text.style.webkitColumnWidth = text.style.columnWidth = text.style.width;
+    text.style.webkitColumnGap = text.style.columnGap = paged ? columnGap + 'px' : '';
+    if (paged && viewport.scrollHeight > viewport.clientHeight + 3) {
+      // Tall, indivisible EPUB content remains reachable by regular scrolling.
+      paged = false;
+      document.body.setAttribute('data-k-reader', 'scroll');
+      text.style.height = text.style.width = '';
+      text.style.webkitColumnWidth = text.style.columnWidth = '';
+      text.style.webkitColumnGap = text.style.columnGap = '';
+    }
+    measure();
+    if (paged) jump(Math.round(ratio * (pageCount - 1)));
+    else {
+      viewport.scrollTop = ratio * end;
+      updatePosition();
+    }
+  }
+  function revealAnchor() {
+    var anchor = window.location.hash.slice(1);
+    if (!anchor || anchor === 'kEnd' || anchor === 'resume') return;
+    try { anchor = decodeURIComponent(anchor); } catch (error) {}
+    var target = document.getElementById(anchor);
+    if (!target || !viewport.contains(target)) return;
+    if (paged) {
+      var offset = viewport.scrollLeft + target.getBoundingClientRect().left
+        - viewport.getBoundingClientRect().left;
+      jump(Math.floor((offset + 1) / stride));
+    } else target.scrollIntoView();
+  }
+  window.kTurnPage = turn;
+  window.kReaderRelayout = function () {
+    interacted = true;
+    layout(positionRatio());
+    save();
+  };
+  var ratio = 0;
+  var fragment = window.location.hash;
+  if (fragment === '#kEnd') ratio = 1;
+  else if (fragment === '#resume') {
+    var parts = (getCookie(cookie) || '').split(':');
+    if (parts[0] === chapter) ratio = Math.max(0, Math.min(1, Number(parts[1]) || 0));
+  }
+  layout(ratio);
+  revealAnchor();
+  window.onhashchange = revealAnchor;
+  viewport.onscroll = function () {
+    if (!paged) updatePosition();
+    if (saveTimer) window.clearTimeout(saveTimer);
+    saveTimer = window.setTimeout(save, 300);
+  };
+  window.onresize = function () { layout(positionRatio()); };
+  window.onpagehide = save;
+  window.onload = function () {
+    layout(interacted ? positionRatio() : ratio);
+    if (!interacted) revealAnchor();
+  };
+  document.onkeydown = function (event) {
+    var e = event || window.event;
+    if (!e) return;
+    if (kSettingsOpen()) {
+      if (e.keyCode === 27) kToggleSettings();
+      if (e.keyCode === 9) {
+        var controls = document.getElementById('kSettings').querySelectorAll('button, a[href]');
+        var first = controls[0];
+        var last = controls[controls.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          last.focus();
+          return false;
+        }
+        if (!e.shiftKey && document.activeElement === last) {
+          first.focus();
+          return false;
+        }
+      }
+      return;
+    }
+    if (kIsTurnNode(e.target || e.srcElement)) return;
+    if (e.keyCode === 37 || e.keyCode === 39) {
+      turn(e.keyCode === 37 ? -1 : 1);
+      if (e.preventDefault) e.preventDefault();
+    }
+  };
+})();
+
+setCookie("W5t_bkH64u-0GwfxFrnEew", 'chapter_29.html', 365);
+kRememberBook("W5t_bkH64u-0GwfxFrnEew");
+</script>
+</body>
+</html>

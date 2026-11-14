@@ -1,0 +1,49 @@
+.custom-css-notification {
+    --notification-accent: var(--primary, var(--button-bg, #4361ee));
+    position: fixed;
+    z-index: 10030;
+    top: max(20px, env(safe-area-inset-top));
+    left: 50%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: max-content;
+    max-width: min(520px, calc(100vw - 32px));
+    box-sizing: border-box;
+    padding: 11px 16px;
+    border: 1px solid var(--toast-border, var(--border, #ddd));
+    border-radius: 12px;
+    transform: translateX(-50%);
+    background: var(--toast-bg, var(--card-bg, #fff));
+    color: var(--toast-text, var(--text, #333));
+    font-family: var(--font-family, system-ui, -apple-system, sans-serif);
+    font-weight: 600;
+    line-height: 1.45;
+    text-align: start;
+    overflow-wrap: anywhere;
+    box-shadow: 0 10px 30px color-mix(in srgb, #000 16%, transparent);
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+.custom-css-notification::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    flex: 0 0 8px;
+    border-radius: 50%;
+    background: var(--notification-accent);
+}
+
+.custom-css-notification.success { --notification-accent: var(--notification-success, #27ae60); }
+.custom-css-notification.info { --notification-accent: var(--primary, var(--button-bg, #4361ee)); }
+.custom-css-notification.warning { --notification-accent: var(--notification-warning, #f39c12); }
+.custom-css-notification.error { --notification-accent: var(--notification-error, #e74c3c); }
+
+.custom-css-notification.fade-out {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .custom-css-notification { transition-duration: .01ms; }
+}

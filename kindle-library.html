@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title data-i18n="library">Library</title>
+<style>
+body{margin:0;padding:0;background-color:#fff!important;color:#111!important;font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.65}
+body.sepia{background-color:#f3e9d2!important;color:#3c2f1a!important}
+body.dark{background-color:#161616!important;color:#c9c9c9!important}
+/* Nested controls share an 8px corner inside 12px panels with a 4px inset. */
+.k-surface,#kRecent li:first-child a,#kCatalog a{border-radius:12px}
+.k-surface{box-sizing:border-box;border:1px solid #aaa;border-bottom-width:2px;background:#fff}
+body.dark .k-surface{background:#161616;border-color:#777}
+body.sepia .k-surface{background:#f3e9d2;border-color:#86795e}
+.k-control{display:inline-block;box-sizing:border-box;min-height:44px;padding:10px 14px;
+  color:inherit;background:transparent;border:1px solid #888;border-radius:8px;text-decoration:none;font:inherit}
+.k-dock{position:fixed;z-index:5;bottom:0;left:0;right:0;margin:0 auto;
+  max-width:720px;display:table;width:100%;height:58px;table-layout:fixed;padding:3px;border-radius:12px 12px 0 0;
+  font:16px/1.3 Arial,sans-serif}
+.k-dock>a{display:table-cell;height:49px;vertical-align:middle;text-align:center;color:inherit;
+  text-decoration:none;font-size:.85em;word-wrap:break-word;border:1px solid transparent;border-radius:8px}
+.k-dock [aria-current]{border-color:currentColor;font-weight:bold}
+#kFontSizeValue{display:inline-block;min-width:48px;text-align:center}
+.k-control:focus,.k-surface a:focus,.k-surface button:focus{outline:2px solid;outline-offset:2px}
+.k-header{padding:10px 16px;border-bottom:1px solid;line-height:1.4;font-family:Arial,sans-serif}
+.k-header a,.k-header button{display:inline-block;min-height:24px;padding:9px 0}
+.k-header button{float:right;background:none;border:0;color:inherit;font:inherit;text-decoration:underline}
+.k-cover{display:block;position:relative;box-sizing:border-box;overflow:hidden;border:1px solid #777;border-radius:3px;text-align:center}
+.k-cover img{position:absolute;top:0;right:0;bottom:0;left:0;max-width:100%;max-height:100%;margin:auto}
+.k-cover-placeholder:before{content:"";position:absolute;top:0;bottom:0;left:13%;border-left:1px solid #777}
+.k-cover-placeholder:after{content:"";position:absolute;top:32%;left:28%;right:16%;height:14%;border-top:1px solid #777;border-bottom:1px solid #777}
+/* Reader chrome shared by EPUB chapters and PDF image pages. */
+.k-reader-header{box-sizing:border-box;max-width:680px;margin:0 auto;padding:0 16px}
+.k-reader-header a,.k-reader-header button{display:inline-block;box-sizing:border-box;min-width:44px;min-height:44px;
+  line-height:1.3;margin:0;padding:12px 0;font:inherit;color:inherit;background:none;border:0;text-decoration:none}
+.k-reader-header button{float:right;font-weight:bold}
+.k-reader-header a{float:left;margin-right:14px}
+.k-reader-header .k-running-title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:12px 0;font-weight:normal}
+.k-reader-header:after{content:"";display:block;clear:both}
+.k-reader-header,.k-reader-footer,.k-reader-settings{font:15px/1.4 Arial,sans-serif}
+.k-reader-footer{text-align:center;overflow:hidden}
+.k-reader-footer button{display:none}
+#kSettingsBackdrop,.k-settings-backdrop{display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:transparent}
+.k-reader-settings{display:none;position:fixed;z-index:10;box-sizing:border-box;left:8px;right:8px;bottom:8px;
+  max-width:540px;max-height:82%;margin:0 auto;padding:10px 12px;text-align:left;overflow:auto}
+.k-reader-settings a,.k-reader-settings button{display:inline-block;box-sizing:border-box;min-height:44px;
+  padding:10px 12px;margin:3px;border:1px solid #888;color:inherit;background:none;font:inherit;text-decoration:none}
+.k-settings-heading{overflow:hidden}
+.k-settings-heading h2{display:inline-block;margin:12px 3px 6px;font-size:1.05em}
+.k-settings-heading button{float:right;min-width:44px;font-size:1.25em;line-height:1}
+.k-settings-modes{padding:6px 0}
+.k-settings-modes button{font-weight:bold}
+.k-settings-modes button[aria-pressed="true"]{color:#fff;background:#111;border-color:#111}
+body.dark .k-settings-modes button[aria-pressed="true"]{color:#111;background:#eee;border-color:#eee}
+.k-reader-settings .k-settings-links{border-top:1px solid #888;padding-top:6px}
+body[data-k-reader] .k-reader-header{position:absolute;top:0;left:0;right:0;height:45px;max-width:680px}
+body[data-k-reader] .k-reader-footer{position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;
+  height:48px;max-width:680px;margin:0 auto;border-top:1px solid #888}
+body[data-k-reader] .k-reader-footer .k-chapter-links{display:none}
+body[data-k-reader] .k-reader-footer button{display:block;box-sizing:border-box;width:18%;height:44px;
+  border:0;background:none;color:inherit;font:inherit;font-size:1.45em}
+body[data-k-reader] .k-reader-footer button:disabled{opacity:.4}
+#kReaderPosition,#kPdfPosition{display:inline-block;margin-top:13px}
+.k-reader-header a:focus,.k-reader-header button:focus,.k-reader-footer button:focus{
+  outline:2px solid;outline-offset:-2px}
+body.sepia .k-reader-footer,body.dark .k-reader-footer{border-color:#666}
+body.sepia .k-header,body.dark .k-header{border-color:#666}
+.k-header a{color:inherit;text-decoration:none;font-weight:bold;font-size:15px}
+.k-content{padding:22px 20px 32px;max-width:640px;margin:0 auto;word-wrap:break-word;line-height:1.7}
+body.sepia .k-content{color:#3c2f1a!important}
+body.dark .k-content{color:#c9c9c9!important}
+body[data-k-font="serif"] #kText,body[data-k-font="serif"] #kText *{font-family:Georgia,"Times New Roman",serif!important}
+body[data-k-font="sans"] #kText,body[data-k-font="sans"] #kText *{font-family:Arial,sans-serif!important}
+.k-content img{max-width:100%;height:auto}
+.k-content a{color:inherit;text-decoration:underline}
+.k-nav{overflow:hidden;border-top:1px solid #999;padding:12px 14px;max-width:640px;margin:0 auto}
+body.sepia .k-nav,body.dark .k-nav{border-color:#666}
+.k-nav a{color:inherit;text-decoration:none;padding:10px 14px;border:1px solid;font-family:Arial,sans-serif}
+.k-nav .prev{float:left}
+.k-nav .next{float:right}
+.k-toc{padding:4px 16px 30px;max-width:640px;margin:0 auto}
+.k-toc ul{list-style:none;margin:0;padding:0}
+.k-toc li{padding:5px 0;line-height:1.45}
+.k-toc li[class^="lvl-"] a{padding:9px 0;border-bottom:1px solid #888}
+.k-toc li.lvl-1{padding-left:16px}
+.k-toc li.lvl-2{padding-left:32px}
+.k-toc li.lvl-3{padding-left:48px}
+.k-toc a{color:inherit;text-decoration:none;display:block}
+.k-toc .sec{color:#666;font-size:14px}
+body.dark .k-toc .sec{color:#9a9a9a}
+
+.k-library{box-sizing:border-box;max-width:720px;margin:0 auto;padding:14px 14px 76px;font:16px/1.4 Arial,sans-serif}
+.k-library-head{overflow:hidden;margin-bottom:10px}
+.k-library-head h1{margin:4px 0;font:700 1.85em/1.25 Arial,sans-serif;letter-spacing:-.02em}
+
+.k-library-tabs{padding:4px;white-space:normal}
+.k-library-tabs a{display:inline-block;box-sizing:border-box;min-height:44px;padding:11px 12px;
+  border-color:transparent;color:inherit;text-decoration:none;font-size:.91em}
+.k-library-tabs a[aria-current]{background:#111;color:#fff;font-weight:bold}
+body.dark .k-library-tabs a[aria-current]{background:#eee;color:#111}
+.k-library-panel{padding:12px 0;min-height:110px}
+.k-library-panel ul{list-style:none;padding:0;margin:0}
+.k-library-panel a{display:block;color:inherit;text-decoration:none}
+.k-lib-info,.k-lib-title,.k-lib-authors{display:block;word-wrap:break-word}
+.k-lib-authors{font-size:.83em;margin-top:3px;opacity:.85}
+.k-lib-format{display:inline-block;margin-top:4px;padding:0 5px;border:1px solid currentColor;
+  border-radius:4px;font:bold .72em/1.5 Arial,sans-serif;letter-spacing:.04em}
+/* The catalog card has a fixed cover height, so the format badge overlays the
+   card's top-right corner instead of extending the text flow past the border. */
+#kCatalog .k-lib-format{position:absolute;top:8px;right:8px;display:block;margin:0;
+  padding:1px 6px;border-radius:6px;background:#fff}
+body.sepia #kCatalog .k-lib-format{background:#f3e9d2}
+body.dark #kCatalog .k-lib-format{background:#161616}
+.k-shelf-group-name{display:block;margin:15px 0 2px;font-weight:bold}
+.k-shelf-list ul{padding-left:12px;border-left:1px solid #888}
+.k-shelf-list a,#kRecent a{overflow:hidden;padding:10px 0;min-height:44px;border-bottom:1px solid #888}
+.k-shelf-list .k-cover,#kRecent .k-cover{float:left;width:42px;height:58px;margin-right:12px}
+#kRecent li:first-child a{border:1px solid #aaa;border-bottom-width:2px;padding:14px;margin-bottom:6px}
+#kRecent li:first-child .k-cover{width:75px;height:104px;margin-right:16px}
+#kRecent li:first-child .k-lib-title{font:700 1.3em/1.3 Georgia,serif}
+#kBookSearch{margin-bottom:14px}
+.k-catalog-sort{display:table;width:100%;margin-top:8px}
+.k-catalog-sort label,.k-catalog-sort-action{display:table-cell;vertical-align:middle}
+.k-catalog-sort label{width:100%}
+.k-catalog-sort label span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.k-catalog-sort-action{padding-left:8px}
+.k-catalog-sort-action button{white-space:nowrap}
+#kBookSort{width:100%;max-width:100%;min-height:44px}
+body.dark #kBookSort option{background:#161616;color:#eee}
+body.sepia #kBookSort option{background:#f3e9d2;color:#3c2f1a}
+.k-pager{display:table;width:100%;table-layout:fixed;margin:8px 0;text-align:center}
+.k-pager .k-control{display:inline-block;width:60px;padding:6px 12px;font-size:1.3em}
+.k-pager>span[data-page]{display:inline-block;min-width:94px;padding:0 10px}
+.k-pager [aria-disabled="true"],.k-pager button:disabled{opacity:.4}
+#kFindBooks{box-sizing:border-box;width:100%;min-height:44px;padding:8px 12px;border:1px solid #888;background:transparent;color:inherit;font:inherit}
+#kFindBooks::placeholder{color:inherit;opacity:.8}
+#kCatalog li[data-book]{display:inline-block;vertical-align:top;box-sizing:border-box;width:32%;margin:0 1.3% 8px 0}
+#kCatalog a{position:relative;box-sizing:border-box;min-height:174px;padding:9px 8px;
+  border:1px solid #aaa;border-bottom-width:2px}
+#kCatalog .k-cover{width:81px;max-width:100%;height:114px;margin:0 auto 8px}
+#kCatalog .k-lib-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+  min-height:2.5em;max-height:2.5em;overflow:hidden;line-height:1.25;font-size:.9em}
+#kCatalog .k-lib-authors{min-height:1.2em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.k-home-settings{padding:12px 14px}
+.k-home-settings fieldset{margin:0 0 12px;padding:0;border:0}
+.k-home-settings legend{font-weight:bold;padding-bottom:5px}
+.k-home-settings button{margin:2px}
+.k-home-settings button[aria-pressed="true"]{border-color:currentColor;font-weight:bold;box-shadow:inset 0 0 0 1px currentColor}
+#kLanguage{max-width:100%;min-width:154px;background:inherit}
+body.dark #kLanguage option{background:#161616;color:#eee}
+body.sepia #kLanguage option{background:#f3e9d2;color:#3c2f1a}
+
+@media (max-width:360px){
+    #kCatalog li[data-book]{width:48%}
+    .k-library-tabs a{padding-left:7px;padding-right:7px}
+}
+</style>
+</head>
+<body class="light">
+<div class="k-library">
+<main>
+<section id="kLibraryView" data-k-view>
+<header class="k-library-head">
+<h1 data-i18n="library">Library</h1>
+</header>
+<nav class="k-library-tabs k-surface" id="kLibraryNav">
+<a class="k-control" href="#kContinue" data-i18n="continue">Continue reading</a>
+
+<a class="k-control" href="#kAllBooks" data-i18n="allBooks">All books</a>
+</nav>
+<section id="kContinue" class="k-library-panel" data-i18n-aria-label="continue" aria-label="Continue reading">
+<p id="kRecentEmpty" data-i18n="emptyRecent">Open a book to start reading.</p><ul id="kRecent"></ul></section>
+
+<section id="kAllBooks" class="k-library-panel" data-i18n-aria-label="allBooks" aria-label="All books">
+<form id="kBookSearch" action="/kindle-library.html#kAllBooks" method="get" style="display:none">
+  <input type="search" class="k-control" id="kFindBooks" name="q" maxlength="200"
+         value="" data-i18n-aria-label="search" data-i18n-placeholder="search"
+         aria-label="Search by book title, author, or tag..." placeholder="Search by book title, author, or tag...">
+  <input type="hidden" name="shelf_page" value="1">
+  <div class="k-catalog-sort">
+    <label for="kBookSort"><span data-i18n="library.sort.label">Sort by</span>
+      <select id="kBookSort" name="sort" class="k-control"><option value="manual" data-i18n="library.sort.manual" selected>Manual order</option><option value="title_asc" data-i18n="library.sort.titleAsc">Title (A–Z)</option><option value="title_desc" data-i18n="library.sort.titleDesc">Title (Z–A)</option><option value="created_desc" data-i18n="library.sort.createdDesc">Recently added</option><option value="updated_desc" data-i18n="library.sort.updatedDesc">Recently updated</option></select>
+    </label>
+    <div class="k-catalog-sort-action">
+      <button class="k-control" type="submit" data-i18n="library.sort.apply">Apply</button>
+    </div>
+  </div>
+</form>
+<ul id="kCatalog"><li data-book="6QrgU-nfQSm_M6lmKAuBRg" data-format="epub" data-search="毛泽东选集 毛泽东 人物 历史" data-chapters="416"><a href="/book/6QrgU-nfQSm_M6lmKAuBRg/kindle.html"><span class="k-cover"><img src="/book/6QrgU-nfQSm_M6lmKAuBRg/resources/OEBPS/Images/cover.jpg" alt=""></span><span class="k-lib-info"><strong class="k-lib-title">毛泽东选集</strong><span class="k-lib-authors">毛泽东</span></span></a></li><li data-book="HxcyeSrJTySgmFoJMnyKFw" data-format="epub" data-search="TheEconomist.2026.02.14 Kovid Goyal 经济、管理与人生" data-chapters="98"><a href="/book/HxcyeSrJTySgmFoJMnyKFw/kindle.html"><span class="k-cover"><img src="/book/HxcyeSrJTySgmFoJMnyKFw/resources/EPUB/static_images/cover.jpg" alt=""></span><span class="k-lib-info"><strong class="k-lib-title">TheEconomist.2026.02.14</strong><span class="k-lib-authors">Kovid Goyal</span></span></a></li><li data-book="IGEQPI0RQ7isVooE7xGLIg" data-format="pdf" data-search="Alice&#x27;s Adventures in Wonderland Lewis Carroll BkV0000010 Bkslr0000001 ISBN&lt;n/a&gt; Carroll Alice Wonderland children&#x27;s 1865 v.1.2"><a href="/book/IGEQPI0RQ7isVooE7xGLIg/kindle.html"><span class="k-cover"><img src="/book/IGEQPI0RQ7isVooE7xGLIg/cover.png" alt=""></span><span class="k-lib-info"><strong class="k-lib-title">Alice's Adventures in Wonderland</strong><span class="k-lib-authors">Lewis Carroll &amp; BkV0000010 &amp; Bkslr0000001 &amp; ISBN</span><span class="k-lib-format" data-i18n="pdfBadge">PDF</span></span></a></li><li data-book="W5t_bkH64u-0GwfxFrnEew" data-format="epub" data-search="一九八四 乔治·奥威尔 小说" data-chapters="30"><a href="/book/W5t_bkH64u-0GwfxFrnEew/kindle.html"><span class="k-cover"><img src="/book/W5t_bkH64u-0GwfxFrnEew/resources/OEBPS/Images/cover.jpeg" alt=""></span><span class="k-lib-info"><strong class="k-lib-title">一九八四</strong><span class="k-lib-authors">乔治·奥威尔</span></span></a></li></ul>
+<div id="kCatalogPager"></div>
+</section>
+</section>
+
+<section id="kHomeSettings" class="k-surface k-home-settings" data-k-view style="display:none">
+<h1 data-i18n="settings">Settings</h1>
+<fieldset><legend data-i18n="theme">Theme</legend>
+<button type="button" class="k-control" data-k-theme="light" onclick="kSelectTheme('light')" data-i18n="light">Light</button>
+<button type="button" class="k-control" data-k-theme="sepia" onclick="kSelectTheme('sepia')" data-i18n="sepia">Sepia</button>
+<button type="button" class="k-control" data-k-theme="dark" onclick="kSelectTheme('dark')" data-i18n="dark">Dark</button>
+</fieldset>
+<fieldset><legend data-i18n="fontFamily">Font family</legend>
+<button type="button" class="k-control" data-k-font-choice="book" onclick="kSelectFont('book')" data-i18n="bookDefault">Book default</button>
+<button type="button" class="k-control" data-k-font-choice="serif" onclick="kSelectFont('serif')" data-i18n="serif">Serif</button>
+<button type="button" class="k-control" data-k-font-choice="sans" onclick="kSelectFont('sans')" data-i18n="sans">Sans serif</button>
+</fieldset>
+<fieldset><legend id="kLanguageLabel" data-i18n="language">Language</legend>
+<select id="kLanguage" class="k-control" aria-labelledby="kLanguageLabel" onchange="kSetLocale(this.value)">
+<option value="en" selected>English</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option><option value="ko">한국어</option><option value="ja">日本語</option><option value="es">Español</option><option value="de">Deutsch</option><option value="fr">Français</option><option value="ru">Русский</option><option value="it">Italiano</option><option value="pt-BR">Português (Brasil)</option><option value="ar">العربية</option><option value="id">Bahasa Indonesia</option><option value="hi">हिन्दी</option><option value="vi">Tiếng Việt</option><option value="th">ไทย</option><option value="ms">Bahasa Melayu</option>
+</select>
+</fieldset>
+<p><button type="button" class="k-control" id="kReadingMode" onclick="kToggleReadingMode()" data-i18n="pageMode">Use page-turning mode</button>
+<button type="button" class="k-control" id="kClickScroll" onclick="kToggleClickScroll()" data-i18n="tapTurn">Click to turn page</button></p>
+<a class="k-control" href="/index.html?full=1" data-i18n="fullLibrary">Open full library</a>
+</section>
+</main>
+<nav class="k-dock k-surface" id="kDock" data-default="kLibraryView"><a href="#kLibraryView" data-i18n="library">Library</a><a href="#kHomeSettings" data-i18n="settings">Settings</a></nav>
+</div>
+<script>
+
+function getCookie(key) {
+  var cookies = document.cookie.split('; ');
+  for (var i = 0; i < cookies.length; i++) {
+    var parts = cookies[i].split('=');
+    if (parts[0] === key) {
+      try { return decodeURIComponent(parts.slice(1).join('=')); } catch (error) { return null; }
+    }
+  }
+  return null;
+}
+function setCookie(key, value, days) {
+  var expires = '';
+  if (days) {
+    var date = new Date();
+    date.setTime(date.getTime() + days * 86400000);
+    expires = '; expires=' + date.toUTCString();
+  }
+  document.cookie = key + '=' + encodeURIComponent(value) + expires + '; path=/; SameSite=Lax';
+}
+function kHistoryKey() {
+  var root = window.location.pathname.replace(/(?:book\/[^/]+\/)?[^/]+$/, '');
+  return 'kindle_recent_' + encodeURIComponent(root);
+}
+function kRememberBook(book) {
+  var key = kHistoryKey();
+  var saved = (getCookie(key) || '').split(',');
+  var recent = [book];
+  for (var i = 0; i < saved.length && recent.length < 12; i++) {
+    if (saved[i] && recent.indexOf(saved[i]) < 0) recent.push(saved[i]);
+  }
+  setCookie(key, recent.join(','), 365);
+}
+var K_THEMES = ['light', 'sepia', 'dark'];
+var K_FONT_SIZES = [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 42, 48];
+function kMarkChoice(attribute, value) {
+  var choices = document.querySelectorAll('[' + attribute + ']');
+  for (var i = 0; i < choices.length; i++) {
+    choices[i].setAttribute('aria-pressed', choices[i].getAttribute(attribute) === value ? 'true' : 'false');
+  }
+}
+function applyTheme(theme) {
+  if (K_THEMES.indexOf(theme) === -1) theme = 'light';
+  document.body.className = theme;
+  kMarkChoice('data-k-theme', theme);
+}
+function kSelectTheme(theme) {
+  setCookie('kindle_theme', theme, 365);
+  applyTheme(theme);
+}
+function kApplyFontChoice(choice) {
+  if (choice !== 'serif' && choice !== 'sans') choice = 'book';
+  document.body.setAttribute('data-k-font', choice);
+  kMarkChoice('data-k-font-choice', choice);
+}
+function kSelectFont(choice) {
+  setCookie('kindle_font_family', choice, 365);
+  kApplyFontChoice(choice);
+  if (window.kReaderRelayout) window.kReaderRelayout();
+}
+function applyFont(size) {
+  var text = document.getElementById('kText');
+  if (!text) return;
+  var pixels = K_FONT_SIZES[size - 1] || K_FONT_SIZES[2];
+  text.style.setProperty('font-size', pixels + 'px', 'important');
+  var value = document.getElementById('kFontSizeValue');
+  if (value) value.textContent = pixels + ' px';
+}
+function kTheme() {
+  var current = getCookie('kindle_theme') || 'light';
+  var index = -1;
+  for (var i = 0; i < K_THEMES.length; i++) {
+    if (K_THEMES[i] === current) { index = i; break; }
+  }
+  if (index < 0) { index = 0; }
+  var next = K_THEMES[(index + 1) % K_THEMES.length];
+  kSelectTheme(next);
+}
+function kFont(delta) {
+  var size = parseInt(getCookie('kindle_font_size') || '3', 10);
+  if (isNaN(size)) { size = 3; }
+  size = Math.max(1, Math.min(K_FONT_SIZES.length, size + delta));
+  setCookie('kindle_font_size', String(size), 365);
+  applyFont(size);
+  if (window.kReaderRelayout) window.kReaderRelayout();
+}
+(function () {
+  applyTheme(getCookie('kindle_theme') || 'light');
+  kApplyFontChoice(getCookie('kindle_font_family'));
+  var size = parseInt(getCookie('kindle_font_size') || '3', 10);
+  if (isNaN(size)) { size = 3; }
+  applyFont(size);
+})();
+// Keep the reader layout and tap navigation as independent preferences.
+function kClickScrollOn() {
+  return getCookie('kindle_click_scroll') !== 'off';
+}
+function kPagedMode() {
+  var mode = getCookie('kindle_reading_mode');
+  return mode ? mode === 'pages' : kClickScrollOn();
+}
+function kToggleClickScroll() {
+  // Preserve the old layout when moving from the legacy combined setting.
+  if (!getCookie('kindle_reading_mode')) {
+    setCookie('kindle_reading_mode', kPagedMode() ? 'pages' : 'scroll', 365);
+  }
+  setCookie('kindle_click_scroll', kClickScrollOn() ? 'off' : 'on', 365);
+  kSyncReaderToggles();
+}
+function kToggleReadingMode() {
+  setCookie('kindle_reading_mode', kPagedMode() ? 'scroll' : 'pages', 365);
+  kSyncReaderToggles();
+  if (window.kReaderRelayout) window.kReaderRelayout();
+}
+function kSyncReaderToggles() {
+  var tap = document.getElementById('kClickScroll');
+  var mode = document.getElementById('kReadingMode');
+  if (tap) tap.setAttribute('aria-pressed', kClickScrollOn() ? 'true' : 'false');
+  if (mode) mode.setAttribute('aria-pressed', kPagedMode() ? 'true' : 'false');
+}
+function kSettingsOpen() {
+  var settings = document.getElementById('kSettings');
+  return settings && settings.style.display === 'block';
+}
+function kToggleSettings() {
+  var settings = document.getElementById('kSettings');
+  var backdrop = document.getElementById('kSettingsBackdrop');
+  var toggle = document.getElementById('kSettingsToggle');
+  if (!settings || !backdrop || !toggle) return;
+  var open = !kSettingsOpen();
+  settings.style.display = backdrop.style.display = open ? 'block' : 'none';
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) settings.getElementsByTagName('button')[0].focus();
+  else toggle.focus();
+}
+function kIsTurnNode(node) {
+  while (node && node !== document.body) {
+    var tag = String(node.tagName || '').toUpperCase();
+    if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return true;
+    node = node.parentNode;
+  }
+  return false;
+}
+function kClickTurn(e) {
+  var ev = e || window.event;
+  if (!ev) return;
+  if (kSettingsOpen() || !kClickScrollOn() || !window.kTurnPage) return;
+  var viewport = document.getElementById('kViewport');
+  var target = ev.target || ev.srcElement;
+  if (!viewport || !target || !viewport.contains(target) || kIsTurnNode(target)) return;
+  if (window.getSelection && String(window.getSelection())) return;
+  var bounds = viewport.getBoundingClientRect();
+  var width = bounds.right - bounds.left;
+  if (width <= 0) return;
+  var x = ev.clientX - bounds.left;
+  if (x < width / 3) window.kTurnPage(-1);
+  else if (x > width * 2 / 3) window.kTurnPage(1);
+}
+(function () {
+  kSyncReaderToggles();
+  document.onclick = kClickTurn;
+})();
+
+
+(function () {
+  var dictionaries = {"en": {"library": "Library", "continue": "Continue reading", "allBooks": "All books", "emptyRecent": "Open a book to start reading.", "emptyLibrary": "No books in your library yet.", "fullLibrary": "Open full library", "theme": "Theme", "search": "Search by book title, author, or tag...", "noResults": "No matching books.", "settings": "Settings", "fontFamily": "Font family", "language": "Language", "light": "Light", "sepia": "Sepia", "dark": "Dark", "bookDefault": "Book default", "serif": "Serif", "sans": "Sans serif", "pageMode": "Use page-turning mode", "tapTurn": "Click to turn page", "previousPage": "Previous page", "nextPage": "Next page", "pageOf": "Page {number} of {total}", "pdfBadge": "PDF", "library.sort.label": "Sort by", "library.sort.apply": "Apply", "library.sort.manual": "Manual order", "library.sort.titleAsc": "Title (A\u2013Z)", "library.sort.titleDesc": "Title (Z\u2013A)", "library.sort.createdDesc": "Recently added", "library.sort.updatedDesc": "Recently updated"}, "zh-CN": {"library": "\u4e66\u5e93", "continue": "\u7ee7\u7eed\u9605\u8bfb", "allBooks": "\u5168\u90e8\u4e66\u7c4d", "emptyRecent": "\u6253\u5f00\u4e00\u672c\u4e66\u5f00\u59cb\u9605\u8bfb\u3002", "emptyLibrary": "\u4e66\u5e93\u4e2d\u8fd8\u6ca1\u6709\u4e66\u7c4d\u3002", "fullLibrary": "\u6253\u5f00\u5b8c\u6574\u4e66\u5e93", "theme": "\u4e3b\u9898", "search": "\u6309\u4e66\u540d\u3001\u4f5c\u8005\u6216\u6807\u7b7e\u641c\u7d22\u2026", "noResults": "\u6ca1\u6709\u627e\u5230\u5339\u914d\u7684\u4e66\u7c4d\u3002", "settings": "\u8bbe\u7f6e", "fontFamily": "\u5b57\u4f53", "language": "\u8bed\u8a00", "light": "\u6d45\u8272", "sepia": "\u68d5\u8910\u8272", "dark": "\u6df1\u8272", "bookDefault": "\u4e66\u7c4d\u9ed8\u8ba4", "serif": "\u886c\u7ebf", "sans": "\u65e0\u886c\u7ebf", "pageMode": "\u4f7f\u7528\u7ffb\u9875\u6a21\u5f0f", "tapTurn": "\u70b9\u51fb\u7ffb\u9875", "previousPage": "\u4e0a\u4e00\u9875", "nextPage": "\u4e0b\u4e00\u9875", "pageOf": "\u7b2c {number} \u9875\uff0c\u5171 {total} \u9875", "pdfBadge": "PDF", "library.sort.label": "\u6392\u5e8f\u65b9\u5f0f", "library.sort.apply": "\u5e94\u7528", "library.sort.manual": "\u624b\u52a8\u6392\u5e8f", "library.sort.titleAsc": "\u4e66\u540d\uff08A \u2192 Z\uff09", "library.sort.titleDesc": "\u4e66\u540d\uff08Z \u2192 A\uff09", "library.sort.createdDesc": "\u6700\u8fd1\u52a0\u5165", "library.sort.updatedDesc": "\u6700\u8fd1\u66f4\u65b0"}, "zh-TW": {"library": "\u66f8\u5eab", "continue": "\u7e7c\u7e8c\u95b1\u8b80", "allBooks": "\u5168\u90e8\u66f8\u7c4d", "emptyRecent": "\u6253\u958b\u4e00\u672c\u66f8\u958b\u59cb\u95b1\u8b80\u3002", "emptyLibrary": "\u60a8\u7684\u5716\u66f8\u9928\u4e2d\u9084\u6c92\u6709\u66f8\u3002", "fullLibrary": "\u958b\u555f\u5b8c\u6574\u66f8\u5eab", "theme": "\u4e3b\u984c", "search": "\u6309\u66f8\u540d\u3001\u4f5c\u8005\u6216\u6a19\u7c64\u641c\u5c0b...", "noResults": "\u627e\u4e0d\u5230\u7b26\u5408\u7684\u66f8\u7c4d\u3002", "settings": "\u8a2d\u5b9a", "fontFamily": "\u5b57\u578b\u7cfb\u5217", "language": "\u8a9e\u8a00", "light": "\u5149", "sepia": "\u68d5\u8910\u8272", "dark": "\u6df1\u8272", "bookDefault": "\u66f8\u7c4d\u9810\u8a2d", "serif": "\u896f\u7dda", "sans": "\u7121\u896f\u7dda", "pageMode": "\u4f7f\u7528\u7ffb\u9801\u6a21\u5f0f", "tapTurn": "\u9ede\u9078\u7ffb\u9801", "previousPage": "\u4e0a\u4e00\u9801", "nextPage": "\u4e0b\u4e00\u9801", "pageOf": "\u7b2c {number} \u9801\uff0c\u5171 {total} \u9801", "pdfBadge": "PDF", "library.sort.label": "\u6392\u5e8f\u4f9d\u64da", "library.sort.apply": "\u5957\u7528", "library.sort.manual": "\u624b\u52d5\u6392\u5e8f", "library.sort.titleAsc": "\u6a19\u984c (A\u2013Z)", "library.sort.titleDesc": "\u6a19\u984c (Z\u2013A)", "library.sort.createdDesc": "\u6700\u8fd1\u65b0\u589e", "library.sort.updatedDesc": "\u6700\u8fd1\u66f4\u65b0"}, "ko": {"library": "\ub77c\uc774\ube0c\ub7ec\ub9ac", "continue": "\uc774\uc5b4\uc11c \uc77d\uae30", "allBooks": "\ubaa8\ub4e0 \ucc45", "emptyRecent": "\ucc45\uc744 \uc5f4\uc5b4 \uc77d\uae30 \uc2dc\uc791\ud558\uc138\uc694.", "emptyLibrary": "\uc544\uc9c1 \ub77c\uc774\ube0c\ub7ec\ub9ac\uc5d0 \ucc45\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.", "fullLibrary": "\uc804\uccb4 \ub77c\uc774\ube0c\ub7ec\ub9ac \uc5f4\uae30", "theme": "\ud14c\ub9c8", "search": "\ucc45 \uc81c\ubaa9, \uc800\uc790 \ub610\ub294 \ud0dc\uadf8\ub85c \uac80\uc0c9...", "noResults": "\uc77c\uce58\ud558\ub294 \ucc45\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.", "settings": "\uc124\uc815", "fontFamily": "\uae00\uaf34", "language": "\uc5b8\uc5b4", "light": "\ub77c\uc774\ud2b8", "sepia": "\uc138\ud53c\uc544", "dark": "\ub2e4\ud06c", "bookDefault": "\ucc45 \uae30\ubcf8\uac12", "serif": "\uc138\ub9ac\ud504", "sans": "\uc0b0\uc138\ub9ac\ud504", "pageMode": "\ud398\uc774\uc9c0 \ub118\uae40 \ubaa8\ub4dc \uc0ac\uc6a9", "tapTurn": "\ud074\ub9ad\ud558\uc5ec \ud398\uc774\uc9c0\ub97c \ub118\uae30\uc138\uc694", "previousPage": "\uc774\uc804 \ud398\uc774\uc9c0", "nextPage": "\ub2e4\uc74c \ud398\uc774\uc9c0", "pageOf": "\uc804\uccb4 {total}\ud398\uc774\uc9c0 \uc911 {number}\ud398\uc774\uc9c0", "pdfBadge": "PDF", "library.sort.label": "\uc815\ub82c \uae30\uc900", "library.sort.apply": "\uc801\uc6a9", "library.sort.manual": "\uc218\ub3d9 \uc21c\uc11c", "library.sort.titleAsc": "\uc81c\ubaa9(A~Z)", "library.sort.titleDesc": "\uc81c\ubaa9(Z\u2013A)", "library.sort.createdDesc": "\ucd5c\uadfc \ucd94\uac00\ub428", "library.sort.updatedDesc": "\ucd5c\uadfc \uc218\uc815\ub428"}, "ja": {"library": "\u30e9\u30a4\u30d6\u30e9\u30ea", "continue": "\u7d9a\u304d\u3092\u8aad\u3080", "allBooks": "\u3059\u3079\u3066\u306e\u672c", "emptyRecent": "\u672c\u3092\u958b\u3044\u3066\u8aad\u307f\u59cb\u3081\u307e\u3057\u3087\u3046\u3002", "emptyLibrary": "\u30e9\u30a4\u30d6\u30e9\u30ea\u306b\u306f\u307e\u3060\u672c\u304c\u3042\u308a\u307e\u305b\u3093\u3002", "fullLibrary": "\u901a\u5e38\u306e\u30e9\u30a4\u30d6\u30e9\u30ea\u3092\u958b\u304f", "theme": "\u30c6\u30fc\u30de", "search": "\u672c\u306e\u30bf\u30a4\u30c8\u30eb\u3001\u8457\u8005\u3001\u307e\u305f\u306f\u30bf\u30b0\u3067\u691c\u7d22...", "noResults": "\u4e00\u81f4\u3059\u308b\u672c\u304c\u3042\u308a\u307e\u305b\u3093\u3002", "settings": "\u8a2d\u5b9a", "fontFamily": "\u30d5\u30a9\u30f3\u30c8 \u30d5\u30a1\u30df\u30ea\u30fc", "language": "\u8a00\u8a9e", "light": "\u30e9\u30a4\u30c8", "sepia": "\u30bb\u30d4\u30a2", "dark": "\u30c0\u30fc\u30af", "bookDefault": "\u30d6\u30c3\u30af\u306e\u30c7\u30d5\u30a9\u30eb\u30c8", "serif": "\u660e\u671d\u4f53", "sans": "\u30b4\u30b7\u30c3\u30af\u4f53", "pageMode": "\u30da\u30fc\u30b8\u3081\u304f\u308a\u30e2\u30fc\u30c9\u3092\u4f7f\u7528\u3059\u308b", "tapTurn": "\u30af\u30ea\u30c3\u30af\u3057\u3066\u30da\u30fc\u30b8\u3092\u3081\u304f\u308b", "previousPage": "\u524d\u306e\u30da\u30fc\u30b8", "nextPage": "\u6b21\u306e\u30da\u30fc\u30b8", "pageOf": "{total}\u30da\u30fc\u30b8\u4e2d{number}\u30da\u30fc\u30b8", "pdfBadge": "PDF", "library.sort.label": "\u4e26\u3079\u66ff\u3048\u57fa\u6e96", "library.sort.apply": "\u9069\u7528", "library.sort.manual": "\u624b\u52d5\u9806", "library.sort.titleAsc": "\u30bf\u30a4\u30c8\u30eb (A \uff5e Z)", "library.sort.titleDesc": "\u30bf\u30a4\u30c8\u30eb (Z-A)", "library.sort.createdDesc": "\u6700\u8fd1\u8ffd\u52a0\u3055\u308c\u307e\u3057\u305f", "library.sort.updatedDesc": "\u6700\u8fd1\u66f4\u65b0\u3055\u308c\u307e\u3057\u305f"}, "es": {"library": "Biblioteca", "continue": "Seguir leyendo", "allBooks": "Todos los libros", "emptyRecent": "Abre un libro para empezar a leer.", "emptyLibrary": "Todav\u00eda no hay libros en tu biblioteca.", "fullLibrary": "Abrir la biblioteca completa", "theme": "Tema", "search": "Buscar por t\u00edtulo, autor o etiqueta\u2026", "noResults": "No hay libros que coincidan.", "settings": "Ajustes", "fontFamily": "Familia tipogr\u00e1fica", "language": "Idioma", "light": "Claro", "sepia": "Sepia", "dark": "Oscuro", "bookDefault": "Valor predeterminado del libro", "serif": "Con serifa", "sans": "Sin serifa", "pageMode": "Usar el modo de paginaci\u00f3n", "tapTurn": "Haz clic para pasar de p\u00e1gina", "previousPage": "P\u00e1gina anterior", "nextPage": "P\u00e1gina siguiente", "pageOf": "P\u00e1gina {number} de {total}", "pdfBadge": "PDF", "library.sort.label": "Ordenar por", "library.sort.apply": "Aplicar", "library.sort.manual": "Orden manual", "library.sort.titleAsc": "T\u00edtulo (A\u2013Z)", "library.sort.titleDesc": "T\u00edtulo (Z\u2013A)", "library.sort.createdDesc": "A\u00f1adidos recientemente", "library.sort.updatedDesc": "Actualizados recientemente"}, "de": {"library": "Bibliothek", "continue": "Weiterlesen", "allBooks": "Alle B\u00fccher", "emptyRecent": "\u00d6ffne ein Buch, um mit dem Lesen zu beginnen.", "emptyLibrary": "Deine Bibliothek enth\u00e4lt noch keine B\u00fccher.", "fullLibrary": "Vollst\u00e4ndige Bibliothek \u00f6ffnen", "theme": "Design", "search": "Nach Buchtitel, Autor oder Tag suchen\u2026", "noResults": "Keine passenden B\u00fccher.", "settings": "Einstellungen", "fontFamily": "Schriftfamilie", "language": "Sprache", "light": "Hell", "sepia": "Sepia", "dark": "Dunkel", "bookDefault": "Buchstandard", "serif": "Mit Serifen", "sans": "Ohne Serifen", "pageMode": "Seitenmodus verwenden", "tapTurn": "Zum Umbl\u00e4ttern klicken", "previousPage": "Vorherige Seite", "nextPage": "N\u00e4chste Seite", "pageOf": "Seite {number} von {total}", "pdfBadge": "PDF", "library.sort.label": "Sortieren nach", "library.sort.apply": "Anwenden", "library.sort.manual": "Manuelle Reihenfolge", "library.sort.titleAsc": "Titel (A\u2013Z)", "library.sort.titleDesc": "Titel (Z\u2013A)", "library.sort.createdDesc": "Zuletzt hinzugef\u00fcgt", "library.sort.updatedDesc": "Zuletzt aktualisiert"}, "fr": {"library": "Biblioth\u00e8que", "continue": "Reprendre la lecture", "allBooks": "Tous les livres", "emptyRecent": "Ouvrez un livre pour commencer \u00e0 lire.", "emptyLibrary": "Votre biblioth\u00e8que ne contient encore aucun livre.", "fullLibrary": "Ouvrir la biblioth\u00e8que compl\u00e8te", "theme": "Th\u00e8me", "search": "Rechercher par titre, auteur ou \u00e9tiquette\u2026", "noResults": "Aucun livre correspondant.", "settings": "R\u00e9glages", "fontFamily": "Famille de polices", "language": "Langue", "light": "Clair", "sepia": "S\u00e9pia", "dark": "Sombre", "bookDefault": "R\u00e9glage par d\u00e9faut du livre", "serif": "Avec empattements", "sans": "Sans empattements", "pageMode": "Utiliser le mode pagination", "tapTurn": "Cliquez pour tourner la page", "previousPage": "Page pr\u00e9c\u00e9dente", "nextPage": "Page suivante", "pageOf": "Page {number} sur {total}", "pdfBadge": "PDF", "library.sort.label": "Trier par", "library.sort.apply": "Appliquer", "library.sort.manual": "Ordre manuel", "library.sort.titleAsc": "Titre (A\u2013Z)", "library.sort.titleDesc": "Titre (Z\u2013A)", "library.sort.createdDesc": "Ajouts r\u00e9cents", "library.sort.updatedDesc": "Mises \u00e0 jour r\u00e9centes"}, "ru": {"library": "\u0411\u0438\u0431\u043b\u0438\u043e\u0442\u0435\u043a\u0430", "continue": "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c \u0447\u0442\u0435\u043d\u0438\u0435", "allBooks": "\u0412\u0441\u0435 \u043a\u043d\u0438\u0433\u0438", "emptyRecent": "\u041e\u0442\u043a\u0440\u043e\u0439\u0442\u0435 \u043a\u043d\u0438\u0433\u0443, \u0447\u0442\u043e\u0431\u044b \u043d\u0430\u0447\u0430\u0442\u044c \u0447\u0442\u0435\u043d\u0438\u0435.", "emptyLibrary": "\u0412 \u0432\u0430\u0448\u0435\u0439 \u0431\u0438\u0431\u043b\u0438\u043e\u0442\u0435\u043a\u0435 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442 \u043a\u043d\u0438\u0433.", "fullLibrary": "\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u043e\u043b\u043d\u0443\u044e \u0431\u0438\u0431\u043b\u0438\u043e\u0442\u0435\u043a\u0443", "theme": "\u0422\u0435\u043c\u0430", "search": "\u041f\u043e\u0438\u0441\u043a \u043f\u043e \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044e, \u0430\u0432\u0442\u043e\u0440\u0443 \u0438\u043b\u0438 \u043c\u0435\u0442\u043a\u0435\u2026", "noResults": "\u041f\u043e\u0434\u0445\u043e\u0434\u044f\u0449\u0438\u0445 \u043a\u043d\u0438\u0433 \u043d\u0435\u0442.", "settings": "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438", "fontFamily": "\u0413\u0430\u0440\u043d\u0438\u0442\u0443\u0440\u0430 \u0448\u0440\u0438\u0444\u0442\u0430", "language": "\u042f\u0437\u044b\u043a", "light": "\u0421\u0432\u0435\u0442\u043b\u0430\u044f", "sepia": "\u0421\u0435\u043f\u0438\u044f", "dark": "\u0422\u0451\u043c\u043d\u0430\u044f", "bookDefault": "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u043a\u043d\u0438\u0433\u0438 \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e", "serif": "\u0421 \u0437\u0430\u0441\u0435\u0447\u043a\u0430\u043c\u0438", "sans": "\u0411\u0435\u0437 \u0437\u0430\u0441\u0435\u0447\u0435\u043a", "pageMode": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u043f\u043e\u0441\u0442\u0440\u0430\u043d\u0438\u0447\u043d\u044b\u0439 \u0440\u0435\u0436\u0438\u043c", "tapTurn": "\u0429\u0451\u043b\u043a\u043d\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u043f\u0435\u0440\u0435\u043b\u0438\u0441\u0442\u043d\u0443\u0442\u044c", "previousPage": "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430", "nextPage": "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430", "pageOf": "\u0421\u0442\u0440\u0430\u043d\u0438\u0446\u0430 {number} \u0438\u0437 {total}", "pdfBadge": "PDF", "library.sort.label": "\u0421\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u043e", "library.sort.apply": "\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c", "library.sort.manual": "\u0420\u0443\u0447\u043d\u043e\u0439 \u043f\u043e\u0440\u044f\u0434\u043e\u043a", "library.sort.titleAsc": "\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u044e (\u0410\u2013\u042f)", "library.sort.titleDesc": "\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u044e (\u042f\u2013\u0410)", "library.sort.createdDesc": "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043d\u043e\u0432\u044b\u0435", "library.sort.updatedDesc": "\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043e\u0431\u043d\u043e\u0432\u043b\u0451\u043d\u043d\u044b\u0435"}, "it": {"library": "Biblioteca", "continue": "Continua a leggere", "allBooks": "Tutti i libri", "emptyRecent": "Apri un libro per iniziare a leggere.", "emptyLibrary": "La tua biblioteca non contiene ancora libri.", "fullLibrary": "Apri la biblioteca completa", "theme": "Tema", "search": "Cerca per titolo, autore o etichetta\u2026", "noResults": "Nessun libro corrispondente.", "settings": "Impostazioni", "fontFamily": "Famiglia di caratteri", "language": "Lingua", "light": "Chiaro", "sepia": "Seppia", "dark": "Scuro", "bookDefault": "Impostazione predefinita del libro", "serif": "Con grazie", "sans": "Senza grazie", "pageMode": "Usa la modalit\u00e0 paginazione", "tapTurn": "Fai clic per cambiare pagina", "previousPage": "Pagina precedente", "nextPage": "Pagina successiva", "pageOf": "Pagina {number} di {total}", "pdfBadge": "PDF", "library.sort.label": "Ordina per", "library.sort.apply": "Applica", "library.sort.manual": "Ordine manuale", "library.sort.titleAsc": "Titolo (A\u2013Z)", "library.sort.titleDesc": "Titolo (Z\u2013A)", "library.sort.createdDesc": "Aggiunti di recente", "library.sort.updatedDesc": "Aggiornati di recente"}, "pt-BR": {"library": "Biblioteca", "continue": "Continuar lendo", "allBooks": "Todos os livros", "emptyRecent": "Abra um livro para come\u00e7ar a ler.", "emptyLibrary": "Ainda n\u00e3o h\u00e1 livros na sua biblioteca.", "fullLibrary": "Abrir a biblioteca completa", "theme": "Tema", "search": "Buscar por t\u00edtulo, autor ou etiqueta\u2026", "noResults": "Nenhum livro encontrado.", "settings": "Configura\u00e7\u00f5es", "fontFamily": "Fam\u00edlia da fonte", "language": "Idioma", "light": "Claro", "sepia": "S\u00e9pia", "dark": "Escuro", "bookDefault": "Padr\u00e3o do livro", "serif": "Com serifa", "sans": "Sem serifa", "pageMode": "Usar modo de pagina\u00e7\u00e3o", "tapTurn": "Clique para virar a p\u00e1gina", "previousPage": "P\u00e1gina anterior", "nextPage": "Pr\u00f3xima p\u00e1gina", "pageOf": "P\u00e1gina {number} de {total}", "pdfBadge": "PDF", "library.sort.label": "Ordenar por", "library.sort.apply": "Aplicar", "library.sort.manual": "Ordem manual", "library.sort.titleAsc": "T\u00edtulo (A\u2013Z)", "library.sort.titleDesc": "T\u00edtulo (Z\u2013A)", "library.sort.createdDesc": "Adicionados recentemente", "library.sort.updatedDesc": "Atualizados recentemente"}, "ar": {"library": "\u0627\u0644\u0645\u0643\u062a\u0628\u0629", "continue": "\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u0642\u0631\u0627\u0621\u0629", "allBooks": "\u0643\u0644 \u0627\u0644\u0643\u062a\u0628", "emptyRecent": "\u0627\u0641\u062a\u062d \u0643\u062a\u0627\u0628\u064b\u0627 \u0644\u062a\u0628\u062f\u0623 \u0627\u0644\u0642\u0631\u0627\u0621\u0629.", "emptyLibrary": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0643\u062a\u0628 \u0641\u064a \u0645\u0643\u062a\u0628\u062a\u0643 \u0628\u0639\u062f.", "fullLibrary": "\u0641\u062a\u062d \u0627\u0644\u0645\u0643\u062a\u0628\u0629 \u0627\u0644\u0643\u0627\u0645\u0644\u0629", "theme": "\u0627\u0644\u0633\u0645\u0629", "search": "\u0627\u0628\u062d\u062b \u0628\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0643\u062a\u0627\u0628 \u0623\u0648 \u0627\u0644\u0645\u0624\u0644\u0641 \u0623\u0648 \u0627\u0644\u0648\u0633\u0645\u2026", "noResults": "\u0644\u0627 \u062a\u0648\u062c\u062f \u0643\u062a\u0628 \u0645\u0637\u0627\u0628\u0642\u0629.", "settings": "\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a", "fontFamily": "\u0646\u0648\u0639 \u0627\u0644\u062e\u0637", "language": "\u0627\u0644\u0644\u063a\u0629", "light": "\u0641\u0627\u062a\u062d", "sepia": "\u0628\u0646\u064a", "dark": "\u062f\u0627\u0643\u0646", "bookDefault": "\u0625\u0639\u062f\u0627\u062f \u0627\u0644\u0643\u062a\u0627\u0628 \u0627\u0644\u0627\u0641\u062a\u0631\u0627\u0636\u064a", "serif": "\u0628\u0632\u0648\u0627\u0626\u062f", "sans": "\u0628\u0644\u0627 \u0632\u0648\u0627\u0626\u062f", "pageMode": "\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0648\u0636\u0639 \u062a\u0642\u0644\u064a\u0628 \u0627\u0644\u0635\u0641\u062d\u0627\u062a", "tapTurn": "\u0627\u0646\u0642\u0631 \u0644\u062a\u0642\u0644\u064a\u0628 \u0627\u0644\u0635\u0641\u062d\u0629", "previousPage": "\u0627\u0644\u0635\u0641\u062d\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629", "nextPage": "\u0627\u0644\u0635\u0641\u062d\u0629 \u0627\u0644\u062a\u0627\u0644\u064a\u0629", "pageOf": "\u0627\u0644\u0635\u0641\u062d\u0629 {number} \u0645\u0646 {total}", "pdfBadge": "PDF", "library.sort.label": "\u0627\u0644\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628", "library.sort.apply": "\u062a\u0637\u0628\u064a\u0642", "library.sort.manual": "\u062a\u0631\u062a\u064a\u0628 \u064a\u062f\u0648\u064a", "library.sort.titleAsc": "\u0627\u0644\u0639\u0646\u0648\u0627\u0646 (\u0623\u2013\u064a)", "library.sort.titleDesc": "\u0627\u0644\u0639\u0646\u0648\u0627\u0646 (\u064a\u2013\u0623)", "library.sort.createdDesc": "\u0627\u0644\u0645\u0636\u0627\u0641 \u062d\u062f\u064a\u062b\u064b\u0627", "library.sort.updatedDesc": "\u0627\u0644\u0645\u062d\u062f\u0651\u062b \u062d\u062f\u064a\u062b\u064b\u0627"}, "id": {"library": "Perpustakaan", "continue": "Lanjutkan membaca", "allBooks": "Semua buku", "emptyRecent": "Buka buku untuk mulai membaca.", "emptyLibrary": "Belum ada buku di perpustakaan Anda.", "fullLibrary": "Buka perpustakaan lengkap", "theme": "Tema", "search": "Cari berdasarkan judul, penulis, atau tag\u2026", "noResults": "Tidak ada buku yang cocok.", "settings": "Pengaturan", "fontFamily": "Jenis huruf", "language": "Bahasa", "light": "Terang", "sepia": "Sepia", "dark": "Gelap", "bookDefault": "Bawaan buku", "serif": "Serif", "sans": "Tanpa serif", "pageMode": "Gunakan mode halaman", "tapTurn": "Klik untuk membalik halaman", "previousPage": "Halaman sebelumnya", "nextPage": "Halaman berikutnya", "pageOf": "Halaman {number} dari {total}", "pdfBadge": "PDF", "library.sort.label": "Urutkan berdasarkan", "library.sort.apply": "Terapkan", "library.sort.manual": "Urutan manual", "library.sort.titleAsc": "Judul (A\u2013Z)", "library.sort.titleDesc": "Judul (Z\u2013A)", "library.sort.createdDesc": "Baru ditambahkan", "library.sort.updatedDesc": "Baru diperbarui"}, "hi": {"library": "\u092a\u0941\u0938\u094d\u0924\u0915\u093e\u0932\u092f", "continue": "\u092a\u0922\u093c\u0928\u093e \u091c\u093e\u0930\u0940 \u0930\u0916\u0947\u0902", "allBooks": "\u0938\u092d\u0940 \u0915\u093f\u0924\u093e\u092c\u0947\u0902", "emptyRecent": "\u092a\u0922\u093c\u0928\u093e \u0936\u0941\u0930\u0942 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0915\u093f\u0924\u093e\u092c \u0916\u094b\u0932\u0947\u0902\u0964", "emptyLibrary": "\u0906\u092a\u0915\u0947 \u092a\u0941\u0938\u094d\u0924\u0915\u093e\u0932\u092f \u092e\u0947\u0902 \u0905\u092d\u0940 \u0915\u094b\u0908 \u092a\u0941\u0938\u094d\u0924\u0915 \u0928\u0939\u0940\u0902 \u0939\u0948\u0964", "fullLibrary": "\u092a\u0942\u0930\u0940 \u0932\u093e\u0907\u092c\u094d\u0930\u0947\u0930\u0940 \u0916\u094b\u0932\u0947\u0902", "theme": "\u0925\u0940\u092e", "search": "\u092a\u0941\u0938\u094d\u0924\u0915 \u0915\u0947 \u0936\u0940\u0930\u094d\u0937\u0915, \u0932\u0947\u0916\u0915 \u092f\u093e \u091f\u0948\u0917 \u0938\u0947 \u0916\u094b\u091c\u0947\u0902\u2026", "noResults": "\u0915\u094b\u0908 \u092e\u093f\u0932\u0924\u0940-\u091c\u0941\u0932\u0924\u0940 \u0915\u093f\u0924\u093e\u092c \u0928\u0939\u0940\u0902 \u092e\u093f\u0932\u0940\u0964", "settings": "\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938", "fontFamily": "\u092b\u093c\u0949\u0928\u094d\u091f \u092a\u0930\u093f\u0935\u093e\u0930", "language": "\u092d\u093e\u0937\u093e", "light": "\u0939\u0932\u094d\u0915\u093e", "sepia": "\u0938\u0947\u092a\u093f\u092f\u093e", "dark": "\u0917\u0939\u0930\u093e", "bookDefault": "\u092a\u0941\u0938\u094d\u0924\u0915 \u0915\u093e \u0921\u093f\u092b\u093c\u0949\u0932\u094d\u091f", "serif": "\u0938\u0947\u0930\u093f\u092b\u093c", "sans": "\u0938\u0948\u0928\u094d\u0938 \u0938\u0947\u0930\u093f\u092b\u093c", "pageMode": "\u092a\u0943\u0937\u094d\u0920 \u092a\u0932\u091f\u0928\u0947 \u0915\u093e \u092e\u094b\u0921 \u0907\u0938\u094d\u0924\u0947\u092e\u093e\u0932 \u0915\u0930\u0947\u0902", "tapTurn": "\u092a\u0943\u0937\u094d\u0920 \u092a\u0932\u091f\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0915\u094d\u0932\u093f\u0915 \u0915\u0930\u0947\u0902", "previousPage": "\u092a\u093f\u091b\u0932\u093e \u092a\u0943\u0937\u094d\u0920", "nextPage": "\u0905\u0917\u0932\u093e \u092a\u0943\u0937\u094d\u0920", "pageOf": "{total} \u092e\u0947\u0902 \u0938\u0947 \u092a\u0943\u0937\u094d\u0920 {number}", "pdfBadge": "PDF", "library.sort.label": "\u0915\u094d\u0930\u092e\u092c\u0926\u094d\u0927 \u0915\u0930\u0947\u0902", "library.sort.apply": "\u0932\u093e\u0917\u0942 \u0915\u0930\u0947\u0902", "library.sort.manual": "\u092e\u0948\u0928\u094d\u092f\u0941\u0905\u0932 \u0915\u094d\u0930\u092e", "library.sort.titleAsc": "\u0936\u0940\u0930\u094d\u0937\u0915 (A\u2013Z)", "library.sort.titleDesc": "\u0936\u0940\u0930\u094d\u0937\u0915 (Z\u2013A)", "library.sort.createdDesc": "\u0939\u093e\u0932 \u092e\u0947\u0902 \u091c\u094b\u0921\u093c\u0940 \u0917\u0908\u0902", "library.sort.updatedDesc": "\u0939\u093e\u0932 \u092e\u0947\u0902 \u0905\u092a\u0921\u0947\u091f \u0939\u0941\u0908\u0902"}, "vi": {"library": "Th\u01b0 vi\u1ec7n", "continue": "\u0110\u1ecdc ti\u1ebfp", "allBooks": "T\u1ea5t c\u1ea3 s\u00e1ch", "emptyRecent": "M\u1edf m\u1ed9t cu\u1ed1n s\u00e1ch \u0111\u1ec3 b\u1eaft \u0111\u1ea7u \u0111\u1ecdc.", "emptyLibrary": "Th\u01b0 vi\u1ec7n c\u1ee7a b\u1ea1n ch\u01b0a c\u00f3 s\u00e1ch.", "fullLibrary": "M\u1edf th\u01b0 vi\u1ec7n \u0111\u1ea7y \u0111\u1ee7", "theme": "Ch\u1ee7 \u0111\u1ec1", "search": "T\u00ecm theo t\u00ean s\u00e1ch, t\u00e1c gi\u1ea3 ho\u1eb7c th\u1ebb\u2026", "noResults": "Kh\u00f4ng t\u00ecm th\u1ea5y s\u00e1ch ph\u00f9 h\u1ee3p.", "settings": "C\u00e0i \u0111\u1eb7t", "fontFamily": "Ph\u00f4ng ch\u1eef", "language": "Ng\u00f4n ng\u1eef", "light": "S\u00e1ng", "sepia": "N\u00e2u \u0111\u1ecf", "dark": "T\u1ed1i", "bookDefault": "M\u1eb7c \u0111\u1ecbnh c\u1ee7a s\u00e1ch", "serif": "C\u00f3 ch\u00e2n", "sans": "Kh\u00f4ng ch\u00e2n", "pageMode": "D\u00f9ng ch\u1ebf \u0111\u1ed9 l\u1eadt trang", "tapTurn": "Nh\u1ea5p \u0111\u1ec3 l\u1eadt trang", "previousPage": "Trang tr\u01b0\u1edbc", "nextPage": "Trang sau", "pageOf": "Trang {number} / {total}", "pdfBadge": "PDF", "library.sort.label": "S\u1eafp x\u1ebfp theo", "library.sort.apply": "\u00c1p d\u1ee5ng", "library.sort.manual": "Th\u1ee9 t\u1ef1 th\u1ee7 c\u00f4ng", "library.sort.titleAsc": "T\u00ean s\u00e1ch (A\u2013Z)", "library.sort.titleDesc": "T\u00ean s\u00e1ch (Z\u2013A)", "library.sort.createdDesc": "M\u1edbi th\u00eam g\u1ea7n \u0111\u00e2y", "library.sort.updatedDesc": "M\u1edbi c\u1eadp nh\u1eadt g\u1ea7n \u0111\u00e2y"}, "th": {"library": "\u0e2b\u0e49\u0e2d\u0e07\u0e2a\u0e21\u0e38\u0e14", "continue": "\u0e2d\u0e48\u0e32\u0e19\u0e15\u0e48\u0e2d", "allBooks": "\u0e2b\u0e19\u0e31\u0e07\u0e2a\u0e37\u0e2d\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14", "emptyRecent": "\u0e40\u0e1b\u0e34\u0e14\u0e2b\u0e19\u0e31\u0e07\u0e2a\u0e37\u0e2d\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e40\u0e23\u0e34\u0e48\u0e21\u0e2d\u0e48\u0e32\u0e19", "emptyLibrary": "\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e2b\u0e19\u0e31\u0e07\u0e2a\u0e37\u0e2d\u0e43\u0e19\u0e2b\u0e49\u0e2d\u0e07\u0e2a\u0e21\u0e38\u0e14\u0e02\u0e2d\u0e07\u0e04\u0e38\u0e13", "fullLibrary": "\u0e40\u0e1b\u0e34\u0e14\u0e04\u0e25\u0e31\u0e07\u0e2b\u0e19\u0e31\u0e07\u0e2a\u0e37\u0e2d\u0e09\u0e1a\u0e31\u0e1a\u0e40\u0e15\u0e47\u0e21", "theme": "\u0e18\u0e35\u0e21", "search": "\u0e04\u0e49\u0e19\u0e2b\u0e32\u0e08\u0e32\u0e01\u0e0a\u0e37\u0e48\u0e2d\u0e2b\u0e19\u0e31\u0e07\u0e2a\u0e37\u0e2d \u0e1c\u0e39\u0e49\u0e40\u0e02\u0e35\u0e22\u0e19 \u0e2b\u0e23\u0e37\u0e2d\u0e41\u0e17\u0e47\u0e01\u2026", "noResults": "\u0e44\u0e21\u0e48\u0e1e\u0e1a\u0e2b\u0e19\u0e31\u0e07\u0e2a\u0e37\u0e2d\u0e17\u0e35\u0e48\u0e15\u0e23\u0e07\u0e01\u0e31\u0e19", "settings": "\u0e01\u0e32\u0e23\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32", "fontFamily": "\u0e41\u0e1a\u0e1a\u0e2d\u0e31\u0e01\u0e29\u0e23", "language": "\u0e20\u0e32\u0e29\u0e32", "light": "\u0e2a\u0e27\u0e48\u0e32\u0e07", "sepia": "\u0e0b\u0e35\u0e40\u0e1b\u0e35\u0e22", "dark": "\u0e21\u0e37\u0e14", "bookDefault": "\u0e04\u0e48\u0e32\u0e40\u0e23\u0e34\u0e48\u0e21\u0e15\u0e49\u0e19\u0e02\u0e2d\u0e07\u0e2b\u0e19\u0e31\u0e07\u0e2a\u0e37\u0e2d", "serif": "\u0e21\u0e35\u0e40\u0e0a\u0e34\u0e07", "sans": "\u0e44\u0e21\u0e48\u0e21\u0e35\u0e40\u0e0a\u0e34\u0e07", "pageMode": "\u0e43\u0e0a\u0e49\u0e42\u0e2b\u0e21\u0e14\u0e1e\u0e25\u0e34\u0e01\u0e2b\u0e19\u0e49\u0e32", "tapTurn": "\u0e04\u0e25\u0e34\u0e01\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e1e\u0e25\u0e34\u0e01\u0e2b\u0e19\u0e49\u0e32", "previousPage": "\u0e2b\u0e19\u0e49\u0e32\u0e01\u0e48\u0e2d\u0e19", "nextPage": "\u0e2b\u0e19\u0e49\u0e32\u0e16\u0e31\u0e14\u0e44\u0e1b", "pageOf": "\u0e2b\u0e19\u0e49\u0e32 {number} \u0e08\u0e32\u0e01 {total}", "pdfBadge": "PDF", "library.sort.label": "\u0e40\u0e23\u0e35\u0e22\u0e07\u0e15\u0e32\u0e21", "library.sort.apply": "\u0e43\u0e0a\u0e49", "library.sort.manual": "\u0e25\u0e33\u0e14\u0e31\u0e1a\u0e17\u0e35\u0e48\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e40\u0e2d\u0e07", "library.sort.titleAsc": "\u0e0a\u0e37\u0e48\u0e2d\u0e40\u0e23\u0e37\u0e48\u0e2d\u0e07 (A\u2013Z)", "library.sort.titleDesc": "\u0e0a\u0e37\u0e48\u0e2d\u0e40\u0e23\u0e37\u0e48\u0e2d\u0e07 (Z\u2013A)", "library.sort.createdDesc": "\u0e40\u0e1e\u0e34\u0e48\u0e21\u0e25\u0e48\u0e32\u0e2a\u0e38\u0e14", "library.sort.updatedDesc": "\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e25\u0e48\u0e32\u0e2a\u0e38\u0e14"}, "ms": {"library": "Perpustakaan", "continue": "Teruskan membaca", "allBooks": "Semua buku", "emptyRecent": "Buka buku untuk mula membaca.", "emptyLibrary": "Belum ada buku dalam perpustakaan anda.", "fullLibrary": "Buka pustaka penuh", "theme": "Tema", "search": "Cari mengikut tajuk, pengarang atau tag\u2026", "noResults": "Tiada buku yang sepadan.", "settings": "Tetapan", "fontFamily": "Jenis fon", "language": "Bahasa", "light": "Cerah", "sepia": "Sepia", "dark": "Gelap", "bookDefault": "Lalai buku", "serif": "Serif", "sans": "Tanpa serif", "pageMode": "Gunakan mod selak halaman", "tapTurn": "Klik untuk menyelak halaman", "previousPage": "Halaman sebelumnya", "nextPage": "Halaman seterusnya", "pageOf": "Halaman {number} daripada {total}", "pdfBadge": "PDF", "library.sort.label": "Isih mengikut", "library.sort.apply": "Guna", "library.sort.manual": "Susunan manual", "library.sort.titleAsc": "Tajuk (A\u2013Z)", "library.sort.titleDesc": "Tajuk (Z\u2013A)", "library.sort.createdDesc": "Baru ditambah", "library.sort.updatedDesc": "Baru dikemas kini"}};
+  var keys = Object.keys(dictionaries);
+  var listeners = [];
+  var active;
+  function normalize(value) {
+    var code = (value || '').toLowerCase().replace(/_/g, '-');
+    var base = code.split('-')[0];
+    if (base === 'zh') return /^zh-(tw|hk|mo|hant)/.test(code) ? 'zh-TW' : 'zh-CN';
+    if (base === 'pt') return 'pt-BR';
+    for (var i = 0; i < keys.length; i++) if (keys[i] === base) return base;
+    return '';
+  }
+  window.kTranslate = function (key) { return dictionaries[active][key]; };
+  window.kOnLocaleChange = function (callback) { listeners.push(callback); };
+  window.kLocalize = function (root) {
+    var elements = (root || document).querySelectorAll('[data-i18n],[data-i18n-aria-label],[data-i18n-placeholder]');
+    for (var i = 0; i < elements.length; i++) {
+      var element = elements[i];
+      var message = kTranslate(element.getAttribute('data-i18n'));
+      if (typeof message === 'string') element.textContent = message;
+      var attributes = ['aria-label', 'placeholder'];
+      for (var j = 0; j < attributes.length; j++) {
+        var text = kTranslate(element.getAttribute('data-i18n-' + attributes[j]));
+        if (typeof text === 'string') {
+          text = text.replace('{number}', element.getAttribute('data-page') || '')
+                     .replace('{total}', element.getAttribute('data-total') || '');
+          element.setAttribute(attributes[j], text);
+        }
+      }
+    }
+  };
+  function apply(locale) {
+    active = locale;
+    document.documentElement.lang = locale;
+    var select = document.getElementById('kLanguage');
+    if (select) select.value = locale;
+    var chrome = document.querySelectorAll('[data-k-ui-language]');
+    for (var i = 0; i < chrome.length; i++) chrome[i].lang = locale;
+    kLocalize(document);
+    for (var j = 0; j < listeners.length; j++) listeners[j]();
+  }
+  window.kSetLocale = function (locale) {
+    locale = normalize(locale);
+    if (!locale) return;
+    setCookie('epub_browser_locale', locale, 365);
+    apply(locale);
+  };
+  function sync() {
+    var fallback = false ? initial : (navigator.language || navigator.userLanguage);
+    apply(normalize(getCookie('epub_browser_locale')) || normalize(fallback) || 'en');
+  }
+  var initial = document.documentElement.lang;
+  var previousPageShow = window.onpageshow;
+  sync();
+  window.onpageshow = function (event) {
+    if (event && event.persisted) sync();
+    if (previousPageShow) previousPageShow(event);
+  };
+})();
+
+
+(function () {
+  var navigation = document.getElementById('kLibraryNav');
+  var tabs = navigation.getElementsByTagName('a');
+  var recent = document.getElementById('kRecent');
+  var current = '';
+  function showPanel() {
+    var requested = location.hash.slice(1);
+    if (requested === 'kContinue' || requested === 'kAllBooks' || requested === 'kBookshelf') current = requested;
+    var selected = document.getElementById(current) ? current : (recent.children.length ? 'kContinue' : 'kAllBooks');
+    for (var i = 0; i < tabs.length; i++) {
+      var panel = document.getElementById(tabs[i].hash.slice(1));
+      var active = panel && panel.id === selected;
+      if (panel) panel.style.display = active ? 'block' : 'none';
+      if (active) tabs[i].setAttribute('aria-current', 'page');
+      else tabs[i].removeAttribute('aria-current');
+    }
+  }
+  showPanel();
+  window.kShowLibraryPanel = showPanel;
+  for (var i = 0; i < tabs.length; i++) {
+    tabs[i].onclick = function (event) {
+      if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
+      if (window.history && history.pushState) {
+        if (location.hash !== this.hash) history.pushState(null, '', this.hash);
+        showPanel();
+        window.scrollTo(0, 0);
+        return false;
+      }
+    };
+  }
+})();
+
+/* Catalogue sorting also runs on the ES5 Kindle library. */
+(function(root) {
+    'use strict';
+
+    function manualOrder() {
+        try {
+            var order = JSON.parse(root.localStorage.getItem('book-grid-sortable-order'));
+            return Array.isArray(order) ? order : [];
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function sortBooks(books, sort, locale) {
+        var ranks = Object.create(null);
+        if (sort === 'manual') {
+            manualOrder().forEach(function(id, index) { ranks[id] = index; });
+        }
+        var titleCollator = typeof Intl !== 'undefined' && Intl.Collator
+            ? new Intl.Collator(locale || undefined, { sensitivity: 'base' }) : null;
+        function compare(left, right) {
+            return left < right ? -1 : left > right ? 1 : 0;
+        }
+
+        return books.slice().sort(function(left, right) {
+            var difference;
+            if (sort === 'manual') {
+                var leftRank = ranks[left.hash];
+                var rightRank = ranks[right.hash];
+                difference = (leftRank === undefined ? -1 : leftRank) - (rightRank === undefined ? -1 : rightRank);
+            } else {
+                if (sort === 'created_desc' || sort === 'updated_desc') {
+                    var field = sort === 'created_desc' ? 'created_at' : 'updated_at';
+                    difference = compare(right[field] || '', left[field] || '');
+                    if (difference) return difference;
+                }
+                var leftTitle = String(left.title || '');
+                var rightTitle = String(right.title || '');
+                difference = titleCollator ? titleCollator.compare(leftTitle, rightTitle)
+                    : leftTitle.toLowerCase().localeCompare(rightTitle.toLowerCase());
+                if (sort === 'title_desc') difference = -difference;
+            }
+            return difference || compare(left.hash, right.hash);
+        });
+    }
+
+    root.EpubBrowserBookSort = { sortBooks: sortBooks, manualOrder: manualOrder };
+})(window);
+
+(function () {
+  var size = 12;
+  var metadata;
+  var callbacks = [];
+  var recent = document.getElementById('kRecent');
+  var catalog = document.getElementById('kCatalog');
+  var pager = document.getElementById('kCatalogPager');
+  var form = document.getElementById('kBookSearch');
+  var input = document.getElementById('kFindBooks');
+  var sort = document.getElementById('kBookSort');
+  var submittedSort;
+  var requestGeneration = 0;
+  var originalCatalog = catalog.innerHTML;
+  var originalPager = pager.innerHTML;
+  var results = [];
+  var query = '';
+  var resultPage = 1;
+
+  function loadBooks(callback) {
+    if (metadata) return callback(metadata);
+    callbacks.push(callback);
+    if (callbacks.length > 1) return;
+    function finish(books) {
+      metadata = books;
+      var pending = callbacks;
+      callbacks = [];
+      for (var i = 0; i < pending.length; i++) pending[i](books);
+    }
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'book-metadata.json', true);
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) return;
+        var books = null;
+        if (xhr.status === 200 || xhr.status === 0) {
+          try { books = JSON.parse(xhr.responseText); } catch (error) {}
+        }
+        finish(books instanceof Array ? books : null);
+      };
+      xhr.send(null);
+    } catch (error) { finish(null); }
+  }
+
+  function element(tag, style, text) {
+    var node = document.createElement(tag);
+    if (style) node.className = style;
+    if (text) node.textContent = text;
+    return node;
+  }
+
+  function row(book, chapter) {
+    var entry = element('li');
+    entry.setAttribute('data-book', book.hash);
+    entry.setAttribute('data-format', book.format || 'epub');
+    var link = element('a');
+    var cover = element('span', 'k-cover' + (book.cover ? '' : ' k-cover-placeholder'));
+    if (book.cover) {
+      var image = element('img');
+      image.src = book.cover;
+      image.alt = '';
+      cover.appendChild(image);
+    }
+    cover.setAttribute('aria-hidden', 'true');
+    link.appendChild(cover);
+    var info = element('span', 'k-lib-info');
+    info.appendChild(element('strong', 'k-lib-title', book.title));
+    info.appendChild(element('span', 'k-lib-authors', book.authors.join(' & ')));
+    if (book.format === 'pdf') {
+      var badge = element('span', 'k-lib-format', kTranslate('pdfBadge'));
+      badge.setAttribute('data-i18n', 'pdfBadge');
+      info.appendChild(badge);
+      // Shelf/catalog entries open the book page; only "continue
+      // reading" deep links into the reader at the saved page. Books that
+      // cannot be rendered as image pages open the book page too, where the
+      // unsupported notice is shown.
+      var pdfPage = chapter === undefined ? 'kindle.html' : 'kindle_chapter.html#page-' + (chapter + 1);
+      link.href = 'book/' + encodeURIComponent(book.hash) + '/' + pdfPage;
+      link.appendChild(info);
+      entry.appendChild(link);
+      return entry;
+    }
+    var page = chapter === undefined ? 'kindle.html' : 'kindle_chapter_' + chapter + '.html#resume';
+    link.href = 'book/' + encodeURIComponent(book.hash) + '/' + page;
+    link.appendChild(info);
+    entry.appendChild(link);
+    return entry;
+  }
+
+  function renderRecent() {
+    var order = (getCookie(kHistoryKey()) || '').split(',');
+    var saved = {};
+    var pdfSaved = {};
+    var cookies = document.cookie.split(';');
+    for (var i = 0; i < cookies.length; i++) {
+      var parts = cookies[i].match(/^\s*([^=]+)=chapter_([0-9]+)[.]html$/);
+      if (parts) saved[':' + parts[1]] = Number(parts[2]);
+      var pdfParts = cookies[i].match(/^\s*kindle_pdf_pos_([^=]+)=([0-9]+)$/);
+      if (pdfParts) pdfSaved[':' + pdfParts[1]] = Number(pdfParts[2]);
+    }
+    var visible = {};
+    var pageRows = catalog.querySelectorAll('[data-book]');
+    for (var j = 0; j < pageRows.length; j++) {
+      var id = pageRows[j].getAttribute('data-book');
+      visible[':' + id] = pageRows[j];
+    }
+    // The full static reader also writes chapter cookies, without the Kindle MRU.
+    for (var savedKey in saved) if (saved.hasOwnProperty(savedKey)) order.push(savedKey.slice(1));
+    for (var pdfKey in pdfSaved) {
+      if (pdfSaved.hasOwnProperty(pdfKey) && !saved.hasOwnProperty(pdfKey)) order.push(pdfKey.slice(1));
+    }
+    function draw(books) {
+      var byId = {};
+      for (var i = 0; books && i < books.length; i++) byId[':' + books[i].hash] = books[i];
+      recent.innerHTML = '';
+      for (var j = 0; j < order.length && recent.children.length < 5; j++) {
+        var key = ':' + order[j];
+        var current = visible[key];
+        var book = byId[key];
+        if (saved.hasOwnProperty(key)) {
+          var chapter = saved[key];
+          delete saved[key];
+          if (current) {
+            var count = current.getAttribute('data-chapters');
+            if (count !== null && chapter >= Number(count)) continue;
+            var copy = current.cloneNode(true);
+            var link = copy.getElementsByTagName('a')[0];
+            link.href = link.href.replace(/kindle[.]html$/, 'kindle_chapter_' + chapter + '.html#resume');
+            recent.appendChild(copy);
+          } else if (book && book.format === 'epub' &&
+                     (typeof book.chapterCount !== 'number' || chapter < book.chapterCount)) {
+            recent.appendChild(row(book, chapter));
+          }
+        } else if (pdfSaved.hasOwnProperty(key)) {
+          var page = pdfSaved[key];
+          delete pdfSaved[key];
+          if (current) {
+            if (current.getAttribute('data-format') !== 'pdf') continue;
+            var pdfCopy = current.cloneNode(true);
+            pdfCopy.getElementsByTagName('a')[0].href =
+              'book/' + encodeURIComponent(order[j]) + '/kindle_chapter.html#page-' + (page + 1);
+            recent.appendChild(pdfCopy);
+          } else if (book && book.format === 'pdf' && book.kindlePdf) {
+            recent.appendChild(row(book, page));
+          }
+        }
+      }
+      document.getElementById('kRecentEmpty').style.display = recent.children.length ? 'none' : '';
+      if (window.kShowLibraryPanel) window.kShowLibraryPanel();
+    }
+    for (var pendingKey in saved) {
+      if (saved.hasOwnProperty(pendingKey) && !visible[pendingKey]) {
+        loadBooks(draw);
+        return;
+      }
+    }
+    for (var pendingPdfKey in pdfSaved) {
+      if (pdfSaved.hasOwnProperty(pendingPdfKey) && !visible[pendingPdfKey]) {
+        loadBooks(draw);
+        return;
+      }
+    }
+    draw(null);
+  }
+
+  function drawResults() {
+    catalog.innerHTML = '';
+    pager.innerHTML = '';
+    if (!results.length) {
+      var empty = element('li');
+      empty.setAttribute('data-i18n', 'noResults');
+      catalog.appendChild(empty);
+      kLocalize(catalog);
+      return;
+    }
+    var total = Math.ceil(results.length / size);
+    var offset = (resultPage - 1) * size;
+    for (var i = offset; i < Math.min(results.length, offset + size); i++) catalog.appendChild(row(results[i]));
+    kLocalize(catalog);
+    if (total < 2) return;
+    var controls = element('div', 'k-pager');
+    function button(step, key, arrow) {
+      var control = element('button', 'k-control', arrow);
+      control.type = 'button';
+      control.setAttribute('data-i18n-aria-label', key);
+      control.disabled = resultPage + step < 1 || resultPage + step > total;
+      control.onclick = function () {
+        resultPage += step;
+        drawResults();
+        window.scrollTo(0, 0);
+      };
+      return control;
+    }
+    var position = element('span', '', resultPage + ' / ' + total);
+    position.setAttribute('data-i18n-aria-label', 'pageOf');
+    position.setAttribute('data-page', resultPage);
+    position.setAttribute('data-total', total);
+    controls.appendChild(button(-1, 'previousPage', '‹'));
+    controls.appendChild(position);
+    controls.appendChild(button(1, 'nextPage', '›'));
+    pager.appendChild(controls);
+    kLocalize(pager);
+  }
+
+  function renderCatalog() {
+    var generation = ++requestGeneration;
+    if (!query && submittedSort === 'manual' && !window.EpubBrowserBookSort.manualOrder().length) {
+      catalog.innerHTML = originalCatalog;
+      pager.innerHTML = originalPager;
+      kLocalize(catalog);
+      kLocalize(pager);
+      return;
+    }
+    loadBooks(function (books) {
+      if (generation !== requestGeneration) return;
+      if (!books) {
+        // File browsers may block XHR. Keep the generated catalogue and pager usable.
+        catalog.innerHTML = originalCatalog;
+        pager.innerHTML = originalPager;
+        var rows = catalog.children;
+        for (var i = 0; i < rows.length; i++) {
+          var text = rows[i].getAttribute('data-search') || '';
+          rows[i].style.display = text.toLowerCase().indexOf(query) >= 0 ? '' : 'none';
+        }
+        kLocalize(catalog);
+        kLocalize(pager);
+        return;
+      }
+      var matches = books.filter(function(book) {
+        var haystack = [book.title].concat(book.authors, book.tags).join(' ').toLowerCase();
+        return haystack.indexOf(query) >= 0;
+      });
+      results = window.EpubBrowserBookSort.sortBooks(matches, submittedSort, document.documentElement.lang);
+      drawResults();
+    });
+  }
+
+  form.style.display = 'block';
+  var preferenceKey = kHistoryKey() + '_sort';
+  var savedSort = getCookie(preferenceKey);
+  if (savedSort) sort.value = savedSort;
+  if (!sort.value) sort.value = 'manual';
+  submittedSort = sort.value;
+  form.onsubmit = function () {
+    query = input.value.replace(/^\s+|\s+$/g, '').toLowerCase();
+    submittedSort = sort.value;
+    setCookie(preferenceKey, submittedSort, 365);
+    resultPage = 1;
+    renderCatalog();
+    return false;
+  };
+  if (submittedSort !== 'manual' || window.EpubBrowserBookSort.manualOrder().length) renderCatalog();
+  window.kOnLocaleChange(function () {
+    if (submittedSort !== 'manual') renderCatalog();
+  });
+  renderRecent();
+  var previousPageShow = window.onpageshow;
+  window.onpageshow = function (event) {
+    if (previousPageShow) previousPageShow(event);
+    if (event && event.persisted) renderRecent();
+  };
+})();
+
+
+
+(function () {
+  var dock = document.getElementById('kDock');
+  var links = dock.getElementsByTagName('a');
+  var views = document.querySelectorAll('[data-k-view]');
+  var library = document.getElementById('kLibraryView');
+  var libraryHash = '';
+  function sync() {
+    var requested = location.hash.slice(1);
+    var inLibrary = requested === 'kContinue' || requested === 'kBookshelf' || requested === 'kAllBooks';
+    if (inLibrary) libraryHash = location.hash;
+    var target = inLibrary ? library : document.getElementById(requested);
+    if (!target || target.getAttribute('data-k-view') === null) {
+      target = document.getElementById(dock.getAttribute('data-default'));
+    }
+    for (var i = 0; i < views.length; i++) views[i].style.display = views[i] === target ? 'block' : 'none';
+    for (var j = 0; j < links.length; j++) {
+      if (links[j].hash === '#' + target.id) links[j].setAttribute('aria-current', 'page');
+      else links[j].removeAttribute('aria-current');
+    }
+    if (target === library && window.kShowLibraryPanel) window.kShowLibraryPanel();
+    if (target.id === 'kDashboardWidgets' && window.kActivateDashboard) window.kActivateDashboard();
+    window.scrollTo(0, 0);
+  }
+  for (var i = 0; i < links.length; i++) {
+    links[i].onclick = function (event) {
+      if (event && (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey)) return;
+      var current = location.hash;
+      if (current === '#kContinue' || current === '#kBookshelf' || current === '#kAllBooks') libraryHash = current;
+      var hash = this.hash === '#kLibraryView' && libraryHash ? libraryHash : this.hash;
+      if (window.history && history.pushState) {
+        if (location.hash !== hash) history.pushState(null, '', hash);
+        sync();
+        return false;
+      }
+      if (location.hash !== hash) location.hash = hash;
+      else sync();
+      return false;
+    };
+  }
+  window.onhashchange = sync;
+  window.onpopstate = sync;
+  sync();
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "name": "EPUB Browser",
+  "short_name": "EPUB Browser",
+  "description": "개인용 EPUB 리더 및 정적 사이트 생성기",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#f4f0e6",
+  "theme_color": "#244548",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/immutable/icon-192.15435b416555.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/immutable/icon-512.74615b597047.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/assets/immutable/screenshot-wide.561f1fb31ff3.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "EPUB Browser 데스크톱 화면"
+    },
+    {
+      "src": "/assets/immutable/screenshot-narrow.b18b2c94a054.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "EPUB Browser 모바일 화면"
+    }
+  ],
+  "categories": [
+    "books",
+    "education",
+    "productivity"
+  ],
+  "lang": "ko",
+  "scope": "/",
+  "prefer_related_applications": false
+}
