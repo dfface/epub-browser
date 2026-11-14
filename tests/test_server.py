@@ -684,6 +684,26 @@ class ServerSetupBoundaryTests(unittest.TestCase):
                 )
         self.assertFalse(self.store.has_administrator())
 
+    def test_setup_accepts_nonce_from_an_earlier_page_load(self):
+        first_nonce = self._setup_nonce()
+        second_nonce = self._setup_nonce()
+        cookie_value = self.client.cookies.get("epub_browser_setup_nonce")
+        self.assertIn(first_nonce, cookie_value)
+        self.assertIn(second_nonce, cookie_value)
+
+        response = self.client.post(
+            "/setup",
+            data={
+                "setup_nonce": first_nonce,
+                "username": "owner",
+                "password": "setup-secret",
+                "password_confirmation": "setup-secret",
+            },
+        )
+
+        self.assertEqual(response.status_code, 303)
+        self.assertTrue(self.store.has_administrator())
+
     def test_concurrent_setup_submissions_allow_exactly_one_claim(self):
         barrier = threading.Barrier(2)
 

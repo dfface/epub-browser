@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "Trang {number} / {total}",
   "pdf.pageLoadError": "Không thể tải trang. Vui lòng thử lại.",
   "pdf.loadingPage": "Đang tải trang…",
+  "pdf.browserUnsupported": "Trình duyệt này quá cũ để hiển thị trang PDF. Vui lòng cập nhật hoặc mở sách này bằng phiên bản mới của Chrome, Edge, Firefox hoặc Safari.",
   "pdf.textUnavailable": "Không thể chọn văn bản, tạo chú thích, dùng từ điển hoặc bách khoa toàn thư vì PDF này không có lớp văn bản khả dụng.",
   "pdf.selectionWithinPageRequired": "Chọn văn bản trong một trang PDF để dùng chú thích, từ điển hoặc bách khoa toàn thư.",
   "pdf.passwordRequired": "PDF này được bảo vệ bằng mật khẩu. Hãy nhập mật khẩu trong trình đọc để hiển thị trang.",

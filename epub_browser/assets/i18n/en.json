@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "Page {number} of {total}",
   "pdf.pageLoadError": "This page could not be loaded. Please try again.",
   "pdf.loadingPage": "Loading page…",
+  "pdf.browserUnsupported": "This browser is too old to display PDF pages. Please update it, or open this book in a recent version of Chrome, Edge, Firefox, or Safari.",
   "pdf.textUnavailable": "Text selection, annotations, dictionary, and encyclopedia are unavailable because this PDF has no usable text layer.",
   "pdf.selectionWithinPageRequired": "Select text within one PDF page to use annotations, dictionary, or encyclopedia.",
   "pdf.passwordRequired": "This PDF is password protected. Enter its password in the reader to display the page.",

@@ -197,6 +197,7 @@ PUBLIC_UNAUTHENTICATED_ASSET_NAMES = frozenset(
 )
 AUTH_NONCE_COOKIE_LIMIT = 8
 AUTH_NONCE_VALUE_PATTERN = re.compile(r'[A-Za-z0-9_-]{32,128}')
+SETUP_NONCE_COOKIE_LIMIT = 8
 PUBLIC_WEB_MANIFESTS = frozenset(
     f'/assets/{name}' for name in WEB_MANIFEST_SOURCES
 )
@@ -432,6 +433,7 @@ def reader_content_security_policy(markup, inline_scripts=False):
         "font-src 'self' data:; "
         "media-src 'self' data: blob:; "
         "connect-src 'self'; "
+        "worker-src 'self' blob:; "
         "object-src 'none'; frame-src 'none'; "
         "base-uri 'none'; form-action 'self'"
     ).format(script_sources)
@@ -963,10 +965,25 @@ def create_app(
             samesite=cookie_options['samesite'],
         )
 
-    def set_setup_nonce_cookie(target_response, nonce):
+    def setup_nonce_cookie_values(raw_value):
+        if not isinstance(raw_value, str):
+            return ()
+        return tuple(
+            value
+            for value in raw_value.split('.')[-SETUP_NONCE_COOKIE_LIMIT:]
+            if AUTH_NONCE_VALUE_PATTERN.fullmatch(value)
+        )
+
+    def set_setup_nonce_cookie(target_response, nonce, existing_value=None):
+        values = [
+            value
+            for value in setup_nonce_cookie_values(existing_value)
+            if not secrets.compare_digest(value, nonce)
+        ]
+        values.append(nonce)
         target_response.set_cookie(
             SETUP_NONCE_COOKIE,
-            nonce,
+            '.'.join(values[-SETUP_NONCE_COOKIE_LIMIT:]),
             max_age=600,
             path='/setup',
             secure=auth_service.config.cookie_secure,
@@ -1361,6 +1378,7 @@ def create_app(
         status_code=200,
         locale='en',
         locale_explicit=False,
+        existing_nonce_cookie=None,
     ):
         locale = normalize_login_locale(locale)
         nonce = secrets.token_urlsafe(32)
@@ -1425,7 +1443,7 @@ if(localeField)localeField.value=localeSelect.value;
             status_code=status_code,
             headers={'Cache-Control': 'no-store'},
         )
-        set_setup_nonce_cookie(page, nonce)
+        set_setup_nonce_cookie(page, nonce, existing_nonce_cookie)
         return page
 
     async def setup(request):
@@ -1446,6 +1464,7 @@ if(localeField)localeField.value=localeSelect.value;
                 setup_form,
                 locale=requested_locale,
                 locale_explicit=locale_explicit,
+                existing_nonce_cookie=request.cookies.get(SETUP_NONCE_COOKIE),
             )
         if not valid_same_origin_request_source(request):
             return invalid_setup_request()
@@ -1456,11 +1475,12 @@ if(localeField)localeField.value=localeSelect.value;
         cookie_nonce = request.cookies.get(SETUP_NONCE_COOKIE)
         submitted_nonce = form.get('setup_nonce')
         if (
-            not isinstance(cookie_nonce, str)
-            or not isinstance(submitted_nonce, str)
-            or not cookie_nonce
+            not isinstance(submitted_nonce, str)
             or not submitted_nonce
-            or not secrets.compare_digest(cookie_nonce, submitted_nonce)
+            or not any(
+                secrets.compare_digest(cookie_value, submitted_nonce)
+                for cookie_value in setup_nonce_cookie_values(cookie_nonce)
+            )
         ):
             return invalid_setup_request()
         if await run_db(store.has_administrator):
@@ -1491,6 +1511,7 @@ if(localeField)localeField.value=localeSelect.value;
                 status_code=400,
                 locale=submitted_locale,
                 locale_explicit=True,
+                existing_nonce_cookie=request.cookies.get(SETUP_NONCE_COOKIE),
             )
         if password != confirmation:
             return await run_render(
@@ -1499,6 +1520,7 @@ if(localeField)localeField.value=localeSelect.value;
                 status_code=400,
                 locale=submitted_locale,
                 locale_explicit=True,
+                existing_nonce_cookie=request.cookies.get(SETUP_NONCE_COOKIE),
             )
         try:
             raw_session, _ = await run_db(
@@ -1523,6 +1545,7 @@ if(localeField)localeField.value=localeSelect.value;
                 status_code=409,
                 locale=submitted_locale,
                 locale_explicit=True,
+                existing_nonce_cookie=request.cookies.get(SETUP_NONCE_COOKIE),
             )
         except ValueError:
             return await run_render(
@@ -1531,6 +1554,7 @@ if(localeField)localeField.value=localeSelect.value;
                 status_code=400,
                 locale=submitted_locale,
                 locale_explicit=True,
+                existing_nonce_cookie=request.cookies.get(SETUP_NONCE_COOKIE),
             )
         redirect = RedirectResponse(
             '/',

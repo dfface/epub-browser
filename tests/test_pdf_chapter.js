@@ -172,7 +172,9 @@ function createHarness(options = {}) {
             getTextContent() {
               getTextContentCalls += 1;
               const pageTexts = options.pageTexts || [];
-              if (options.textError) return Promise.reject(new Error('broken text layer'));
+              if (options.textError) return Promise.reject(
+                options.textError === true ? new Error('broken text layer') : options.textError
+              );
               if (options.deferText && options.deferText.includes(pageNumber)) {
                 return new Promise((resolve, reject) => textRequests.push({ pageNumber, resolve, reject }));
               }
@@ -835,4 +837,36 @@ test('rejects external or unhashed PDF.js assets before importing or fetching', 
   assert.equal(node.getAttribute('data-pdf-rendered'), 'error');
   assert.equal(node.children[0].getAttribute('role'), 'alert');
   assert.equal(node.children[0].textContent, 'translated:reader.chapterLoadFailed');
+});
+
+test('asks the reader to upgrade when the browser lacks the PDF runtime features', async () => {
+  const saved = Promise.withResolvers;
+  delete Promise.withResolvers;
+  try {
+    const harness = createHarness();
+    const node = harness.page(1);
+    harness.document.appendChild(node);
+
+    await harness.adapter.renderWithin(harness.document);
+
+    assert.equal(harness.importUrls.length, 0);
+    assert.equal(harness.getDocumentCalls.length, 0);
+    assert.equal(node.getAttribute('data-pdf-rendered'), 'error');
+    assert.equal(node.children[0].getAttribute('role'), 'alert');
+    assert.equal(node.children[0].textContent, 'translated:pdf.browserUnsupported');
+  } finally {
+    Promise.withResolvers = saved;
+  }
+});
+
+test('treats a missing runtime API failure as an upgrade prompt instead of a retry', async () => {
+  const harness = createHarness({ textError: new TypeError('drawText is not a function') });
+  const node = harness.page(1);
+  harness.document.appendChild(node);
+
+  await harness.adapter.renderWithin(harness.document);
+
+  const alert = node.children.find((child) => child.getAttribute('role') === 'alert');
+  assert.equal(node.getAttribute('data-pdf-rendered'), 'error');
+  assert.equal(alert.textContent, 'translated:pdf.browserUnsupported');
 });

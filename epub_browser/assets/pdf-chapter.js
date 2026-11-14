@@ -22,6 +22,135 @@
     return new URL(value, root.document.baseURI || root.location.href);
   }
 
+  function needsRuntimePolyfills() {
+    return (
+      typeof Map.prototype.getOrInsertComputed !== 'function'
+      || typeof Map.prototype.getOrInsert !== 'function'
+      || typeof Promise.try !== 'function'
+      || typeof Uint8Array.fromBase64 !== 'function'
+      || typeof Uint8Array.prototype.toBase64 !== 'function'
+      || typeof Uint8Array.prototype.toHex !== 'function'
+      || typeof Math.sumPrecise !== 'function'
+    );
+  }
+
+  // PDF.js 6 depends on very recent JavaScript built-ins. Browsers that shipped
+  // before those APIs landed would otherwise fail with an unusable PDF page.
+  function installRuntimePolyfills() {
+    function define(target, name, value) {
+      if (typeof target[name] === 'function') return;
+      Object.defineProperty(target, name, {
+        value: value,
+        configurable: true,
+        writable: true,
+        enumerable: false,
+      });
+    }
+    define(Map.prototype, 'getOrInsert', function getOrInsert(key, value) {
+      if (!this.has(key)) this.set(key, value);
+      return this.get(key);
+    });
+    define(Map.prototype, 'getOrInsertComputed', function getOrInsertComputed(key, callback) {
+      if (this.has(key)) return this.get(key);
+      var value = callback(key);
+      this.set(key, value);
+      return value;
+    });
+    define(Promise, 'try', function tryCallback(callback) {
+      var args = Array.prototype.slice.call(arguments, 1);
+      return new Promise(function (resolve) {
+        resolve(callback.apply(undefined, args));
+      });
+    });
+    define(Uint8Array, 'fromBase64', function fromBase64(value) {
+      var binary = globalThis.atob(String(value));
+      var bytes = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      return bytes;
+    });
+    define(Uint8Array.prototype, 'toBase64', function toBase64() {
+      var binary = '';
+      for (var i = 0; i < this.length; i += 1) binary += String.fromCharCode(this[i]);
+      return globalThis.btoa(binary);
+    });
+    define(Uint8Array.prototype, 'toHex', function toHex() {
+      var hex = '';
+      for (var i = 0; i < this.length; i += 1) {
+        hex += (this[i] < 16 ? '0' : '') + this[i].toString(16);
+      }
+      return hex;
+    });
+    define(Math, 'sumPrecise', function sumPrecise(values) {
+      var sum = 0;
+      var compensation = 0;
+      var iterator = values[Symbol.iterator]();
+      for (var step = iterator.next(); !step.done; step = iterator.next()) {
+        var value = step.value + compensation;
+        var next = sum + value;
+        compensation = value - (next - sum);
+        sum = next;
+      }
+      return sum;
+    });
+  }
+
+  // PDF.js 6 evaluates these built-ins immediately, before any later polyfill
+  // could run. When they are missing the browser is too old to render PDF at
+  // all, so readers get an upgrade hint instead of a misleading retry error.
+  function supportsPDFRuntime() {
+    return (
+      typeof Promise === 'function'
+      && typeof Map === 'function'
+      && typeof Set === 'function'
+      && typeof WeakMap === 'function'
+      && typeof Symbol === 'function'
+      && typeof URL === 'function'
+      && typeof fetch === 'function'
+      && typeof TextDecoder === 'function'
+      && typeof structuredClone === 'function'
+      && typeof Promise.withResolvers === 'function'
+      && typeof Promise.allSettled === 'function'
+      && typeof Object.hasOwn === 'function'
+      && typeof Object.fromEntries === 'function'
+      && typeof Array.prototype.at === 'function'
+      && typeof Array.prototype.findLast === 'function'
+      && typeof String.prototype.replaceAll === 'function'
+      && (typeof HTMLScriptElement !== 'function'
+        || 'noModule' in HTMLScriptElement.prototype)
+    );
+  }
+
+  function unsupportedBrowserError() {
+    var error = new Error('Browser lacks the JavaScript features PDF.js requires');
+    error.code = 'pdf-browser-unsupported';
+    return error;
+  }
+
+  function isUnsupportedBrowserError(error) {
+    if (!error) return false;
+    if (error.code === 'pdf-browser-unsupported') return true;
+    if (!(error instanceof TypeError) && !(error instanceof ReferenceError)) return false;
+    return /is not a function|is not a constructor|is not defined/.test(
+      String(error.message || '')
+    );
+  }
+
+  function installCompatibilityWorker(pdfjs, workerUrl) {
+    if (typeof root.Worker !== 'function' || typeof root.Blob !== 'function'
+        || !root.URL || typeof root.URL.createObjectURL !== 'function') {
+      return false;
+    }
+    var source = '(' + installRuntimePolyfills.toString() + ')();\nimport '
+      + JSON.stringify(absoluteURL(workerUrl).href) + ';';
+    var blobUrl = root.URL.createObjectURL(new root.Blob([source], { type: 'text/javascript' }));
+    try {
+      pdfjs.GlobalWorkerOptions.workerPort = new root.Worker(blobUrl, { type: 'module' });
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
   function trustedAssetURL(value, worker) {
     var url = absoluteURL(value);
     var origin = root.location.origin || absoluteURL(root.location.href).origin;
@@ -99,9 +228,14 @@
     }
     runtimeKey = key;
     if (!modulePromise) {
+      if (!supportsPDFRuntime()) return Promise.reject(unsupportedBrowserError());
+      var compatibilityNeeded = needsRuntimePolyfills();
+      installRuntimePolyfills();
       var importer = dependencies.importModule || function(url) { return import(url); };
       modulePromise = Promise.resolve(importer(config.moduleUrl)).then(function(pdfjs) {
-        pdfjs.GlobalWorkerOptions.workerSrc = config.workerUrl;
+        if (!compatibilityNeeded || !installCompatibilityWorker(pdfjs, config.workerUrl)) {
+          pdfjs.GlobalWorkerOptions.workerSrc = config.workerUrl;
+        }
         return pdfjs;
       });
     }
@@ -434,7 +568,11 @@
       if (record.disposed || generation !== record.generation) return;
       node.setAttribute('data-pdf-rendered', 'error');
       node.setAttribute('aria-busy', 'false');
-      statusNode(node, 'alert', 'reader.chapterLoadFailed');
+      statusNode(
+        node,
+        'alert',
+        isUnsupportedBrowserError(error) ? 'pdf.browserUnsupported' : 'reader.chapterLoadFailed'
+      );
       announceAnnotationContentReady(node, false);
     }
   }

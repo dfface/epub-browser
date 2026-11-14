@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "الصفحة {number} من {total}",
   "pdf.pageLoadError": "تعذّر تحميل الصفحة. يرجى المحاولة مرة أخرى.",
   "pdf.loadingPage": "جارٍ تحميل الصفحة…",
+  "pdf.browserUnsupported": "هذا المتصفح قديم جدًا لعرض صفحات PDF. حدّثه أو افتح هذا الكتاب في نسخة حديثة من Chrome أو Edge أو Firefox أو Safari.",
   "pdf.textUnavailable": "لا يتوفر تحديد النص والتعليقات والقاموس والموسوعة لأن ملف PDF هذا لا يحتوي على طبقة نص قابلة للاستخدام.",
   "pdf.selectionWithinPageRequired": "حدد نصًا داخل صفحة PDF واحدة لاستخدام التعليقات أو القاموس أو الموسوعة.",
   "pdf.passwordRequired": "ملف PDF هذا محمي بكلمة مرور. أدخلها في القارئ لعرض الصفحة.",

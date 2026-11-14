@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "第 {number} 页，共 {total} 页",
   "pdf.pageLoadError": "页面加载失败，请重试。",
   "pdf.loadingPage": "正在加载页面…",
+  "pdf.browserUnsupported": "当前浏览器版本过低，无法显示 PDF 页面。请升级浏览器，或改用最新版的 Chrome、Edge、Firefox 或 Safari 打开本书。",
   "pdf.textUnavailable": "此 PDF 没有可用的文本层，因此无法使用文本选择、标注、词典和百科。",
   "pdf.selectionWithinPageRequired": "请在同一 PDF 页面内选择文本，才能使用标注、词典或百科。",
   "pdf.passwordRequired": "此 PDF 受密码保护。请在阅读器中输入密码以显示页面。",

@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "Halaman {number} daripada {total}",
   "pdf.pageLoadError": "Halaman tidak dapat dimuatkan. Sila cuba lagi.",
   "pdf.loadingPage": "Memuatkan halaman…",
+  "pdf.browserUnsupported": "Pelayar ini terlalu lama untuk memaparkan halaman PDF. Kemas kini pelayar atau buka buku ini dalam versi terkini Chrome, Edge, Firefox atau Safari.",
   "pdf.textUnavailable": "Pemilihan teks, anotasi, kamus dan ensiklopedia tidak tersedia kerana PDF ini tiada lapisan teks yang boleh digunakan.",
   "pdf.selectionWithinPageRequired": "Pilih teks dalam satu halaman PDF untuk menggunakan anotasi, kamus atau ensiklopedia.",
   "pdf.passwordRequired": "PDF ini dilindungi kata laluan. Masukkannya dalam pembaca untuk memaparkan halaman.",

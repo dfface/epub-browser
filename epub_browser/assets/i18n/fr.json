@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "Page {number} sur {total}",
   "pdf.pageLoadError": "Impossible de charger la page. Veuillez réessayer.",
   "pdf.loadingPage": "Chargement de la page…",
+  "pdf.browserUnsupported": "Ce navigateur est trop ancien pour afficher les pages PDF. Mettez-le à jour ou ouvrez ce livre dans une version récente de Chrome, Edge, Firefox ou Safari.",
   "pdf.textUnavailable": "La sélection de texte, les annotations, le dictionnaire et l’encyclopédie ne sont pas disponibles, car ce PDF ne possède pas de couche de texte exploitable.",
   "pdf.selectionWithinPageRequired": "Sélectionnez du texte dans une seule page PDF pour utiliser les annotations, le dictionnaire ou l’encyclopédie.",
   "pdf.passwordRequired": "Ce PDF est protégé par un mot de passe. Saisissez-le dans le lecteur pour afficher la page.",

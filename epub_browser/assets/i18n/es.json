@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "Página {number} de {total}",
   "pdf.pageLoadError": "No se pudo cargar la página. Inténtalo de nuevo.",
   "pdf.loadingPage": "Cargando página…",
+  "pdf.browserUnsupported": "Este navegador es demasiado antiguo para mostrar páginas PDF. Actualízalo o abre este libro en una versión reciente de Chrome, Edge, Firefox o Safari.",
   "pdf.textUnavailable": "La selección de texto, las anotaciones, el diccionario y la enciclopedia no están disponibles porque este PDF no tiene una capa de texto utilizable.",
   "pdf.selectionWithinPageRequired": "Selecciona texto dentro de una sola página PDF para usar anotaciones, diccionario o enciclopedia.",
   "pdf.passwordRequired": "Este PDF está protegido con contraseña. Introdúcela en el lector para mostrar la página.",

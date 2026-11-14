@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "{total}ページ中{number}ページ",
   "pdf.pageLoadError": "ページを読み込めませんでした。もう一度お試しください。",
   "pdf.loadingPage": "ページを読み込んでいます…",
+  "pdf.browserUnsupported": "お使いのブラウザは古いため PDF ページを表示できません。ブラウザを更新するか、最新版の Chrome、Edge、Firefox、Safari でこの本を開いてください。",
   "pdf.textUnavailable": "この PDF には利用可能なテキストレイヤーがないため、テキスト選択、注釈、辞書、百科事典は使用できません。",
   "pdf.selectionWithinPageRequired": "注釈、辞書、百科事典を使うには、1 つの PDF ページ内でテキストを選択してください。",
   "pdf.passwordRequired": "この PDF はパスワードで保護されています。ページを表示するにはリーダーでパスワードを入力してください。",

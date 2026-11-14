@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "第 {number} 頁，共 {total} 頁",
   "pdf.pageLoadError": "頁面載入失敗，請重試。",
   "pdf.loadingPage": "正在載入頁面…",
+  "pdf.browserUnsupported": "目前瀏覽器版本過舊，無法顯示 PDF 頁面。請升級瀏覽器，或改用最新版的 Chrome、Edge、Firefox 或 Safari 開啟本書。",
   "pdf.textUnavailable": "此 PDF 沒有可用的文字層，因此無法使用文字選取、標註、詞典和百科。",
   "pdf.selectionWithinPageRequired": "請在同一 PDF 頁面內選取文字，才能使用標註、詞典或百科。",
   "pdf.passwordRequired": "此 PDF 受密碼保護。請在閱讀器中輸入密碼以顯示頁面。",

@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "전체 {total}페이지 중 {number}페이지",
   "pdf.pageLoadError": "페이지를 불러오지 못했습니다. 다시 시도해 주세요.",
   "pdf.loadingPage": "페이지를 불러오는 중…",
+  "pdf.browserUnsupported": "브라우저 버전이 오래되어 PDF 페이지를 표시할 수 없습니다. 브라우저를 업데이트하거나 최신 버전의 Chrome, Edge, Firefox, Safari에서 이 책을 열어 주세요.",
   "pdf.textUnavailable": "이 PDF에는 사용 가능한 텍스트 레이어가 없어 텍스트 선택, 주석, 사전 및 백과사전을 사용할 수 없습니다.",
   "pdf.selectionWithinPageRequired": "주석, 사전 또는 백과사전을 사용하려면 한 PDF 페이지 안에서 텍스트를 선택하세요.",
   "pdf.passwordRequired": "이 PDF는 암호로 보호되어 있습니다. 페이지를 표시하려면 리더에서 암호를 입력하세요.",

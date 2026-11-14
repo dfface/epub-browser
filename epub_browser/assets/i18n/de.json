@@ -1342,6 +1342,7 @@
   "pdf.pageOf": "Seite {number} von {total}",
   "pdf.pageLoadError": "Die Seite konnte nicht geladen werden. Bitte versuche es erneut.",
   "pdf.loadingPage": "Seite wird geladen…",
+  "pdf.browserUnsupported": "Dieser Browser ist zu alt, um PDF-Seiten anzuzeigen. Bitte aktualisiere ihn oder öffne dieses Buch in einer aktuellen Version von Chrome, Edge, Firefox oder Safari.",
   "pdf.textUnavailable": "Textauswahl, Anmerkungen, Wörterbuch und Enzyklopädie sind nicht verfügbar, da dieses PDF keine nutzbare Textebene enthält.",
   "pdf.selectionWithinPageRequired": "Wählen Sie Text innerhalb einer einzelnen PDF-Seite aus, um Anmerkungen, Wörterbuch oder Enzyklopädie zu verwenden.",
   "pdf.passwordRequired": "Dieses PDF ist passwortgeschützt. Geben Sie das Passwort im Reader ein, um die Seite anzuzeigen.",
