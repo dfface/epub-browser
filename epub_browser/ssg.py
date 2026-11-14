@@ -30,7 +30,13 @@ from .book_identity import (
 from .cli import SSGConfig
 from .models import ConvertedBook
 from .identity import source_sha256
-from .pdf_processor import PDFMetadata, inspect_pdf, render_pdf_cover
+from .pdf_processor import (
+    PDFMetadata,
+    PDFProcessingError,
+    inspect_pdf,
+    render_pdf_cover,
+    render_pdf_kindle_pages,
+)
 from .processor import EPUBProcessor
 from .reader_pages import ReaderPageRenderer
 from .reporting import Reporter
@@ -402,7 +408,34 @@ class SSGPublisher:
                         chapter_index, document_url
                     ),
                 )
-            self._validate_pdf_book(working, toc, len(metadata.pages))
+            kindle_pdf = False
+            if self.config.kindle:
+                try:
+                    page_count = render_pdf_kindle_pages(
+                        document, working / "kindle_pdf"
+                    )
+                except PDFProcessingError:
+                    page_count = 0
+                if page_count == len(metadata.pages):
+                    landscape = bool(metadata.pages) and (
+                        metadata.pages[0].width > metadata.pages[0].height
+                    )
+                    self._atomic_write_text(
+                        working / "kindle_chapter.html",
+                        renderer.create_kindle_pdf_page(
+                            page_count, landscape=landscape
+                        ),
+                    )
+                    self._atomic_write_text(
+                        working / "kindle.html",
+                        renderer.create_kindle_pdf_toc_page(),
+                    )
+                    kindle_pdf = True
+                else:
+                    shutil.rmtree(working / "kindle_pdf", ignore_errors=True)
+            self._validate_pdf_book(
+                working, toc, len(metadata.pages), kindle=kindle_pdf
+            )
             os.replace(working, destination)
             working = None
             book_metadata = renderer.get_metadata()
@@ -416,6 +449,7 @@ class SSGPublisher:
                     if book_metadata.cover else None
                 ),
                 source_format=PDF_FORMAT,
+                kindle_pdf=kindle_pdf,
             )
         finally:
             if working is not None and working.exists():
@@ -459,7 +493,9 @@ class SSGPublisher:
                 temporary.unlink()
 
     @staticmethod
-    def _validate_pdf_book(directory: Path, toc, page_count: int) -> None:
+    def _validate_pdf_book(
+        directory: Path, toc, page_count: int, *, kindle: bool = False,
+    ) -> None:
         expected = [f"chapter_{index}.html" for index in range(page_count)]
         if [item.get("chapter_file") for item in toc] != expected:
             raise SSGBuildError("PDF table of contents is incomplete")
@@ -471,6 +507,14 @@ class SSGPublisher:
         for name in ("index.html", "toc.json", "document.pdf", *expected):
             if not (directory / name).is_file():
                 raise SSGBuildError(f"PDF output is missing {name}")
+        if kindle:
+            expected_pages = [
+                f"kindle_pdf/page_{index}.jpg"
+                for index in range(1, page_count + 1)
+            ]
+            for name in ("kindle.html", "kindle_chapter.html", *expected_pages):
+                if not (directory / name).is_file():
+                    raise SSGBuildError(f"PDF Kindle output is missing {name}")
 
     def _persist_pdf_identities(self, prepared: Sequence[_PreparedBook]) -> None:
         for book in prepared:

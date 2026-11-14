@@ -114,7 +114,12 @@ class SSGPublicationTests(unittest.TestCase):
             with Image.open(book / "cover.png") as image:
                 self.assertLessEqual(image.width, 600)
                 self.assertLessEqual(image.height, 900)
-            self.assertIn('href="/reader/book/{}/chapter_0.html"'.format(book_id), index_html)
+            # A PDF without outline metadata shows an empty TOC plus a page
+            # jump instead of one link per page.
+            self.assertNotIn('class="chapter-link"', index_html)
+            self.assertIn('class="toc-empty"', index_html)
+            self.assertIn('id="pdfTocPage"', index_html)
+            self.assertIn("window.location.href = 'chapter_' + (page - 1) + '.html'", index_html)
             self.assertIn('"documentUrl":"/reader/book/{}/document.pdf"'.format(book_id), chapter_html)
             self.assertNotIn("/api/", chapter_html)
             self.assertNotIn("reading-sessions.js", chapter_html)
@@ -728,7 +733,7 @@ class SSGPublicationTests(unittest.TestCase):
             self.assertIn('href="/kindle-library.html"', index)
             self.assertIn('href="/index.html?full=1"', minimal_library)
 
-    def test_kindle_minimal_reader_pages_are_not_generated_for_pdf(self):
+    def test_pdf_without_kindle_option_has_no_minimal_pages(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "book.pdf"
@@ -744,12 +749,53 @@ class SSGPublicationTests(unittest.TestCase):
             )
             book = output / "book" / metadata[0]["hash"]
             self.assertFalse((book / "kindle.html").exists())
+            self.assertFalse((book / "kindle_pdf").exists())
             self.assertEqual(list(book.glob("kindle_chapter_*.html")), [])
             # PDF pages must not redirect anywhere: there is no minimal page.
             book_index = (book / "index.html").read_text(encoding="utf-8")
             self.assertNotIn("location.replace('kindle.html')", book_index)
             chapter = (book / "chapter_0.html").read_text(encoding="utf-8")
             self.assertNotIn("kindle_chapter", chapter)
+
+    def test_kindle_option_generates_image_pages_for_pdf(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "book.pdf"
+            output = root / "dist"
+            self._write_pdf(source, pages=2)
+            SSGPublisher(
+                SSGConfig((source,), output, kindle=True),
+                show_progress=False,
+            ).build()
+
+            metadata = json.loads(
+                (output / "book-metadata.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(metadata[0]["format"], "pdf")
+            self.assertTrue(metadata[0]["kindlePdf"])
+            book = output / "book" / metadata[0]["hash"]
+            kindle_page = (book / "kindle_chapter.html").read_text(encoding="utf-8")
+            self.assertIn("kindle_pdf/page_", kindle_page)
+            self.assertIn("id=\"kPdfNext\"", kindle_page)
+            self.assertIn('href="kindle.html"', kindle_page)
+            kindle_toc = (book / "kindle.html").read_text(encoding="utf-8")
+            self.assertIn("kindle_chapter.html#page-", kindle_toc)
+            self.assertIn('data-i18n="contents"', kindle_toc)
+            self.assertNotIn("pdf-chapter.js", kindle_page)
+            self.assertNotIn("/vendor/pdfjs/", kindle_page)
+            for page_number in (1, 2):
+                image = book / "kindle_pdf" / f"page_{page_number}.jpg"
+                self.assertTrue(image.is_file())
+                self.assertTrue(image.read_bytes().startswith(b"\xff\xd8"))
+            library = (output / "kindle-library.html").read_text(encoding="utf-8")
+            self.assertIn(
+                f'href="/book/{metadata[0]["hash"]}/kindle.html"', library
+            )
+            pdf_row = library.split(
+                f'data-book="{metadata[0]["hash"]}"', 1
+            )[1].split("</li>", 1)[0]
+            self.assertIn("kindle.html", pdf_row)
+            self.assertNotIn("aria-disabled", pdf_row)
 
     def test_kindle_pages_are_opt_in(self):
         with tempfile.TemporaryDirectory() as directory:

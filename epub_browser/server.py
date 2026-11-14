@@ -79,6 +79,11 @@ from .processor import (
     SERVER_OUTPUT_REVISION_FILE,
     server_book_public_path_allowed,
 )
+from .pdf_processor import (
+    PDFProcessingError,
+    pdf_kindle_supported,
+    render_pdf_kindle_page,
+)
 from .pdf_delivery import (
     ByteRange,
     OwnedPDFFileResponse,
@@ -4412,7 +4417,7 @@ window.location.assign(payload.redirect||'/');
     def kindle_library_books(principal, sort):
         """Project visible book records onto the read-only minimal shelf."""
         books = []
-        records = [record for record in store.visible_books(principal) if record.source_format == EPUB_FORMAT]
+        records = list(store.visible_books(principal))
         for record in sort_visible_catalog(principal, records, sort):
             try:
                 metadata = json.loads(record.metadata_json)
@@ -4425,6 +4430,36 @@ window.location.assign(payload.redirect||'/');
             except (TypeError, json.JSONDecodeError):
                 authors = ()
             tags = metadata.get("tags")
+            kindle_pdf = False
+            if kindle and record.source_format == PDF_FORMAT:
+                try:
+                    pdf_metadata = json.loads(
+                        Path(
+                            base_directory,
+                            "book",
+                            record.book_id,
+                            "pdf",
+                            "metadata.json",
+                        ).read_text(encoding="utf-8")
+                    )
+                    kindle_pdf = (
+                        isinstance(pdf_metadata, dict)
+                        and bool(pdf_metadata.get("pages"))
+                        and (
+                            not pdf_metadata.get("encrypted")
+                            or pdf_kindle_supported(
+                                Path(
+                                    base_directory,
+                                    "book",
+                                    record.book_id,
+                                    "pdf",
+                                    "document.pdf",
+                                )
+                            )
+                        )
+                    )
+                except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                    kindle_pdf = False
             books.append(
                 LibraryBook(
                     book_id=record.book_id,
@@ -4434,6 +4469,7 @@ window.location.assign(payload.redirect||'/');
                     cover=(f"/book/{record.book_id}/{metadata['cover']}"
                            if metadata.get("cover") else None),
                     source_format=record.source_format,
+                    kindle_pdf=kindle_pdf,
                 )
             )
         return books
@@ -4449,16 +4485,24 @@ window.location.assign(payload.redirect||'/');
 
         def load_shelf():
             books = kindle_library_books(principal, sort)
-            visible = {book.book_id for book in books}
+            visible = {
+                book.book_id: book
+                for book in books
+                if book.source_format == EPUB_FORMAT or book.kindle_pdf
+            }
             limit = store.get_general_settings()["recent_reading_limit"]
             recent = []
             for row in store.list_reading_progress(principal.user_id):
                 book_id = row["book_id"]
                 chapter = row["chapter_index"]
-                if book_id not in visible:
+                book = visible.get(book_id)
+                if book is None:
                     continue
                 cache = Path(base_directory) / "book" / book_id / "content"
-                if not (cache / f"chapter_{chapter}.json").is_file() and not (
+                if book.source_format == PDF_FORMAT:
+                    if chapter < 0:
+                        continue
+                elif not (cache / f"chapter_{chapter}.json").is_file() and not (
                     library_manager is not None and library_manager.book_cache_is_cold(book_id)
                 ):
                     continue
@@ -4965,6 +5009,15 @@ window.location.assign(payload.redirect||'/');
                 and recorded_cover == book_relative_path
                 and recorded_cover == 'cover.png'
             )
+            kindle_pdf_image_match = (
+                re.fullmatch(
+                    r'kindle_pdf/page_([0-9]+)\.jpg',
+                    book_relative_path,
+                    re.IGNORECASE,
+                )
+                if kindle and book.source_format == PDF_FORMAT
+                else None
+            )
             kindle_page_allowed = (
                 kindle
                 and book.source_format == EPUB_FORMAT
@@ -4973,11 +5026,16 @@ window.location.assign(payload.redirect||'/');
                     book_relative_path,
                     re.IGNORECASE,
                 )
+            ) or (
+                kindle
+                and book.source_format == PDF_FORMAT
+                and book_relative_path.lower() in ('kindle.html', 'kindle_chapter.html')
             )
             if not (
                 server_book_public_path_allowed(book_relative_path)
                 or pdf_cover_allowed
                 or kindle_page_allowed
+                or kindle_pdf_image_match
             ):
                 return response(error_payload('not_found', 'Not Found'), 404)
             reader_page = book_relative_path.lower().endswith('.html')
@@ -5009,7 +5067,12 @@ window.location.assign(payload.redirect||'/');
             ):
                 return await book_preparation_page(request, book, kindle_page_allowed)
             try:
-                await pin_book_cache(request, book_id, read=reader_page, restore=not keep_cold)
+                await pin_book_cache(
+                    request,
+                    book_id,
+                    read=reader_page or bool(kindle_pdf_image_match),
+                    restore=not keep_cold,
+                )
             except BookCacheUnavailable:
                 return response(error_payload('book_content_unavailable', 'Book content is unavailable'), 503)
             cold_metadata = (
@@ -5020,7 +5083,11 @@ window.location.assign(payload.redirect||'/');
                 server_book_output_is_current, base_directory, book_id, book.source_format,
             ):
                 return response(error_payload('not_found', 'Not Found'), 404)
-            if not reader_page and book_relative_path != 'toc.json':
+            if (
+                not reader_page
+                and book_relative_path != 'toc.json'
+                and not kindle_pdf_image_match
+            ):
                 return await public_files.get_response(path, request.scope)
             ai_settings = await run_db(store.get_ai_settings)
             ai_reading_enabled = bool(ai_settings.get("enabled"))
@@ -5054,6 +5121,54 @@ window.location.assign(payload.redirect||'/');
             has_dynamic_cache = await run_io(_has_dynamic_cache)
             if has_dynamic_cache:
                 try:
+                    if kindle_pdf_image_match:
+                        page_number = int(kindle_pdf_image_match.group(1))
+                        try:
+                            pdf_metadata = await run_io(renderer.pdf_metadata)
+                        except ServerPageError:
+                            return response(error_payload('not_found', 'Not Found'), 404)
+                        if (
+                            page_number < 1
+                            or page_number > len(pdf_metadata.pages)
+                        ):
+                            return response(
+                                error_payload('not_found', 'Not Found'), 404
+                            )
+                        fingerprint = re.sub(
+                            r'[^0-9A-Za-z_-]', '_', book.source_fingerprint
+                        ) or 'current'
+                        target = (
+                            Path(data_directory)
+                            / 'kindle-pdf'
+                            / book_id
+                            / fingerprint
+                            / f'page_{page_number}.jpg'
+                        )
+                        if not target.is_file():
+                            try:
+                                await run_io(
+                                    render_pdf_kindle_page,
+                                    Path(
+                                        base_directory,
+                                        'book',
+                                        book_id,
+                                        'pdf',
+                                        'document.pdf',
+                                    ),
+                                    page_number,
+                                    target,
+                                )
+                            except PDFProcessingError:
+                                return response(
+                                    error_payload('not_found', 'Not Found'), 404
+                                )
+                        image_response = FileResponse(
+                            target, media_type='image/jpeg'
+                        )
+                        image_response.headers['X-Content-Type-Options'] = (
+                            'nosniff'
+                        )
+                        return image_response
                     if book_relative_path == 'index.html':
                         review = await run_db(
                             store.get_book_review,
@@ -5078,10 +5193,40 @@ window.location.assign(payload.redirect||'/');
                         return await account_reader_page(markup, principal)
                     if kindle_page_allowed:
                         if book_relative_path == 'kindle.html':
+                            if book.source_format == PDF_FORMAT:
+                                markup = await run_render(
+                                    renderer.render_kindle_pdf_toc,
+                                    locale=resolve_request_locale(request),
+                                )
+                                dynamic_response = HTMLResponse(
+                                    markup,
+                                    headers={'Cache-Control': 'private, no-cache'},
+                                )
+                                return await apply_security_headers(
+                                    dynamic_response,
+                                    markup=markup,
+                                    inline_scripts=True,
+                                )
                             dashboard = await run_db(store.get_kindle_screensaver, principal.user_id)
                             tools = {"pomodoro": dashboard["pomodoro"]}
                             markup = await run_render(
                                 renderer.render_kindle_index, locale=resolve_request_locale(request), tools=tools,
+                            )
+                            dynamic_response = HTMLResponse(
+                                markup,
+                                headers={'Cache-Control': 'private, no-cache'},
+                            )
+                            return await apply_security_headers(
+                                dynamic_response,
+                                markup=markup,
+                                inline_scripts=True,
+                            )
+                        if book_relative_path == 'kindle_chapter.html':
+                            if book.source_format != PDF_FORMAT:
+                                return Response(status_code=404)
+                            markup = await run_render(
+                                renderer.render_kindle_pdf_index,
+                                locale=resolve_request_locale(request),
                             )
                             dynamic_response = HTMLResponse(
                                 markup,

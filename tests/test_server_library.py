@@ -148,6 +148,16 @@ class ServerLibraryManagerTests(unittest.TestCase):
             self.assertEqual(_json_login(client, "admin", "secret").status_code, 200)
             epub_chapter = f"/book/{epub.book_id}/chapter_0.html"
             self.assertEqual(client.get(epub_chapter).status_code, 200)
+            pdf_pages = (
+                manager.server_dir / "kindle-pdf" / pdf.book_id / "fp" / "page_1.jpg"
+            )
+            pdf_pages.parent.mkdir(parents=True, exist_ok=True)
+            pdf_pages.write_bytes(b"page")
+            epub_pages = (
+                manager.server_dir / "kindle-pdf" / epub.book_id / "fp" / "page_1.jpg"
+            )
+            epub_pages.parent.mkdir(parents=True, exist_ok=True)
+            epub_pages.write_bytes(b"page")
             csrf = client.get("/api/session").json()["csrf_token"]
             self.store.set_reading_progress(
                 self.store.get_user_by_username("admin").user_id, epub.book_id, 0,
@@ -174,6 +184,8 @@ class ServerLibraryManagerTests(unittest.TestCase):
             epub_root = manager.public_dir / "book" / epub.book_id
             self.assertFalse((pdf_root / "pdf" / "document.pdf").exists())
             self.assertTrue((epub_root / "content" / "chapter_0.json").exists())
+            self.assertFalse(pdf_pages.exists())
+            self.assertTrue(epub_pages.exists())
 
             shelf = client.get("/book-metadata.json").json()
             self.assertEqual({book["hash"] for book in shelf}, {epub.book_id, pdf.book_id})

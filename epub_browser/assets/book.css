@@ -598,6 +598,51 @@ body {
     }
 }
 
+/* Shared empty state for EPUB and PDF book pages: identical container,
+   typography and spacing; PDF only adds the page-jump form. */
+.toc-empty {
+    padding: 20px 16px 24px;
+    text-align: center;
+    color: var(--text-secondary);
+}
+
+.toc-empty p {
+    margin: 0;
+}
+
+.toc-empty p + .toc-jump {
+    margin-top: 14px;
+}
+
+.toc-jump {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.toc-jump input {
+    width: 7em;
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius-lg);
+    background: var(--background);
+    color: var(--text);
+    font-size: 1rem;
+    text-align: center;
+}
+
+.toc-jump button {
+    padding: 9px 18px;
+    border: 0;
+    border-radius: var(--border-radius-lg);
+    background: var(--primary);
+    color: #fff;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
 .toc-level-0 { margin-left: 0px; }
 .toc-level-1 { margin-left: 25px; font-size: 0.95em; }
 .toc-level-2 { margin-left: 50px; font-size: 0.9em; }

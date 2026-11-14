@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import quote
 
 from .asset_publisher import PublishedAssets
-from .pdf_processor import PDFMetadata, PDFPageMetadata
+from .pdf_processor import PDFMetadata, PDFPageMetadata, pdf_kindle_supported
 from .reader_pages import ReaderPageRenderer
 from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .urls import SiteURLs
@@ -192,6 +192,40 @@ class ServerPageRenderer:
         except (KeyError, TypeError, ValueError) as error:
             raise ServerPageError("PDF metadata cache is invalid") from error
         return metadata, renderer
+
+    def pdf_metadata(self) -> PDFMetadata:
+        return self._pdf_renderer()[0]
+
+    def render_kindle_pdf_index(self, *, locale=None):
+        metadata, renderer = self._pdf_renderer()
+        supported = bool(metadata.pages) and (
+            not metadata.encrypted
+            or pdf_kindle_supported(self.pdf_dir / "document.pdf")
+        )
+        landscape = bool(metadata.pages) and (
+            metadata.pages[0].width > metadata.pages[0].height
+        )
+        return renderer.create_kindle_pdf_page(
+            len(metadata.pages),
+            locale=locale,
+            unsupported=not supported,
+            landscape=landscape,
+        )
+
+    def render_kindle_pdf_toc(self, *, locale=None):
+        metadata, renderer = self._pdf_renderer()
+        if not metadata.pages:
+            raise ServerPageError("PDF outline cache is missing")
+        supported = not metadata.encrypted or pdf_kindle_supported(
+            self.pdf_dir / "document.pdf"
+        )
+        if not supported:
+            # The book page must still explain why no reader is available
+            # instead of offering a table of contents that leads nowhere.
+            return renderer.create_kindle_pdf_page(
+                len(metadata.pages), locale=locale, unsupported=True,
+            )
+        return renderer.create_kindle_pdf_toc_page(locale=locale)
 
     def _asset_manifest(self) -> dict[str, str]:
         manifest = self._read_json(self.public_dir / "assets" / "asset-manifest.json")

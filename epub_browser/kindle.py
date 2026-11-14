@@ -64,6 +64,8 @@ def kindle_message(locale, key):
         "agenda": "account.kindle.agenda",
         "noEvents": "account.kindle.noEvents",
         "calendarUnavailable": "account.kindle.calendarUnavailable",
+        "pdfBadge": "pdf.formatBadge",
+        "pdfUnsupported": "kindle.pdfUnsupported",
     }
     prefix = "account.kindle." if key.startswith("pomo") else "kindle."
     message_key = keys.get(key, prefix + key)
