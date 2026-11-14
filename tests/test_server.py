@@ -6108,6 +6108,23 @@ class ServerKindleTests(unittest.TestCase):
         self.assertEqual(self.client.put(settings, json=dict(options, timezone="")).json()["timezone"], "")
         self.assertIsNone(self.client.get(offset).json()["offset"])
 
+    def test_kindle_week_start_preference_controls_calendar(self):
+        settings = "/api/account/kindle-screensaver"
+        options = {"clock": True, "calendar": True, "memo": True, "default": False}
+        self.assertEqual(self.client.get(settings).json()["week_start"], "monday")
+        self.assertIn('data-week-start="monday"', self.client.get("/kindle/screensaver").text)
+        saved = self.client.put(settings, json=dict(options, week_start="sunday"))
+        self.assertEqual(saved.status_code, 200)
+        self.assertEqual(saved.json()["week_start"], "sunday")
+        self.assertEqual(self.client.get(settings).json()["week_start"], "sunday")
+        self.assertIn('data-week-start="sunday"', self.client.get("/kindle/screensaver").text)
+        self.assertEqual(self.client.put(settings, json=dict(options, week_start="monday")).json()["week_start"], "monday")
+        self.assertEqual(self.client.put(settings, json=options).json()["week_start"], "monday")
+        invalid = self.client.put(settings, json=dict(options, week_start="friday"))
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(invalid.json()["code"], "invalid_kindle_week_start")
+        self.assertEqual(self.client.put(settings, json=dict(options, week_start=None)).status_code, 400)
+
     def test_kindle_merges_calendar_feeds_even_if_one_is_unavailable(self):
         options = {"clock": True, "calendar": True, "memo": True, "default": False}
         urls = ["webcal://calendar.example.com/first", "https://calendar.example.com/second",
@@ -6183,7 +6200,7 @@ class ServerKindleTests(unittest.TestCase):
         self.assertIn("UTC", preferences.pop("timezones"))
         self.assertEqual(preferences, dict(
             options, memo_text="<b>secret</b>", calendar_url="", calendar_urls=[],
-            pomodoro=False, timezone="",
+            pomodoro=False, timezone="", week_start="monday",
         ))
         self.assertNotIn('id="kMemo"', self.client.get(path).text)
         self.assertNotIn('id="kCalendar"', self.client.get(path).text)
@@ -6404,6 +6421,28 @@ class ServerKindleTests(unittest.TestCase):
         self.assertEqual(
             self.client.get("/book/pdf/kindle_pdf/page_1.jpg").status_code, 404
         )
+
+    def test_kindle_shelf_keeps_evicted_pdf_book_readable(self):
+        # Eviction keeps pdf/metadata.json but drops the document; the shelf
+        # must still offer the book so the reading flow can restore it on
+        # demand instead of permanently claiming Kindle mode is unsupported.
+        public = Path(self.directory.name)
+        pdf_directory = public / "book" / "pdf" / "pdf"
+        payload = json.loads(
+            (pdf_directory / "metadata.json").read_text(encoding="utf-8")
+        )
+        payload["encrypted"] = True
+        (pdf_directory / "metadata.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+        (pdf_directory / "document.pdf").unlink()
+        (public / "book" / "pdf" / ".server-book-evicted").write_text(
+            PDF_OUTPUT_REVISION, encoding="utf-8"
+        )
+        shelf = self.client.get("/kindle-library.html")
+        self.assertEqual(shelf.status_code, 200)
+        self.assertIn("/book/pdf/kindle.html", shelf.text)
+        self.assertNotIn('data-i18n="pdfUnsupported"', shelf.text)
 
     def test_kindle_surfaces_respect_restricted_visibility(self):
         # Grant the EPUB only to alice; Bob must be refused on every Kindle

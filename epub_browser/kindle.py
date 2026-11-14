@@ -12,6 +12,7 @@ from .locales import SUPPORTED_LOCALES
 
 
 KINDLE_WIDGETS = ("clock", "calendar", "memo", "default")
+KINDLE_WEEK_STARTS = ("monday", "sunday")
 KINDLE_MEMO_MAX_LENGTH = 4000
 
 
@@ -24,6 +25,10 @@ def kindle_timezone_offset(zone):
     if not zone:
         return None
     return int(datetime.now(ZoneInfo(zone)).utcoffset().total_seconds())
+
+
+def valid_kindle_week_start(value):
+    return value in KINDLE_WEEK_STARTS
 
 
 def valid_kindle_memo(text):
@@ -228,7 +233,13 @@ def render_kindle_dashboard_widgets(settings, locale, active):
     visible = '' if active else ' style="display:none"'
     offset = kindle_timezone_offset(settings.get("timezone"))
     timezone_attr = f' data-timezone-offset="{offset}"' if offset is not None else ""
-    panels = f'<section id="kDashboardWidgets" class="k-dashboard" data-k-view{visible}{timezone_attr}>{clock}{widgets}{agenda}</section>'
+    week_start = settings.get("week_start")
+    if not valid_kindle_week_start(week_start):
+        week_start = "monday"
+    panels = (
+        '<section id="kDashboardWidgets" class="k-dashboard" data-k-view'
+        f'{visible}{timezone_attr} data-week-start="{week_start}">{clock}{widgets}{agenda}</section>'
+    )
     return panels + pomodoro, _DASHBOARD_JS + pomodoro_script
 
 
@@ -286,6 +297,7 @@ _DASHBOARD_JS = r"""
   var dashboard = document.getElementById('kDashboardWidgets');
   var offsetAttr = dashboard.getAttribute('data-timezone-offset');
   var timezoneOffset = offsetAttr === null ? null : Number(offsetAttr);
+  var weekStart = dashboard.getAttribute('data-week-start') === 'sunday' ? 'sunday' : 'monday';
   var clock = document.getElementById('kClock');
   var clockDate = document.getElementById('kClockDate');
   var hour = document.getElementById('kHour');
@@ -303,8 +315,11 @@ _DASHBOARD_JS = r"""
   var locale = document.documentElement.lang;
   var lastDate = '';
   function weekdays() {
-    return locale.indexOf('zh') === 0 ? ['一','二','三','四','五','六','日']
+    var sunday = locale.indexOf('zh') === 0 ? ['日','一','二','三','四','五','六']
+      : ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var monday = locale.indexOf('zh') === 0 ? ['一','二','三','四','五','六','日']
       : ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    return weekStart === 'sunday' ? sunday : monday;
   }
   function pad(value) { return value < 10 ? '0' + value : String(value); }
   function label(date, options, fallback) {
@@ -414,14 +429,17 @@ _DASHBOARD_JS = r"""
         year + '/' + pad(m + 1) + '/' + pad(now.getUTCDate())));
     }
     if (!days) return;
-    var first = (new Date(Date.UTC(year, m, 1)).getUTCDay() + 6) % 7;
+    var monthStart = new Date(Date.UTC(year, m, 1)).getUTCDay();
+    var first = weekStart === 'sunday' ? monthStart : (monthStart + 6) % 7;
     var count = new Date(Date.UTC(year, m + 1, 0)).getUTCDate();
     setText(month, label(now, {year: 'numeric', month: 'long'}, year + ' / ' + pad(m + 1)));
     var rows = '<thead><tr>';
     var fallbackDays = weekdays();
     for (var i = 0; i < 7; i++) {
+      var weekdayIndex = weekStart === 'sunday' ? i : (i + 1) % 7;
       var heading = document.createElement('span');
-      heading.textContent = label(new Date(Date.UTC(2024, 0, i + 1)), {weekday: 'short'}, fallbackDays[i]);
+      // 2024-01-07 is a Sunday, so it anchors the Sunday-first header row.
+      heading.textContent = label(new Date(Date.UTC(2024, 0, 7 + weekdayIndex)), {weekday: 'short'}, fallbackDays[i]);
       rows += '<th scope="col">' + heading.innerHTML + '</th>';
     }
     rows += '</tr></thead><tbody>';

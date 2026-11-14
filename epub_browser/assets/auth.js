@@ -3672,6 +3672,8 @@
             });
             timezone.value = settings.timezone || '';
           }
+          var weekStart = form.elements.namedItem('week_start');
+          if (weekStart) weekStart.value = settings.week_start === 'sunday' ? 'sunday' : 'monday';
           fields.disabled = false;
         });
       }).catch(function() { showStatus('account.error.network', 'error'); });
@@ -3926,6 +3928,8 @@
         var calendarField = kindleForm.elements.namedItem('calendar_urls');
         var timezone = kindleForm.elements.namedItem('timezone');
         if (timezone) settings.timezone = timezone.value;
+        var weekStart = kindleForm.elements.namedItem('week_start');
+        if (weekStart) settings.week_start = weekStart.value;
         if (memoField.value !== memoField.defaultValue) settings.memo_text = memoField.value;
         if (calendarField.value !== calendarField.defaultValue) settings.calendar_urls = calendarField.value.split(/\r?\n/).map(function(url) { return url.trim(); }).filter(Boolean);
         fields.disabled = true;

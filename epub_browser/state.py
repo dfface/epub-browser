@@ -40,7 +40,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 33
+DB_SCHEMA_VERSION = 34
 APPEARANCE_DEFAULTS = {"automatic": False, "day": "light", "night": "dark", "manual": "light"}
 APPEARANCE_THEMES = frozenset({"light", "dark", "sepia", "forest", "ocean", "peach", "lavender"})
 
@@ -506,6 +506,12 @@ class StateStore:
                     "TEXT NOT NULL DEFAULT '20'",
                 )
                 connection.execute("PRAGMA user_version = 33")
+            if version < 34:
+                self._add_column_if_missing(
+                    connection, "kindle_screensavers", "week_start",
+                    "TEXT NOT NULL DEFAULT 'monday'",
+                )
+                connection.execute("PRAGMA user_version = 34")
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -8800,6 +8806,7 @@ class StateStore:
             return {
                 "clock": True, "calendar": True, "memo": True, "default": False,
                 "text": "", "calendar_url": "", "calendar_urls": [], "pomodoro": False, "timezone": "",
+                "week_start": "monday",
             }
         urls = (
             json.loads(row["calendar_urls_json"]) if row["calendar_urls_json"] is not None
@@ -8815,6 +8822,7 @@ class StateStore:
             "calendar_urls": urls,
             "pomodoro": bool(row["pomodoro"]),
             "timezone": row["timezone"],
+            "week_start": row["week_start"],
         }
 
     def set_kindle_screensaver_preferences(self, user_id: str, preferences: dict) -> None:
@@ -8826,13 +8834,14 @@ class StateStore:
         memo = preferences.get("memo_text")
         pomodoro = preferences.get("pomodoro")
         timezone = preferences.get("timezone")
+        week_start = preferences.get("week_start")
         with self._connection() as connection:
             connection.execute(
                 """
                 INSERT INTO kindle_screensavers
                     (user_id, clock, calendar, memo_visible, default_page, memo,
-                     calendar_url, pomodoro, calendar_urls_json, timezone)
-                VALUES (?, ?, ?, ?, ?, COALESCE(?, ''), COALESCE(?, ''), COALESCE(?, 0), ?, COALESCE(?, ''))
+                     calendar_url, pomodoro, calendar_urls_json, timezone, week_start)
+                VALUES (?, ?, ?, ?, ?, COALESCE(?, ''), COALESCE(?, ''), COALESCE(?, 0), ?, COALESCE(?, ''), COALESCE(?, 'monday'))
                 ON CONFLICT(user_id) DO UPDATE SET clock = excluded.clock,
                     calendar = excluded.calendar, memo_visible = excluded.memo_visible,
                     default_page = excluded.default_page,
@@ -8840,11 +8849,13 @@ class StateStore:
                     calendar_url = COALESCE(?, kindle_screensavers.calendar_url),
                     pomodoro = COALESCE(?, kindle_screensavers.pomodoro),
                     calendar_urls_json = COALESCE(excluded.calendar_urls_json, kindle_screensavers.calendar_urls_json),
-                    timezone = COALESCE(?, kindle_screensavers.timezone)
+                    timezone = COALESCE(?, kindle_screensavers.timezone),
+                    week_start = COALESCE(?, kindle_screensavers.week_start)
                 """,
                 (user_id, preferences["clock"], preferences["calendar"],
                  preferences["memo"], preferences["default"], memo, first_feed,
-                 pomodoro, feeds, timezone, memo, first_feed, pomodoro, timezone),
+                 pomodoro, feeds, timezone, week_start,
+                 memo, first_feed, pomodoro, timezone, week_start),
             )
 
     def set_kindle_memo(self, user_id: str, memo: str) -> None:

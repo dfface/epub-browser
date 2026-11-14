@@ -127,7 +127,13 @@ from .book_search import (
 )
 from .server_pages import ServerPageError, ServerPageRenderer
 from .source_format import EPUB_FORMAT, PDF_FORMAT, is_supported_source
-from .kindle import KINDLE_WIDGETS, kindle_timezone_offset, kindle_timezones, valid_kindle_memo
+from .kindle import (
+    KINDLE_WIDGETS,
+    kindle_timezone_offset,
+    kindle_timezones,
+    valid_kindle_memo,
+    valid_kindle_week_start,
+)
 from .kindle_calendar import CALENDAR_REFRESH_SECONDS, calendar_url, load_calendar_events
 from .book_sort import library_sort, sort_catalog
 from .site import LibraryBook, render_kindle_library_page, render_library_shell
@@ -4456,30 +4462,24 @@ window.location.assign(payload.redirect||'/');
             tags = metadata.get("tags")
             kindle_pdf = False
             if kindle and record.source_format == PDF_FORMAT:
+                pdf_directory = Path(
+                    base_directory, "book", record.book_id, "pdf"
+                )
                 try:
                     pdf_metadata = json.loads(
-                        Path(
-                            base_directory,
-                            "book",
-                            record.book_id,
-                            "pdf",
-                            "metadata.json",
-                        ).read_text(encoding="utf-8")
+                        (pdf_directory / "metadata.json").read_text(encoding="utf-8")
                     )
+                    # An evicted cache keeps pdf/metadata.json but drops the
+                    # document; it is restored on demand, so a missing file is
+                    # not evidence that Kindle mode cannot render this book.
+                    document = pdf_directory / "document.pdf"
                     kindle_pdf = (
                         isinstance(pdf_metadata, dict)
                         and bool(pdf_metadata.get("pages"))
                         and (
                             not pdf_metadata.get("encrypted")
-                            or pdf_kindle_supported(
-                                Path(
-                                    base_directory,
-                                    "book",
-                                    record.book_id,
-                                    "pdf",
-                                    "document.pdf",
-                                )
-                            )
+                            or not document.is_file()
+                            or pdf_kindle_supported(document)
                         )
                     )
                 except (OSError, UnicodeDecodeError, json.JSONDecodeError):
@@ -4633,6 +4633,8 @@ window.location.assign(payload.redirect||'/');
                 zone = data["timezone"]
                 if not isinstance(zone, str) or (zone and zone not in kindle_timezones()):
                     return invalid("invalid_kindle_timezone")
+            if "week_start" in data and not valid_kindle_week_start(data["week_start"]):
+                return invalid("invalid_kindle_week_start")
             if "calendar_urls" in data or "calendar_url" in data:
                 urls = data.get("calendar_urls", [data.get("calendar_url")])
                 try:
@@ -4650,6 +4652,7 @@ window.location.assign(payload.redirect||'/');
              "memo_text": settings["text"], "calendar_url": settings["calendar_url"],
              "calendar_urls": settings["calendar_urls"],
              "pomodoro": settings["pomodoro"], "timezone": settings["timezone"],
+             "week_start": settings["week_start"],
              **({"timezones": kindle_timezones()} if request.method == "GET" else {})},
             cache_control='private, no-store',
         )

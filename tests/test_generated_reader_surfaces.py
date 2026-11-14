@@ -446,7 +446,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertNotIn('data-i18n="pdfUnsupported"', pdf_row)
         self.assertNotIn('/assets/', page)
 
-    def test_kindle_library_marks_pdf_books_without_pages_as_unsupported(self):
+    def test_kindle_library_links_pdf_books_without_pages_to_book_page(self):
         books = (
             LibraryBook('alpha', 'Alpha Book', ('One Author',), (), None),
             LibraryBook(
@@ -459,12 +459,13 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         self.assertIn('data-book="pdf-book"', page)
         self.assertIn('data-format="pdf"', page)
         self.assertIn('class="k-lib-format"', page)
-        self.assertIn("PDF books can't be opened in Kindle mode yet.", page)
-        self.assertNotIn('/book/pdf-book/kindle', page)
-        # The PDF row is not a navigable link.
+        # The shelf never claims Kindle mode cannot read PDFs in general; the
+        # per-book limitation is only explained on the book page.
+        self.assertNotIn('pdfUnsupported', page)
+        self.assertNotIn('k-lib-unsupported', page)
         pdf_row = page.split('data-book="pdf-book"', 1)[1].split('</li>', 1)[0]
-        self.assertNotIn('href=', pdf_row)
-        self.assertIn('aria-disabled="true"', pdf_row)
+        self.assertIn('href="/book/pdf-book/kindle.html"', pdf_row)
+        self.assertNotIn('aria-disabled', pdf_row)
         self.assertNotIn('/assets/', page)
 
     def test_kindle_pdf_page_reader_is_dependency_free_es5(self):
@@ -669,7 +670,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             pdf_entry = next(item for item in metadata if item['hash'] == 'pdf-book')
             self.assertTrue(pdf_entry['kindlePdf'])
 
-    def test_ssg_kindle_library_lists_pdf_books_without_pages_as_unsupported(self):
+    def test_ssg_kindle_library_links_pdf_books_without_pages_to_book_page(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             assets = AssetPublisher(
@@ -688,9 +689,9 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('href="/book/epub-book/kindle.html"', page)
             self.assertIn('data-book="pdf-book"', page)
             self.assertIn('data-format="pdf"', page)
-            self.assertIn('k-lib-unsupported', page)
-            self.assertIn('pdfUnsupported', page)
-            self.assertNotIn('/book/pdf-book/kindle', page)
+            self.assertNotIn('k-lib-unsupported', page)
+            self.assertNotIn('pdfUnsupported', page)
+            self.assertIn('href="/book/pdf-book/kindle.html"', page)
 
     def test_ssg_chapter_template_embeds_kindle_entry_script(self):
         with tempfile.TemporaryDirectory() as directory:

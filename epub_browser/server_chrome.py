@@ -574,6 +574,11 @@ def render_account_panel(kindle=False):
                 <select id="kindleTimezone" name="timezone">
                     <option value="" data-i18n="account.kindle.deviceTimezone">Use device time zone</option>
                 </select>
+                <label for="kindleWeekStart" data-i18n="account.kindle.weekStart">Week starts on</label>
+                <select id="kindleWeekStart" name="week_start">
+                    <option value="monday" data-i18n="account.kindle.weekMonday">Monday</option>
+                    <option value="sunday" data-i18n="account.kindle.weekSunday">Sunday</option>
+                </select>
                 <label for="kindleMemoText" data-i18n="account.kindle.memo">Memo</label>
                 <textarea id="kindleMemoText" name="memo_text" rows="4" maxlength="4000" aria-describedby="kindleMemoHelp"></textarea>
                 <p class="account-help" id="kindleMemoHelp" data-i18n="account.kindle.memoHelp">Only your account can read this memo.</p>

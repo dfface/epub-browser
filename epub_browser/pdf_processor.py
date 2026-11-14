@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import shutil
 import tempfile
+import threading
 from typing import BinaryIO, Optional, Tuple
 
 from pypdf import PdfReader
@@ -13,6 +14,11 @@ from pypdfium2 import raw as pdfium_raw
 
 
 PDF_SIGNATURE_BYTES = 1024
+
+# PDFium is not thread-safe. The Server renders Kindle page images from worker
+# threads, so every PDFium document must be opened, used and closed while
+# holding this lock instead of racing on shared library state.
+_PDFIUM_LOCK = threading.Lock()
 
 
 class _UnboundedPDFReadError(Exception):
@@ -339,34 +345,35 @@ def render_pdf_cover(
     if max_width <= 0 or max_height <= 0:
         raise PDFProcessingError("PDF cover bounds must be positive")
     _validate_pdf_signature(source)
-    try:
-        document = pdfium.PdfDocument(str(source))
-    except pdfium.PdfiumError as error:
-        if error.err_code == pdfium_raw.FPDF_ERR_PASSWORD:
+    with _PDFIUM_LOCK:
+        try:
+            document = pdfium.PdfDocument(str(source))
+        except pdfium.PdfiumError as error:
+            if error.err_code == pdfium_raw.FPDF_ERR_PASSWORD:
+                return None
+            raise PDFProcessingError("Unable to render PDF cover") from None
+        if len(document) == 0:
+            document.close()
             return None
-        raise PDFProcessingError("Unable to render PDF cover") from None
-    if len(document) == 0:
-        document.close()
-        return None
-    page = document[0]
-    bitmap = None
-    image = None
-    try:
-        width, height = page.get_size()
-        scale = min(max_width / width, max_height / height)
-        bitmap = page.render(scale=scale)
-        image = bitmap.to_pil()
-        _save_cover_atomically(image, destination)
-        return destination
-    except Exception:
-        raise PDFProcessingError("Unable to render PDF cover") from None
-    finally:
-        if image is not None:
-            image.close()
-        if bitmap is not None:
-            bitmap.close()
-        page.close()
-        document.close()
+        page = document[0]
+        bitmap = None
+        image = None
+        try:
+            width, height = page.get_size()
+            scale = min(max_width / width, max_height / height)
+            bitmap = page.render(scale=scale)
+            image = bitmap.to_pil()
+            _save_cover_atomically(image, destination)
+            return destination
+        except Exception:
+            raise PDFProcessingError("Unable to render PDF cover") from None
+        finally:
+            if image is not None:
+                image.close()
+            if bitmap is not None:
+                bitmap.close()
+            page.close()
+            document.close()
 
 
 KINDLE_PDF_PAGE_WIDTH = 1000
@@ -434,12 +441,13 @@ def _open_pdf_for_rendering(source: Path):
 
 def pdf_kindle_supported(source: Path) -> bool:
     """Return whether PDFium can open the document without a password."""
-    try:
-        document = _open_pdf_for_rendering(Path(source))
-    except PDFProcessingError:
-        return False
-    document.close()
-    return True
+    with _PDFIUM_LOCK:
+        try:
+            document = _open_pdf_for_rendering(Path(source))
+        except PDFProcessingError:
+            return False
+        document.close()
+        return True
 
 
 def render_pdf_kindle_pages(
@@ -456,30 +464,31 @@ def render_pdf_kindle_pages(
         raise PDFProcessingError("PDF page width must be positive")
     if not 1 <= quality <= 95:
         raise PDFProcessingError("PDF page quality must be between 1 and 95")
-    document = _open_pdf_for_rendering(source)
-    page_count = len(document)
-    if page_count == 0:
-        document.close()
-        raise PDFProcessingError("PDF has no pages")
-    try:
-        destination.mkdir(parents=True, exist_ok=True)
-        for page_number in range(1, page_count + 1):
-            _render_kindle_page(
-                document,
-                page_number,
-                destination / f"page_{page_number}.jpg",
-                max_width=max_width,
-                quality=quality,
-            )
-        return page_count
-    except PDFProcessingError:
-        shutil.rmtree(destination, ignore_errors=True)
-        raise
-    except Exception:
-        shutil.rmtree(destination, ignore_errors=True)
-        raise PDFProcessingError("Unable to render PDF pages") from None
-    finally:
-        document.close()
+    with _PDFIUM_LOCK:
+        document = _open_pdf_for_rendering(source)
+        page_count = len(document)
+        if page_count == 0:
+            document.close()
+            raise PDFProcessingError("PDF has no pages")
+        try:
+            destination.mkdir(parents=True, exist_ok=True)
+            for page_number in range(1, page_count + 1):
+                _render_kindle_page(
+                    document,
+                    page_number,
+                    destination / f"page_{page_number}.jpg",
+                    max_width=max_width,
+                    quality=quality,
+                )
+            return page_count
+        except PDFProcessingError:
+            shutil.rmtree(destination, ignore_errors=True)
+            raise
+        except Exception:
+            shutil.rmtree(destination, ignore_errors=True)
+            raise PDFProcessingError("Unable to render PDF pages") from None
+        finally:
+            document.close()
 
 
 def render_pdf_kindle_page(
@@ -497,23 +506,24 @@ def render_pdf_kindle_page(
         raise PDFProcessingError("PDF page width must be positive")
     if not 1 <= quality <= 95:
         raise PDFProcessingError("PDF page quality must be between 1 and 95")
-    document = _open_pdf_for_rendering(source)
-    try:
-        if page_number < 1 or page_number > len(document):
-            raise PDFProcessingError("PDF page is out of range")
-        destination.parent.mkdir(parents=True, exist_ok=True)
+    with _PDFIUM_LOCK:
+        document = _open_pdf_for_rendering(source)
         try:
-            _render_kindle_page(
-                document,
-                page_number,
-                destination,
-                max_width=max_width,
-                quality=quality,
-            )
-        except PDFProcessingError:
-            raise
-        except Exception:
-            raise PDFProcessingError("Unable to render PDF page") from None
-        return destination
-    finally:
-        document.close()
+            if page_number < 1 or page_number > len(document):
+                raise PDFProcessingError("PDF page is out of range")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                _render_kindle_page(
+                    document,
+                    page_number,
+                    destination,
+                    max_width=max_width,
+                    quality=quality,
+                )
+            except PDFProcessingError:
+                raise
+            except Exception:
+                raise PDFProcessingError("Unable to render PDF page") from None
+            return destination
+        finally:
+            document.close()

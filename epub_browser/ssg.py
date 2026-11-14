@@ -416,10 +416,10 @@ class SSGPublisher:
                     )
                 except PDFProcessingError:
                     page_count = 0
+                landscape = bool(metadata.pages) and (
+                    metadata.pages[0].width > metadata.pages[0].height
+                )
                 if page_count == len(metadata.pages):
-                    landscape = bool(metadata.pages) and (
-                        metadata.pages[0].width > metadata.pages[0].height
-                    )
                     self._atomic_write_text(
                         working / "kindle_chapter.html",
                         renderer.create_kindle_pdf_page(
@@ -433,8 +433,22 @@ class SSGPublisher:
                     kindle_pdf = True
                 else:
                     shutil.rmtree(working / "kindle_pdf", ignore_errors=True)
+                    # The book page still needs to exist so shelf entries have
+                    # somewhere to explain why this PDF has no Kindle reader.
+                    self._atomic_write_text(
+                        working / "kindle.html",
+                        renderer.create_kindle_pdf_page(
+                            len(metadata.pages),
+                            unsupported=True,
+                            landscape=landscape,
+                        ),
+                    )
             self._validate_pdf_book(
-                working, toc, len(metadata.pages), kindle=kindle_pdf
+                working,
+                toc,
+                len(metadata.pages),
+                kindle=self.config.kindle,
+                kindle_pages=kindle_pdf,
             )
             os.replace(working, destination)
             working = None
@@ -495,6 +509,7 @@ class SSGPublisher:
     @staticmethod
     def _validate_pdf_book(
         directory: Path, toc, page_count: int, *, kindle: bool = False,
+        kindle_pages: bool = False,
     ) -> None:
         expected = [f"chapter_{index}.html" for index in range(page_count)]
         if [item.get("chapter_file") for item in toc] != expected:
@@ -508,11 +523,16 @@ class SSGPublisher:
             if not (directory / name).is_file():
                 raise SSGBuildError(f"PDF output is missing {name}")
         if kindle:
+            # Even when page images cannot be rendered, the book page exists so
+            # the shelf can link to a page that explains the limitation.
+            if not (directory / "kindle.html").is_file():
+                raise SSGBuildError("PDF Kindle output is missing kindle.html")
+        if kindle_pages:
             expected_pages = [
                 f"kindle_pdf/page_{index}.jpg"
                 for index in range(1, page_count + 1)
             ]
-            for name in ("kindle.html", "kindle_chapter.html", *expected_pages):
+            for name in ("kindle_chapter.html", *expected_pages):
                 if not (directory / name).is_file():
                     raise SSGBuildError(f"PDF Kindle output is missing {name}")
 

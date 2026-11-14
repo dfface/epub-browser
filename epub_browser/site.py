@@ -72,28 +72,19 @@ def _kindle_book_row(
         badge_html = (
             f'<span class="k-lib-format" data-i18n="pdfBadge">{badge}</span>'
         )
-        if book.kindle_pdf:
-            # Shelf/catalog entries open the book page (kindle.html); only
-            # "continue reading" jumps straight into the reader at a page.
-            if chapter is None:
-                target = f"/book/{book.book_id}/kindle.html"
-            else:
-                target = f"/book/{book.book_id}/kindle_chapter.html#page-{chapter + 1}"
-            href = html.escape(urls.public(target), quote=True)
-            return (
-                f'{entry}<a href="{href}">{kindle_cover(cover_url)}'
-                f'<span class="k-lib-info"><strong class="k-lib-title">{title}</strong>'
-                f'<span class="k-lib-authors">{authors}</span>{badge_html}'
-                f'</span></a></li>'
-            )
-        # Kindle PDF pages are unavailable (for example encrypted PDFs), so
-        # keep the entry visible but disable navigation.
-        message = html.escape(kindle_message(locale, "pdfUnsupported"))
+        # Shelf/catalog entries open the book page (kindle.html); only
+        # "continue reading" jumps straight into the reader at a page. Books
+        # that cannot be rendered as image pages still open their book page,
+        # which explains why Kindle mode has no reader for them.
+        if chapter is None:
+            target = f"/book/{book.book_id}/kindle.html"
+        else:
+            target = f"/book/{book.book_id}/kindle_chapter.html#page-{chapter + 1}"
+        href = html.escape(urls.public(target), quote=True)
         return (
-            f'{entry}<a class="k-lib-entry" aria-disabled="true">{kindle_cover(cover_url)}'
+            f'{entry}<a href="{href}">{kindle_cover(cover_url)}'
             f'<span class="k-lib-info"><strong class="k-lib-title">{title}</strong>'
             f'<span class="k-lib-authors">{authors}</span>{badge_html}'
-            f'<span class="k-lib-unsupported" data-i18n="pdfUnsupported">{message}</span>'
             f'</span></a></li>'
         )
     filename = "kindle.html" if chapter is None else f"kindle_chapter_{chapter}.html"
@@ -235,20 +226,12 @@ _KINDLE_LOCAL_CATALOG_JS = r"""
       var badge = element('span', 'k-lib-format', kTranslate('pdfBadge'));
       badge.setAttribute('data-i18n', 'pdfBadge');
       info.appendChild(badge);
-      if (book.kindlePdf) {
-        // Shelf/catalog entries open the book page; only "continue
-        // reading" deep links into the reader at the saved page.
-        var pdfPage = chapter === undefined ? 'kindle.html' : 'kindle_chapter.html#page-' + (chapter + 1);
-        link.href = 'book/' + encodeURIComponent(book.hash) + '/' + pdfPage;
-      } else {
-        // Kindle PDF pages are unavailable: show an explicit message
-        // instead of linking to a page that does not exist.
-        link.className = 'k-lib-entry';
-        link.setAttribute('aria-disabled', 'true');
-        var note = element('span', 'k-lib-unsupported', kTranslate('pdfUnsupported'));
-        note.setAttribute('data-i18n', 'pdfUnsupported');
-        info.appendChild(note);
-      }
+      // Shelf/catalog entries open the book page; only "continue
+      // reading" deep links into the reader at the saved page. Books that
+      // cannot be rendered as image pages open the book page too, where the
+      // unsupported notice is shown.
+      var pdfPage = chapter === undefined ? 'kindle.html' : 'kindle_chapter.html#page-' + (chapter + 1);
+      link.href = 'book/' + encodeURIComponent(book.hash) + '/' + pdfPage;
       link.appendChild(info);
       entry.appendChild(link);
       return entry;
@@ -309,8 +292,6 @@ _KINDLE_LOCAL_CATALOG_JS = r"""
           delete pdfSaved[key];
           if (current) {
             if (current.getAttribute('data-format') !== 'pdf') continue;
-            var anchor = current.getElementsByTagName('a')[0];
-            if (!anchor || anchor.getAttribute('aria-disabled') === 'true') continue;
             var pdfCopy = current.cloneNode(true);
             pdfCopy.getElementsByTagName('a')[0].href =
               'book/' + encodeURIComponent(order[j]) + '/kindle_chapter.html#page-' + (page + 1);
@@ -525,7 +506,7 @@ def _kindle_library_locale_script(server_mode):
         "library", "continue", "allBooks", "emptyRecent", "emptyLibrary", "fullLibrary", "theme",
         "search", "noResults", "settings", "fontFamily", "language", "light",
         "sepia", "dark", "bookDefault", "serif", "sans", "pageMode", "tapTurn", "previousPage",
-        "nextPage", "pageOf", "pdfBadge", "pdfUnsupported",
+        "nextPage", "pageOf", "pdfBadge",
     )
     if server_mode:
         keys += (
@@ -696,8 +677,6 @@ body.dark .k-library-tabs a[aria-current]{{background:#eee;color:#111}}
   padding:1px 6px;border-radius:6px;background:#fff}}
 body.sepia #kCatalog .k-lib-format{{background:#f3e9d2}}
 body.dark #kCatalog .k-lib-format{{background:#161616}}
-.k-lib-unsupported{{display:block;margin-top:3px;font-size:.8em;font-style:italic;opacity:.85}}
-#kCatalog .k-lib-unsupported{{overflow:hidden;height:2.6em;line-height:1.3}}
 .k-shelf-group-name{{display:block;margin:15px 0 2px;font-weight:bold}}
 .k-shelf-list ul{{padding-left:12px;border-left:1px solid #888}}
 .k-shelf-list a,#kRecent a{{overflow:hidden;padding:10px 0;min-height:44px;border-bottom:1px solid #888}}

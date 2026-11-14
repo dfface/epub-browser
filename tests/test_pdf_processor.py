@@ -4,6 +4,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 from unittest.mock import patch, PropertyMock
@@ -23,6 +24,7 @@ from epub_browser.pdf_processor import (
     inspect_pdf,
     pdf_kindle_supported,
     render_pdf_cover,
+    render_pdf_kindle_page,
 )
 
 
@@ -381,6 +383,43 @@ class PDFProcessorTests(unittest.TestCase):
         self.assertFalse(
             pdf_kindle_supported(self.directory / "missing.pdf")
         )
+
+    def test_kindle_page_images_render_safely_from_parallel_threads(self):
+        # The Server answers page-image requests from worker threads, and
+        # PDFium is not thread-safe; rendering must be serialized so a burst of
+        # concurrent requests does not fail with "Unable to render PDF page".
+        page_count = 6
+        source = self.fixture_pdf(
+            page_sizes=tuple((200, 400) for _ in range(page_count)),
+            text_pages=tuple(range(page_count)),
+        )
+        destination = self.directory / "pages"
+        barrier = threading.Barrier(page_count)
+        errors = []
+
+        def render(page_number):
+            barrier.wait()
+            try:
+                render_pdf_kindle_page(
+                    source, page_number, destination / f"page_{page_number}.jpg"
+                )
+            except PDFProcessingError as error:
+                errors.append(error)
+
+        threads = [
+            threading.Thread(target=render, args=(page_number,))
+            for page_number in range(1, page_count + 1)
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(errors, [])
+        for page_number in range(1, page_count + 1):
+            image = destination / f"page_{page_number}.jpg"
+            self.assertTrue(image.is_file())
+            self.assertTrue(image.read_bytes().startswith(b"\xff\xd8"))
 
     def test_inspect_pdf_rejects_a_missing_signature_with_a_stable_error(self):
         source = self.directory / "not-a-document.pdf"
