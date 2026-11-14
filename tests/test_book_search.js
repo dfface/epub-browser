@@ -186,3 +186,53 @@ test('rangeForText collapses rendered whitespace and recovers stale offsets by c
   assert.deepEqual(range.end, { node: match, offset: 5 });
   assert.equal(api.rangeForText(section, { start: 0, end: 5, match: 'nope' }), null);
 });
+
+test('Ctrl/Cmd+K opens the book search dialog and focuses the query input', () => {
+  const listeners = {};
+  function makeElement() {
+    return {
+      hidden: false,
+      attributes: {},
+      focused: false,
+      selected: false,
+      addEventListener() {},
+      setAttribute(name, value) { this.attributes[name] = String(value); },
+      removeAttribute(name) { delete this.attributes[name]; },
+      hasAttribute(name) { return Object.prototype.hasOwnProperty.call(this.attributes, name); },
+      focus() { this.focused = true; },
+      select() { this.selected = true; },
+    };
+  }
+  const form = makeElement();
+  const input = makeElement();
+  input.value = '';
+  const modal = makeElement();
+  modal.hidden = true;
+  const toggle = makeElement();
+  const close = makeElement();
+  const elements = {
+    bookSearchForm: form,
+    bookSearchInput: input,
+    bookSearchModal: modal,
+    bookSearchToggle: toggle,
+    bookSearchClose: close,
+  };
+  const document = {
+    readyState: 'complete',
+    addEventListener(type, listener) { (listeners[type] = listeners[type] || []).push(listener); },
+    getElementById(id) { return elements[id] || null; },
+    createElement: makeElement,
+    querySelector() { return null; },
+  };
+  loadAsset({ document, window: { document } });
+
+  let prevented = false;
+  listeners.keydown.forEach(listener => listener({
+    key: 'k', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false,
+    defaultPrevented: false, preventDefault() { prevented = true; },
+  }));
+
+  assert.equal(prevented, true);
+  assert.equal(modal.hidden, false);
+  assert.equal(input.focused, true);
+});

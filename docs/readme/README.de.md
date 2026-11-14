@@ -588,6 +588,7 @@ Das Image führt den dauerhaften Server-Modus mit folgenden Standardeinstellunge
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 Da eingebettete Identitäten EPUB- oder PDF-Dateien ändern können, binde die Bibliothek mit Lese- und Schreibzugriff ein. Binde den Server-Zustand ebenfalls mit Lese- und Schreibzugriff ein und bewahre ihn beim Austausch des Containers:
 

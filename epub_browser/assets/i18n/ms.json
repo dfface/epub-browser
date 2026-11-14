@@ -967,6 +967,7 @@
   "settings.arrowKeyNavigation": "Gunakan kekunci anak panah kiri dan kanan untuk menavigasi",
   "settings.spaceKeyNavigation": "Gunakan Space untuk halaman atau bab seterusnya",
   "reader.locateCurrentChapter": "Cari bab semasa",
+  "reader.locateCurrentSection": "Cari bahagian semasa",
   "annotations.addImageNote": "Tambah nota imej",
   "annotations.imageNote": "Nota imej",
   "annotations.showMoreColors": "Tunjukkan {count} warna lagi",

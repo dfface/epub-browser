@@ -967,6 +967,7 @@
   "settings.arrowKeyNavigation": "नेविगेट करने के लिए बाएँ और दाएँ तीर कुंजी इस्तेमाल करें",
   "settings.spaceKeyNavigation": "अगले पृष्ठ या अध्याय के लिए स्पेस इस्तेमाल करें",
   "reader.locateCurrentChapter": "वर्तमान अध्याय खोजें",
+  "reader.locateCurrentSection": "वर्तमान अनुभाग खोजें",
   "annotations.addImageNote": "चित्र नोट जोड़ें",
   "annotations.imageNote": "चित्र नोट",
   "annotations.showMoreColors": "{count} और रंग दिखाएँ",

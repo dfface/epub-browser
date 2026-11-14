@@ -559,6 +559,7 @@ Server는 직접 연결된 피어가 이 CIDR 중 하나에 속하는 요청의 
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 embedded ID 저장 방식은 EPUB 또는 PDF 파일을 업데이트할 수 있으므로 라이브러리를 읽기/쓰기 가능으로 마운트하세요.
 Server 상태도 읽기/쓰기 가능으로 마운트하고 컨테이너를 교체한 후에도 유지하세요.

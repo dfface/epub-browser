@@ -259,22 +259,37 @@ def query_book_search_index(
                 f"WHERE chapter_index IN ({placeholders}) ORDER BY chapter_index",
                 candidates,
             )
-        results = []
+        # First pass: count every hit and remember only the ones that land on
+        # the requested page.  UTF-16 offset tables are not built here, so
+        # chapters without page hits never pay that cost.
+        page_hits: list[tuple[int, str, str, int, int]] = []
         total = 0
         for chapter_index, title, text in rows:
-            utf16, _ = _utf16_offsets(text)
             for start, end in _chapter_hits(text, folded_query):
                 if start_at <= total < stop_at:
-                    results.append({
-                        "chapter_index": int(chapter_index),
-                        "chapter_title": title,
-                        "start_offset": utf16[start],
-                        "end_offset": utf16[end],
-                        "before": _trimmed_before(text, start),
-                        "match": text[start:end],
-                        "after": _trimmed_after(text, end),
-                    })
+                    page_hits.append((int(chapter_index), title, text, start, end))
                 total += 1
+        # Second pass: build UTF-16 offset tables only for chapters that
+        # actually contribute to the requested page, then assemble results in
+        # the same reading order they were discovered.
+        offsets: dict[int, list[int]] = {}
+        for chapter_index, title, text, start, end in page_hits:
+            table = offsets.get(chapter_index)
+            if table is None:
+                table, _ = _utf16_offsets(text)
+                offsets[chapter_index] = table
+        results = []
+        for chapter_index, title, text, start, end in page_hits:
+            table = offsets[chapter_index]
+            results.append({
+                "chapter_index": chapter_index,
+                "chapter_title": title,
+                "start_offset": table[start],
+                "end_offset": table[end],
+                "before": _trimmed_before(text, start),
+                "match": text[start:end],
+                "after": _trimmed_after(text, end),
+            })
         return _search_page(results, total, page)
     finally:
         connection.close()

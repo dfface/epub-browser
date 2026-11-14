@@ -11,6 +11,7 @@
   var runtimeKey = '';
   var activeNodes = new Set();
   var searchGeneration = 0;
+  var MAX_TEXT_CACHE_CHARS = 5 * 1024 * 1024;
 
   function translate(key, params) {
     var i18n = root.EpubBrowserI18n;
@@ -139,7 +140,8 @@
         document: null,
         users: new Set(),
         releaseToken: null,
-        destroyed: false
+        destroyed: false,
+        textCache: null
       };
       task.onPassword = function(updatePassword) {
         var password = root.prompt(translate('pdf.passwordRequired'));
@@ -172,6 +174,40 @@
         if (entry.releaseToken === token && entry.users.size === 0) destroyEntry(entry);
       });
     });
+  }
+
+  function ensureTextCache(entry) {
+    if (!entry.textCache) {
+      entry.textCache = { map: new Map(), chars: 0 };
+    }
+    return entry.textCache;
+  }
+
+  function getCachedPageText(entry, pageNumber) {
+    var cache = entry.textCache;
+    if (!cache) return undefined;
+    var text = cache.map.get(pageNumber);
+    if (text === undefined) return undefined;
+    // Mark as most recently used for LRU eviction.
+    cache.map.delete(pageNumber);
+    cache.map.set(pageNumber, text);
+    return text;
+  }
+
+  function setCachedPageText(entry, pageNumber, text) {
+    var cache = ensureTextCache(entry);
+    if (cache.map.has(pageNumber)) {
+      cache.chars -= cache.map.get(pageNumber).length;
+      cache.map.delete(pageNumber);
+    }
+    cache.chars += text.length;
+    cache.map.set(pageNumber, text);
+    // Evict oldest entries until the cache fits the bound, keeping at least one.
+    while (cache.chars > MAX_TEXT_CACHE_CHARS && cache.map.size > 1) {
+      var oldestKey = cache.map.keys().next().value;
+      cache.chars -= cache.map.get(oldestKey).length;
+      cache.map.delete(oldestKey);
+    }
   }
 
   function nodesWithin(rootNode) {
@@ -557,10 +593,14 @@
       var pdfDocument = await entry.promise;
       var results = [];
       for (var pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
-        var page = await pdfDocument.getPage(pageNumber);
-        var textContent = await page.getTextContent();
-        if (generation !== searchGeneration) return [];
-        var text = (textContent.items || []).map(function(item) { return item.str || ''; }).join(' ').replace(/\s+/g, ' ').trim();
+        var text = getCachedPageText(entry, pageNumber);
+        if (text === undefined) {
+          var page = await pdfDocument.getPage(pageNumber);
+          var textContent = await page.getTextContent();
+          if (generation !== searchGeneration) return [];
+          text = (textContent.items || []).map(function(item) { return item.str || ''; }).join(' ').replace(/\s+/g, ' ').trim();
+          setCachedPageText(entry, pageNumber, text);
+        }
         var position = text.toLocaleLowerCase().indexOf(needle);
         if (position !== -1) {
           results.push({

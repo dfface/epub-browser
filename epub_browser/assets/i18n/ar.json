@@ -967,6 +967,7 @@
   "settings.arrowKeyNavigation": "استخدام مفتاحي السهم الأيسر والأيمن للتنقل",
   "settings.spaceKeyNavigation": "استخدام مفتاح المسافة للصفحة أو الفصل التالي",
   "reader.locateCurrentChapter": "تحديد الفصل الحالي",
+  "reader.locateCurrentSection": "تحديد القسم الحالي",
   "annotations.addImageNote": "إضافة ملاحظة للصورة",
   "annotations.imageNote": "ملاحظة الصورة",
   "annotations.showMoreColors": "إظهار {count} ألوان أخرى",

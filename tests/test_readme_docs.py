@@ -202,6 +202,15 @@ class ReadmeDocumentationTests(unittest.TestCase):
             with self.subTest(path=path):
                 self.assertIn("OIDC", text)
 
+    def test_every_readme_documents_docker_kindle_default(self):
+        readmes = [Path("README.md")]
+        readmes.extend(sorted(Path("docs/readme").glob("README.*.md")))
+
+        for path in readmes:
+            text = path.read_text(encoding="utf-8")
+            with self.subTest(path=path):
+                self.assertIn("- `--kindle`", text)
+
     def test_readmes_document_pdf_chapter_mapping(self):
         contracts = {
             Path("README.md"): (

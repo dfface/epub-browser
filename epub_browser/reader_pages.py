@@ -1110,6 +1110,34 @@ def _kindle_i18n_messages(language, tools=None):
     return labels
 
 
+def pdf_page_navigation(pages):
+    """Build the page-derived chapter and TOC lists shared by PDF renderers.
+
+    Both lists depend only on immutable page metadata, so a Server cache may
+    retain them for the lifetime of one published PDF cache generation.
+    """
+    chapters = [
+        {
+            "title": f"Page {page.page_number}",
+            "path": f"chapter_{page.page_number - 1}.html",
+        }
+        for page in pages
+    ]
+    toc = [
+        {
+            "title": f"Page {page.page_number}",
+            "level": 0,
+            "kind": "chapter",
+            "chapter_index": page.page_number - 1,
+            "chapter_file": f"chapter_{page.page_number - 1}.html",
+            "page_label": str(page.page_number),
+            "outline_labels": list(page.outline_labels),
+        }
+        for page in pages
+    ]
+    return chapters, toc
+
+
 class ReaderPageRenderer:
     """Render shared EPUB and PDF pages from book data and deployment settings."""
 
@@ -1152,27 +1180,13 @@ class ReaderPageRenderer:
         asset_manifest: PublishedAssets,
         urls: SiteURLs,
         deployment_mode: str,
+        navigation=None,
     ) -> "ReaderPageRenderer":
         """Adapt PDF page metadata to the shared reader."""
-        chapters = [
-            {
-                "title": f"Page {page.page_number}",
-                "path": f"chapter_{page.page_number - 1}.html",
-            }
-            for page in metadata.pages
-        ]
-        toc = [
-            {
-                "title": f"Page {page.page_number}",
-                "level": 0,
-                "kind": "chapter",
-                "chapter_index": page.page_number - 1,
-                "chapter_file": f"chapter_{page.page_number - 1}.html",
-                "page_label": str(page.page_number),
-                "outline_labels": list(page.outline_labels),
-            }
-            for page in metadata.pages
-        ]
+        if navigation is None:
+            chapters, toc = pdf_page_navigation(metadata.pages)
+        else:
+            chapters, toc = navigation
         return ReaderPageRenderer(
             book_id=book_id,
             metadata=BookMetadata(
@@ -2886,9 +2900,14 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <nav class="toc-floating reader-drawer" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true"{ai_reading_indicators}>
         <div class="toc-header">
             <h3 data-i18n="reader.thisChapterContents">This chapter</h3>
-            <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
-                <i class="fas fa-times"></i>
-            </button>
+            <div class="toc-header-actions">
+                <button class="toc-current-chapter" id="tocLocateCurrent" type="button" aria-label="Locate current section" data-i18n-aria-label="reader.locateCurrentSection">
+                    <i class="fas fa-crosshairs" aria-hidden="true"></i>
+                </button>
+                <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
         </div>
         <ul class="toc-list" id="tocList">
             <!-- 动态生成的目录将放在这里 -->
@@ -3135,6 +3154,10 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
             <i class="fas fa-arrow-up"></i>
             <span class="control-name" data-i18n="reader.top">Top</span>
         </button>
+        <a class="control-btn" id="bookHomeShortcut" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome" title="Open book home" data-i18n-title="reader.openBookHome">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name" data-i18n="reader.openBookHome">Book home</span>
+        </a>
     </div>
 
     <!-- 移动端控件 -->
@@ -3167,6 +3190,10 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
             <i class="fas fa-cog"></i>
             <span data-i18n="reader.settings">Settings</span>
         </button>
+        <a class="control-btn" id="mobileBookHomeShortcut" href="index.html" aria-label="Open book home" title="Open book home" data-i18n-aria-label="reader.openBookHome" data-i18n-title="reader.openBookHome">
+            <i class="fas fa-book-open"></i>
+            <span data-i18n="reader.openBookHome">Book home</span>
+        </a>
         <button class="control-btn" id="mobileTopBtn" type="button" aria-label="Top" title="Top" data-i18n-aria-label="reader.top" data-i18n-title="reader.top">
             <i class="fas fa-arrow-up"></i>
             <span data-i18n="reader.top">Top</span>

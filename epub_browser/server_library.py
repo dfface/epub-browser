@@ -222,6 +222,10 @@ class ServerLibraryManager:
         self._cache_readers = Counter()
         self._cache_needs_trim = False
         self._restoring_books = set()
+        # Cache validity results are reused for the duration of one reconcile so
+        # that publishing after every conversion does not revalidate the books
+        # that finished earlier in the same batch.
+        self._reconcile_cache_validity: Optional[dict[str, bool]] = None
         self._reconcile_lock = threading.Lock()
         self._commit_lock = threading.Lock()
         self._stop_event = threading.Event()
@@ -281,7 +285,7 @@ class ServerLibraryManager:
             if self._stop_event.is_set():
                 return self._stopped_summary()
             self._notify_callback(self.on_reconcile_started)
-        with self._reconcile_lock:
+        with self._reconcile_lock, self._reconcile_cache_validation():
             if self._stop_event.is_set():
                 return self._stopped_summary()
             self.progress_broker.start_generation(trigger)
@@ -1028,6 +1032,7 @@ class ServerLibraryManager:
                 else:
                     if rollback.exists():
                         shutil.rmtree(rollback, ignore_errors=True)
+                    self._remember_cache_validity(plan.record.book_id)
                     return updated
         finally:
             cleanup = getattr(processor, "cleanup", None)
@@ -1135,6 +1140,7 @@ class ServerLibraryManager:
             else:
                 if rollback.exists():
                     shutil.rmtree(rollback, ignore_errors=True)
+                self._remember_cache_validity(plan.record.book_id)
                 return updated
 
     def _validate_pdf_cache(
@@ -1371,7 +1377,36 @@ class ServerLibraryManager:
                 f"converted book is missing cover {converted.metadata.cover}"
             )
 
+    @contextmanager
+    def _reconcile_cache_validation(self):
+        """Reuse one cache validation per book for the whole reconcile."""
+        previous = self._reconcile_cache_validity
+        self._reconcile_cache_validity = {}
+        try:
+            yield
+        finally:
+            self._reconcile_cache_validity = previous
+
+    def _remember_cache_validity(self, book_id: str, valid: bool = True) -> None:
+        validity = self._reconcile_cache_validity
+        if validity is not None:
+            validity[book_id] = valid
+
+    def _forget_cache_validity(self, book_id: str) -> None:
+        validity = self._reconcile_cache_validity
+        if validity is not None:
+            validity.pop(book_id, None)
+
     def _book_available(self, record: BookRecord) -> bool:
+        validity = self._reconcile_cache_validity
+        if validity is not None and record.book_id in validity:
+            return validity[record.book_id]
+        available = self._book_available_from_disk(record)
+        if validity is not None:
+            validity[record.book_id] = available
+        return available
+
+    def _book_available_from_disk(self, record: BookRecord) -> bool:
         directory = self.public_dir / "book" / record.book_id
         revision = PDF_OUTPUT_REVISION if record.source_format == PDF_FORMAT else SERVER_OUTPUT_REVISION
         try:
@@ -1499,6 +1534,7 @@ class ServerLibraryManager:
             except OSError:
                 os.replace(previous, directory)
                 raise
+            self._remember_cache_validity(record.book_id)
         finally:
             shutil.rmtree(cold, ignore_errors=True)
         # Lazily rendered Kindle PDF pages are derived cache: they follow the
@@ -1606,6 +1642,7 @@ class ServerLibraryManager:
         return not cover or (directory / cover).is_file()
 
     def _invalidate_public_output(self, record: BookRecord) -> None:
+        self._forget_cache_validity(record.book_id)
         directory = self.public_dir / "book" / record.book_id
         marker = (
             PDF_OUTPUT_REVISION_FILE

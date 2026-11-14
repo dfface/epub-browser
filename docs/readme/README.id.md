@@ -558,6 +558,7 @@ Image menjalankan mode Server persisten dengan default berikut:
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 Karena identitas embedded dapat memperbarui berkas EPUB atau PDF, mount perpustakaan sebagai baca-tulis. Mount state Server sebagai baca-tulis dan pertahankan saat mengganti container:
 

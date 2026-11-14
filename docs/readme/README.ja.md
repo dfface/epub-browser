@@ -563,6 +563,7 @@ epub-browser server /path/to/books \
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 embedded モードでは EPUB または PDF ファイルを更新する場合があるため、ライブラリーは読み書き可能でマウントしてください。
 Server 状態も読み書き可能でマウントし、コンテナーを置き換えても保持してください。

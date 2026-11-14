@@ -42,6 +42,8 @@ function element(tagName) {
       return findAll(this, selector)[0] || null;
     },
     querySelectorAll(selector) { return findAll(this, selector); },
+    focus() { this.focused = true; },
+    select() { this.selected = true; },
   };
   node.classList = {
     add(name) {
@@ -220,6 +222,7 @@ function createLibraryHarness(responses, mode = 'server') {
     pendingResponseCount() { return pendingResponses.length; },
     tagCloudToggle,
     resize() { (windowListeners.resize || []).forEach((listener) => listener()); },
+    keydown(event) { (windowListeners.keydown || []).forEach((listener) => listener(event)); },
     flushAnimationFrame() {
       const callback = animationFrames.shift();
       if (callback) callback();
@@ -358,6 +361,21 @@ test('pages through the sorted catalogue and searches across pages', () => {
   harness.searchBox.dispatch('input');
   assert.deepEqual(harness.cardIds(), ['book-24']);
   assert.equal(harness.pager.hidden, true);
+});
+
+test('Ctrl/Cmd+K focuses the library search box', () => {
+  const harness = createLibraryHarness([[]]);
+  harness.window.initScriptLibrary();
+
+  let prevented = false;
+  harness.keydown({
+    key: 'k', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false,
+    defaultPrevented: false, preventDefault() { prevented = true; },
+  });
+
+  assert.equal(prevented, true);
+  assert.equal(harness.searchBox.focused, true);
+  assert.equal(harness.searchBox.selected, true);
 });
 
 test('sizes each page from the rendered grid columns so every row stays complete', () => {

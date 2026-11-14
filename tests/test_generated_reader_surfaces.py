@@ -163,6 +163,15 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             self.assertIn('chapterPrefetch.afterChapterRendered(', chapter_js)
             self.assertIn('chapterPrefetch.take(', chapter_js)
 
+            for markup in (epub_html, pdf_html):
+                self.assertIn('id="tocLocateCurrent"', markup)
+                self.assertIn(
+                    'data-i18n-aria-label="reader.locateCurrentSection"', markup,
+                )
+                self.assertIn('id="bookHomeShortcut"', markup)
+                self.assertIn('id="mobileBookHomeShortcut"', markup)
+                self.assertIn('href="index.html"', markup)
+
     def test_prefetched_navigation_invalidates_in_flight_chapter_requests(self):
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         start = script.index('function navigateReaderChapter(')
@@ -2487,7 +2496,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
 
         toc_start = script.index('function generateToc() {')
-        toc_end = script.index('\n    function updateTocHighlight()', toc_start)
+        toc_end = script.index('\n    function updateTocHighlight(', toc_start)
         toc = script[toc_start:toc_end]
         pagination_start = toc.index('if (isPaginationMode) {')
         pagination_end = toc.index('\n                } else {', pagination_start)
@@ -3132,11 +3141,11 @@ assert.deepEqual(
         self.assertIn("env(safe-area-inset-bottom)", chapter_mobile)
         self.assertRegex(
             chapter_mobile,
-            r"\.mobile-controls\s+#mobileTopBtn\s*\{\s*display:\s*none;",
+            r"\.mobile-controls\s+#mobileTopBtn,\s*\.mobile-controls\s+#mobileBookHomeShortcut\s*\{\s*display:\s*none;",
         )
         self.assertRegex(
             chapter_mobile,
-            r"\.mobile-controls\s+#mobileTopBtn\.is-visible\s*\{\s*display:\s*flex;",
+            r"\.mobile-controls\s+#mobileTopBtn\.is-visible,\s*\.mobile-controls\s+#mobileBookHomeShortcut\.is-visible\s*\{\s*display:\s*flex;",
         )
 
         chapter_script = Path("epub_browser/assets/chapter.js").read_text(
@@ -3144,6 +3153,10 @@ assert.deepEqual(
         )
         self.assertIn("mobileTopBtn.classList.add('is-visible')", chapter_script)
         self.assertIn("mobileTopBtn.classList.remove('is-visible')", chapter_script)
+        self.assertIn(
+            "mobileBookHomeShortcut.classList.toggle('is-visible', visible)",
+            chapter_script,
+        )
 
         chapter_html = self._chapter_html()
         self.assertNotIn('id="mobileAIReadingBtn"', chapter_html)
@@ -4109,6 +4122,11 @@ assert.deepEqual(
         css = Path('epub_browser/assets/breadcrumb.css').read_text(encoding='utf-8')
         self.assertIn('opacity: 0;', css)
         self.assertIn('#scrollToTopBtn.is-visible', css)
+        self.assertIn('#bookHomeShortcut.is-visible', css)
+        self.assertIn(
+            'transform: translateY(10px);',
+            css[css.index('#bookHomeShortcut {'):],
+        )
         for asset in ('library.js', 'book.js', 'chapter.js'):
             script = Path('epub_browser/assets', asset).read_text(encoding='utf-8')
             self.assertIn('function updateScrollToTopVisibility()', script)

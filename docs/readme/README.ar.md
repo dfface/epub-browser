@@ -590,6 +590,7 @@ epub-browser server /path/to/books \
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 لأن الهوية المضمّنة قد تحدّث ملفات EPUB أو PDF، اربط المكتبة للقراءة والكتابة. اربط حالة
 Server للقراءة والكتابة واحتفظ بها عبر استبدال الحاوية:

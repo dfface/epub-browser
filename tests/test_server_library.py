@@ -42,7 +42,11 @@ from epub_browser.reporting import Reporter
 from epub_browser.server import create_app
 from epub_browser.server_library import ServerLibraryManager
 from epub_browser.reader_pages import ReaderPageRenderer
-from epub_browser.server_pages import ServerPageRenderer
+from epub_browser.server_pages import (
+    ServerPageError,
+    ServerPageRenderer,
+    _clear_pdf_derived_cache,
+)
 from epub_browser.sidecar_identity import read_exact_sidecar, sidecar_path_for
 from epub_browser.state import StateStore
 
@@ -625,6 +629,140 @@ class ServerLibraryManagerTests(unittest.TestCase):
         self.assertEqual(rendered, "<html>fresh-pdf-ui</html>")
         manager.shutdown()
 
+    def test_pdf_chapter_requests_reuse_derived_metadata_per_cache_generation(self):
+        self.source.unlink()
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, pages=3)
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        record = manager.reconcile().active_books[0]
+        metadata_path = manager.public_dir / "book" / record.book_id / "pdf" / "metadata.json"
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        payload["pages"][0]["outline_labels"] = ["Cover"]
+        metadata_path.write_text(json.dumps(payload), encoding="utf-8")
+        _clear_pdf_derived_cache()
+        reads = []
+        original_read_json = ServerPageRenderer._read_json
+
+        def counted_read_json(path):
+            if path.name == "metadata.json" and path.parent.name == "pdf":
+                reads.append(path)
+            return original_read_json(path)
+
+        with mock.patch.object(
+            ServerPageRenderer,
+            "_read_json",
+            side_effect=counted_read_json,
+        ):
+            first_toc = ServerPageRenderer(
+                manager.public_dir, record.book_id, source_format="pdf"
+            ).toc_bytes()
+            second_toc = ServerPageRenderer(
+                manager.public_dir, record.book_id, source_format="pdf"
+            ).toc_bytes()
+            chapter_markup = ServerPageRenderer(
+                manager.public_dir, record.book_id, source_format="pdf"
+            ).render_pdf_chapter(1)
+
+        self.assertEqual(len(reads), 1)
+        self.assertEqual(first_toc, second_toc)
+        self.assertIn("Cover", json.loads(first_toc)[0]["outline_labels"])
+        self.assertIn('data-pdf-page-number="2"', chapter_markup)
+
+    def test_pdf_managed_metadata_overrides_stay_request_scoped(self):
+        self.source.unlink()
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, pages=1)
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        record = manager.reconcile().active_books[0]
+        _clear_pdf_derived_cache()
+
+        first = ServerPageRenderer(
+            manager.public_dir,
+            record.book_id,
+            source_format="pdf",
+            metadata_overrides={
+                "title": "Managed first",
+                "authors": ["First author"],
+                "tags": ["first"],
+            },
+        ).render_pdf_chapter(0)
+        second = ServerPageRenderer(
+            manager.public_dir,
+            record.book_id,
+            source_format="pdf",
+            metadata_overrides={
+                "title": "Managed second",
+                "authors": ["Second author"],
+                "tags": ["second"],
+            },
+        ).render_pdf_chapter(0)
+
+        self.assertIn("<title>Page 1 - Managed first</title>", first)
+        self.assertIn("<title>Page 1 - Managed second</title>", second)
+        self.assertNotIn("Managed first", second)
+
+    def test_pdf_derived_metadata_follows_source_replacement_and_page_bounds(self):
+        self.source.unlink()
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, pages=2)
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        first = manager.reconcile().active_books[0]
+        _clear_pdf_derived_cache()
+        ServerPageRenderer(
+            manager.public_dir, first.book_id, source_format="pdf"
+        ).render_pdf_chapter(1)
+        with self.assertRaises(ServerPageError):
+            ServerPageRenderer(
+                manager.public_dir, first.book_id, source_format="pdf"
+            ).render_pdf_chapter(2)
+
+        self._write_pdf(pdf_source, pages=3)
+        replaced = manager.reconcile().active_books[0]
+
+        self.assertEqual(replaced.book_id, first.book_id)
+        markup = ServerPageRenderer(
+            manager.public_dir, replaced.book_id, source_format="pdf"
+        ).render_pdf_chapter(2)
+        self.assertIn('data-pdf-page-number="3"', markup)
+        with self.assertRaises(ServerPageError):
+            ServerPageRenderer(
+                manager.public_dir, replaced.book_id, source_format="pdf"
+            ).render_pdf_chapter(3)
+
+    def test_pdf_chapter_renders_after_book_cache_eviction_and_restoration(self):
+        self.source.unlink()
+        first = self.source_dir / "first.pdf"
+        second = self.source_dir / "second.pdf"
+        self._write_pdf(first, title="First")
+        self._write_pdf(second, title="Second")
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        records = manager.reconcile().active_books
+        recent = next(
+            record for record in records
+            if Path(record.source_path) == second.resolve()
+        )
+        cold = next(record for record in records if record.book_id != recent.book_id)
+        self.store.set_reading_progress(
+            self.store.create_user("pdf-derived-cache", None).user_id,
+            recent.book_id,
+            0,
+        )
+        self.store.set_general_settings(book_cache_limit=1)
+        manager.trim_book_cache()
+
+        self.assertTrue(manager.book_cache_is_cold(cold.book_id))
+        _clear_pdf_derived_cache()
+        with manager.book_cache(cold.book_id):
+            markup = ServerPageRenderer(
+                manager.public_dir, cold.book_id, source_format="pdf"
+            ).render_pdf_chapter(0)
+        self.assertFalse(manager.book_cache_is_cold(cold.book_id))
+        self.assertIn('data-pdf-page-number="1"', markup)
+
     def test_v204_embedded_id_migrates_to_sidecar_without_epub_write(self):
         ensure_embedded_book_id(
             self.source, preferred_book_id="v204_embedded_id"
@@ -901,6 +1039,116 @@ class ServerLibraryManagerTests(unittest.TestCase):
         converter.assert_not_called()
         manager.shutdown()
 
+    def test_unchanged_mixed_library_reconcile_validates_each_cache_once(self):
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, pages=2)
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        records = manager.reconcile().active_books
+        self.assertEqual(
+            {record.source_format for record in records},
+            {"epub", "pdf"},
+        )
+        original_cache_valid = manager._cache_valid
+        checks = Counter()
+
+        def counting_cache_valid(record):
+            checks[record.book_id] += 1
+            return original_cache_valid(record)
+
+        manager._cache_valid = counting_cache_valid
+        summary = manager.reconcile()
+
+        self.assertEqual(summary.reused, len(records))
+        self.assertEqual(
+            dict(checks),
+            {record.book_id: 1 for record in records},
+        )
+
+    def test_changed_cache_is_revalidated_only_for_that_book(self):
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, title="First", pages=2)
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        records = {
+            record.source_format: record
+            for record in manager.reconcile().active_books
+        }
+        original_cache_valid = manager._cache_valid
+        checks = Counter()
+
+        def counting_cache_valid(record):
+            checks[record.book_id] += 1
+            return original_cache_valid(record)
+
+        manager._cache_valid = counting_cache_valid
+        self._write_pdf(pdf_source, title="Second", pages=3)
+        summary = manager.reconcile()
+
+        self.assertEqual(summary.converted, 1)
+        self.assertEqual(
+            [record.book_id for record in summary.active_books].count(
+                records["pdf"].book_id
+            ),
+            1,
+        )
+        self.assertEqual(checks[records["epub"].book_id], 1)
+        self.assertLessEqual(checks[records["pdf"].book_id], 2)
+        book_root = manager.public_dir / "book" / records["pdf"].book_id
+        payload = json.loads(
+            (book_root / "pdf" / "metadata.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(payload["title"], "Second")
+        self.assertEqual(payload["page_count"], 3)
+
+    def test_evicted_cache_rescan_uses_marker_without_revalidation(self):
+        self.source.unlink()
+        first = self.source_dir / "first.pdf"
+        second = self.source_dir / "second.pdf"
+        self._write_pdf(first, title="First")
+        self._write_pdf(second, title="Second")
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        records = manager.reconcile().active_books
+        self.store.set_general_settings(book_cache_limit=1)
+        manager.trim_book_cache()
+        cold = next(
+            record for record in records if manager.book_cache_is_cold(record.book_id)
+        )
+        warm = next(record for record in records if record.book_id != cold.book_id)
+        original_cache_valid = manager._cache_valid
+        checks = Counter()
+
+        def counting_cache_valid(record):
+            checks[record.book_id] += 1
+            return original_cache_valid(record)
+
+        manager._cache_valid = counting_cache_valid
+        summary = manager.reconcile()
+
+        self.assertEqual(summary.reused, 2)
+        self.assertEqual({record.book_id for record in summary.active_books}, {
+            record.book_id for record in records
+        })
+        self.assertNotIn(cold.book_id, checks)
+        self.assertEqual(checks[warm.book_id], 1)
+        self.assertTrue(manager.book_cache_is_cold(cold.book_id))
+
+    def test_missing_epub_chapter_cache_is_detected_and_rebuilt(self):
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        record = manager.reconcile().active_books[0]
+        chapter = (
+            manager.public_dir / "book" / record.book_id
+            / "content" / "chapter_0.json"
+        )
+        chapter.unlink()
+
+        rebuilt = manager.reconcile()
+
+        self.assertEqual(rebuilt.converted, 1)
+        self.assertTrue(chapter.is_file())
+
     def test_reconcile_upgrades_unchanged_legacy_generated_output(self):
         manager = self._manager()
         record = manager.reconcile().active_books[0]
@@ -1137,19 +1385,19 @@ class ServerLibraryManagerTests(unittest.TestCase):
         )
         reuse_checked = threading.Event()
         release_reuse = threading.Event()
-        original_cache_valid = manager._cache_valid
-        cache_checks = 0
+        original_book_available = manager._book_available
+        availability_checks = 0
 
         def pause_after_reuse_check(record):
-            nonlocal cache_checks
-            valid = original_cache_valid(record)
-            cache_checks += 1
-            if cache_checks == 2:
+            nonlocal availability_checks
+            available = original_book_available(record)
+            availability_checks += 1
+            if availability_checks == 2:
                 reuse_checked.set()
                 release_reuse.wait(timeout=5)
-            return valid
+            return available
 
-        manager._cache_valid = pause_after_reuse_check
+        manager._book_available = pause_after_reuse_check
         result = []
         reconcile_thread = threading.Thread(
             target=lambda: result.append(manager.reconcile()),

@@ -967,7 +967,27 @@
             if (!this.keyboardBound && typeof document.addEventListener === 'function') {
                 var self = this;
                 document.addEventListener('keydown', function(event) {
-                    if (event.key === 'Escape' && self.activeDialog) self.cancelPendingDraft();
+                    if (event.key === 'Escape') {
+                        if (self.activeDialog) self.cancelPendingDraft();
+                        return;
+                    }
+                    // The highlighter clears the browser range as soon as it
+                    // captures a selection, so Ctrl/Cmd+C has nothing native
+                    // left to copy. Reuse the draft text shown in the menu.
+                    if (event.defaultPrevented) return;
+                    if (!self.pendingDraft || !self.pendingDraft.source || !self.pendingDraft.source.text) return;
+                    var dialog = self.activeDialog;
+                    if (!dialog || String(dialog.className || '').indexOf('annotation-selection-menu') === -1) return;
+                    if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+                    if (String(event.key || '').toLowerCase() !== 'c') return;
+                    var target = event.target;
+                    if (target && (target.isContentEditable ||
+                        /^(INPUT|TEXTAREA|SELECT)$/.test(String(target.tagName || '').toUpperCase()))) return;
+                    event.preventDefault();
+                    Utils.copyText(self.pendingDraft.source.text).catch(function() {
+                        Utils.showNotification(tr('unableToCopy'), 'error');
+                    });
+                    self.cancelPendingDraft();
                 });
                 this.keyboardBound = true;
             }

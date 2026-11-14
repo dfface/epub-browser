@@ -403,11 +403,7 @@ body.reader-drawer-open .reader-toolbar.top-controls {
     border: 0;
 }
 
-/* Global floating action: only reveal scroll-to-top after meaningful scrolling. */
-.reading-controls {
-    gap: 0;
-}
-
+/* Global floating actions: only reveal them after meaningful scrolling. */
 .reading-controls #scrollToTopBtn {
     width: 46px;
     height: 46px;
@@ -436,7 +432,37 @@ body.reader-drawer-open .reader-toolbar.top-controls {
     transform: translateY(-2px);
 }
 
-.reading-controls #scrollToTopBtn .control-name {
+/* Direct book-home shortcut below the top button; revealed with it. */
+.reading-controls #bookHomeShortcut {
+    width: 46px;
+    height: 46px;
+    border: 1px solid color-mix(in srgb, var(--button-bg) 22%, var(--border));
+    border-radius: 14px;
+    background: color-mix(in srgb, var(--card-bg) 94%, var(--button-bg));
+    box-shadow: var(--shadow-md);
+    color: var(--button-bg);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(10px);
+    transition: opacity 160ms ease, visibility 160ms ease, transform 160ms ease, background-color 160ms ease, color 160ms ease;
+}
+
+.reading-controls #bookHomeShortcut.is-visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.reading-controls #bookHomeShortcut:hover {
+    background: var(--button-bg);
+    color: var(--button-text);
+    transform: translateY(-2px);
+}
+
+.reading-controls #scrollToTopBtn .control-name,
+.reading-controls #bookHomeShortcut .control-name {
     position: absolute;
     width: 1px;
     height: 1px;

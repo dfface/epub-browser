@@ -967,6 +967,7 @@
   "settings.arrowKeyNavigation": "Utiliser les flèches gauche et droite pour naviguer",
   "settings.spaceKeyNavigation": "Utiliser Espace pour passer à la page ou au chapitre suivant",
   "reader.locateCurrentChapter": "Repérer le chapitre actuel",
+  "reader.locateCurrentSection": "Repérer la section actuelle",
   "annotations.addImageNote": "Ajouter une note à l’image",
   "annotations.imageNote": "Note d’image",
   "annotations.showMoreColors": "Afficher {count} couleurs supplémentaires",

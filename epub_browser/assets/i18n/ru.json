@@ -967,6 +967,7 @@
   "settings.arrowKeyNavigation": "Использовать стрелки влево и вправо для навигации",
   "settings.spaceKeyNavigation": "Использовать Пробел для перехода к следующей странице или главе",
   "reader.locateCurrentChapter": "Найти текущую главу",
+  "reader.locateCurrentSection": "Найти текущий раздел",
   "annotations.addImageNote": "Добавить заметку к изображению",
   "annotations.imageNote": "Заметка к изображению",
   "annotations.showMoreColors": "Показать ещё {count} цветов",
