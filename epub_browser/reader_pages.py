@@ -799,6 +799,34 @@ def _kindle_i18n_messages(language, tools=None):
     return labels
 
 
+def pdf_page_navigation(pages):
+    """Build the page-derived chapter and TOC lists shared by PDF renderers.
+
+    Both lists depend only on immutable page metadata, so a Server cache may
+    retain them for the lifetime of one published PDF cache generation.
+    """
+    chapters = [
+        {
+            "title": f"Page {page.page_number}",
+            "path": f"chapter_{page.page_number - 1}.html",
+        }
+        for page in pages
+    ]
+    toc = [
+        {
+            "title": f"Page {page.page_number}",
+            "level": 0,
+            "kind": "chapter",
+            "chapter_index": page.page_number - 1,
+            "chapter_file": f"chapter_{page.page_number - 1}.html",
+            "page_label": str(page.page_number),
+            "outline_labels": list(page.outline_labels),
+        }
+        for page in pages
+    ]
+    return chapters, toc
+
+
 class ReaderPageRenderer:
     """Render shared EPUB and PDF pages from book data and deployment settings."""
 
@@ -841,27 +869,13 @@ class ReaderPageRenderer:
         asset_manifest: PublishedAssets,
         urls: SiteURLs,
         deployment_mode: str,
+        navigation=None,
     ) -> "ReaderPageRenderer":
         """Adapt PDF page metadata to the shared reader."""
-        chapters = [
-            {
-                "title": f"Page {page.page_number}",
-                "path": f"chapter_{page.page_number - 1}.html",
-            }
-            for page in metadata.pages
-        ]
-        toc = [
-            {
-                "title": f"Page {page.page_number}",
-                "level": 0,
-                "kind": "chapter",
-                "chapter_index": page.page_number - 1,
-                "chapter_file": f"chapter_{page.page_number - 1}.html",
-                "page_label": str(page.page_number),
-                "outline_labels": list(page.outline_labels),
-            }
-            for page in metadata.pages
-        ]
+        if navigation is None:
+            chapters, toc = pdf_page_navigation(metadata.pages)
+        else:
+            chapters, toc = navigation
         return ReaderPageRenderer(
             book_id=book_id,
             metadata=BookMetadata(
