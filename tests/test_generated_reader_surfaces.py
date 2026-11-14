@@ -14,7 +14,7 @@ from pathlib import Path
 
 from epub_browser.asset_publisher import AssetPublisher
 from epub_browser.library import EPUBLibrary
-from epub_browser.models import ConvertedBook
+from epub_browser.models import BookMetadata, ConvertedBook
 from epub_browser.pdf_processor import PDFMetadata, PDFPageMetadata
 from epub_browser.processor import EPUBProcessor, server_book_public_path_allowed
 from epub_browser.reader_pages import ReaderPageRenderer
@@ -85,18 +85,21 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
 
             book_html = processor.render_index()
             self.assertIn('data-id="toc-container"', book_html)
-            self.assertEqual(book_html.count('class="chapter-link"'), 3)
+            # Only outline entries are listed; the three page chapters are not.
+            self.assertEqual(book_html.count('class="chapter-link"'), 1)
             self.assertIn('data-i18n="pdf.page"', book_html)
             self.assertEqual(book_html.count('Opening'), 1)
             self.assertEqual(book_html.count('Part I'), 1)
-            self.assertEqual(book_html.count('class="chapter-outline-labels"'), 1)
+            self.assertNotIn('class="chapter-outline-labels"', book_html)
             self.assertNotIn('— Opening', book_html)
             self.assertIn('>Opening · Part I</span>', book_html)
             self.assertRegex(
                 book_html,
-                r'<span class="chapter-title-with-sync"><span [^>]*class="chapter-title"[^>]*>Page 2</span>'
-                r'<span class="chapter-outline-labels"[^>]*>Opening · Part I</span></span>'
-                r'<span class="chapter-page">chapter_1\.html</span>',
+                r'<a class="chapter-link" href="/reader/book/pdf-book/chapter_1\.html" '
+                r'id="eb_ci_1" data-chapter-index="1">'
+                r'<span class="chapter-title-with-sync"><span class="chapter-title"[^>]*>'
+                r'Opening · Part I</span></span>'
+                r'<span class="chapter-page" data-i18n="pdf\.page"',
             )
             self.assertNotIn('data-ai-reading-hub', book_html)
             self.assertNotIn('data-ai-book-chat', book_html)
@@ -379,6 +382,20 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 ):
                     self.assertNotIn(banned, page)
 
+    def test_kindle_index_without_toc_offers_chapter_jump(self):
+        with tempfile.TemporaryDirectory() as directory:
+            processor = EPUBProcessor('book.epub', directory)
+            processor.book_title = 'Kindle Book'
+            processor.lang = 'en'
+            processor.chapters = [{'title': 'One'}, {'title': 'Two'}]
+            index_html = processor.create_kindle_index_page([])
+        self.assertNotIn('class="k-toc"', index_html)
+        self.assertIn('class="k-toc-empty"', index_html)
+        self.assertIn('data-i18n="noContentsBook"', index_html)
+        self.assertIn('id="kChapterJump"', index_html)
+        self.assertIn('data-i18n-placeholder="goToChapter"', index_html)
+        self.assertIn("kindle_chapter_' + (chapter - 1)", index_html)
+
     def test_kindle_minimal_library_page_is_self_contained_and_es5(self):
         with tempfile.TemporaryDirectory() as directory:
             books = (
@@ -408,6 +425,272 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 "=>", "const ", "let ", "Promise", "classList",
             ):
                 self.assertNotIn(banned, page)
+
+    def test_kindle_library_links_pdf_books_with_image_pages(self):
+        books = (
+            LibraryBook('alpha', 'Alpha Book', ('One Author',), (), None),
+            LibraryBook(
+                'pdf-book', 'PDF Book', ('PDF Author',), (), None,
+                source_format='pdf', kindle_pdf=True,
+            ),
+        )
+        page = render_kindle_library_page(books, SiteURLs())
+        self.assertIn('href="/book/alpha/kindle.html"', page)
+        self.assertIn('data-book="pdf-book"', page)
+        self.assertIn('data-format="pdf"', page)
+        self.assertIn('class="k-lib-format"', page)
+        self.assertIn('href="/book/pdf-book/kindle.html"', page)
+        pdf_row = page.split('data-book="pdf-book"', 1)[1].split('</li>', 1)[0]
+        self.assertIn('href="/book/pdf-book/kindle.html"', pdf_row)
+        self.assertNotIn('aria-disabled', pdf_row)
+        self.assertNotIn('data-i18n="pdfUnsupported"', pdf_row)
+        self.assertNotIn('/assets/', page)
+
+    def test_kindle_library_marks_pdf_books_without_pages_as_unsupported(self):
+        books = (
+            LibraryBook('alpha', 'Alpha Book', ('One Author',), (), None),
+            LibraryBook(
+                'pdf-book', 'PDF Book', ('PDF Author',), (), None,
+                source_format='pdf',
+            ),
+        )
+        page = render_kindle_library_page(books, SiteURLs())
+        self.assertIn('href="/book/alpha/kindle.html"', page)
+        self.assertIn('data-book="pdf-book"', page)
+        self.assertIn('data-format="pdf"', page)
+        self.assertIn('class="k-lib-format"', page)
+        self.assertIn("PDF books can't be opened in Kindle mode yet.", page)
+        self.assertNotIn('/book/pdf-book/kindle', page)
+        # The PDF row is not a navigable link.
+        pdf_row = page.split('data-book="pdf-book"', 1)[1].split('</li>', 1)[0]
+        self.assertNotIn('href=', pdf_row)
+        self.assertIn('aria-disabled="true"', pdf_row)
+        self.assertNotIn('/assets/', page)
+
+    def test_kindle_pdf_page_reader_is_dependency_free_es5(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            metadata = PDFMetadata(
+                title='A PDF', authors=(), tags=(), language='en',
+                pages=(
+                    PDFPageMetadata(1, 612.0, 792.0),
+                    PDFPageMetadata(2, 612.0, 792.0),
+                ),
+                encrypted=False, has_extractable_text=True, cover=None,
+            )
+            renderer = ReaderPageRenderer.from_pdf_metadata(
+                book_id='pdf-book', metadata=metadata, cover_path=None,
+                asset_manifest=assets,
+                urls=SiteURLs(), deployment_mode='ssg',
+            )
+            page = renderer.create_kindle_pdf_page(2)
+            landscape_page = renderer.create_kindle_pdf_page(2, landscape=True)
+        self.assertIn('kindle_pdf/page_', page)
+        self.assertIn("image.src = 'kindle_pdf/page_'", page)
+        self.assertIn('class="k-header k-reader-header"', page)
+        self.assertIn('class="k-reader-footer"', page)
+        self.assertIn('aria-modal="true"', page)
+        self.assertIn('data-i18n="fitPage"', page)
+        self.assertIn('data-i18n-aria-label="goToPage"', page)
+        self.assertIn('role="status"', page)
+        self.assertIn('var kPdfLandscape = true;', landscape_page)
+        self.assertIn('id="kPdfPrev"', page)
+        self.assertIn('id="kPdfNext"', page)
+        self.assertIn('kPdfShow', page)
+        self.assertIn('kindle_pdf_pos_', page)
+        self.assertIn('href="kindle.html"', page)
+        self.assertIn('data-i18n="contents"', page)
+        self.assertIn('data-k-pdf-fit="width"', page)
+        self.assertIn('kPdfZoomStep(-1)', page)
+        self.assertIn('kPdfZoomStep(1)', page)
+        self.assertIn('data-i18n-aria-label="zoomOut"', page)
+        self.assertIn('id="kPdfScaleValue"', page)
+        self.assertNotIn('/assets/', page)
+        for banned in ("=>", "const ", "let ", "Promise", "classList"):
+            self.assertNotIn(banned, page)
+
+    def test_kindle_pdf_toc_page_lists_outline_entries(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            metadata = PDFMetadata(
+                title='A PDF', authors=(), tags=(), language='en',
+                pages=(
+                    PDFPageMetadata(1, 612.0, 792.0, ('Cover',)),
+                    PDFPageMetadata(2, 612.0, 792.0, ('Chapter One', 'Part I')),
+                    PDFPageMetadata(3, 612.0, 792.0),
+                ),
+                encrypted=False, has_extractable_text=True, cover=None,
+            )
+            renderer = ReaderPageRenderer.from_pdf_metadata(
+                book_id='pdf-book', metadata=metadata, cover_path=None,
+                asset_manifest=assets,
+                urls=SiteURLs(), deployment_mode='ssg',
+            )
+            toc = renderer.create_kindle_pdf_toc_page()
+        self.assertIn('href="kindle_chapter.html#page-1"', toc)
+        self.assertIn('href="kindle_chapter.html#page-2"', toc)
+        self.assertNotIn('href="kindle_chapter.html#page-3"', toc)
+        self.assertIn('Chapter One', toc)
+        self.assertIn('Part I', toc)
+        self.assertIn('href="/kindle-library.html"', toc)
+        self.assertIn('data-i18n="contents"', toc)
+        self.assertNotIn('/assets/', toc)
+        for banned in ("=>", "const ", "let ", "Promise", "classList"):
+            self.assertNotIn(banned, toc)
+
+    def test_kindle_pdf_toc_page_without_outline_offers_page_jump(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            metadata = PDFMetadata(
+                title='A PDF', authors=(), tags=(), language='en',
+                pages=(
+                    PDFPageMetadata(1, 612.0, 792.0),
+                    PDFPageMetadata(2, 612.0, 792.0),
+                    PDFPageMetadata(3, 612.0, 792.0),
+                ),
+                encrypted=False, has_extractable_text=True, cover=None,
+            )
+            renderer = ReaderPageRenderer.from_pdf_metadata(
+                book_id='pdf-book', metadata=metadata, cover_path=None,
+                asset_manifest=assets,
+                urls=SiteURLs(), deployment_mode='ssg',
+            )
+            toc = renderer.create_kindle_pdf_toc_page()
+            index = renderer.render_index()
+        self.assertNotIn('data-k-pdf-page=', toc)
+        self.assertIn('class="k-toc-empty"', toc)
+        self.assertIn('id="kPdfTocPage"', toc)
+        self.assertIn('max="3"', toc)
+        self.assertIn('data-i18n="noContents"', toc)
+        self.assertIn('data-i18n="jump"', toc)
+        self.assertNotIn('class="chapter-link"', index)
+        self.assertIn('class="toc-empty"', index)
+        self.assertIn('id="pdfTocPage"', index)
+        self.assertIn('data-i18n="pdf.noContents"', index)
+
+    def test_book_page_empty_toc_uses_the_same_state_for_epub_and_pdf(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            epub = ReaderPageRenderer(
+                book_id='epub-book',
+                metadata=BookMetadata(
+                    title='An EPUB', authors=('A',), tags=(), language='en',
+                    cover=None, epub_identifier='urn:epub', source_format='epub',
+                ),
+                chapters=[{'title': 'One', 'path': 'chapter_0.html'}],
+                toc=[{
+                    'title': 'Missing', 'src': 'missing.xhtml',
+                    'level': 0, 'kind': 'chapter',
+                }],
+                description='',
+                asset_manifest=assets,
+                deployment_mode='ssg',
+                urls=SiteURLs(),
+                ai_reading_enabled=False,
+            )
+            epub_index = epub.render_index()
+            pdf_metadata = PDFMetadata(
+                title='A PDF', authors=(), tags=(), language='en',
+                pages=(PDFPageMetadata(1, 612.0, 792.0),),
+                encrypted=False, has_extractable_text=True, cover=None,
+            )
+            pdf = ReaderPageRenderer.from_pdf_metadata(
+                book_id='pdf-book', metadata=pdf_metadata, cover_path=None,
+                asset_manifest=assets,
+                urls=SiteURLs(), deployment_mode='ssg',
+            )
+            pdf_index = pdf.render_index()
+        self.assertNotIn('class="chapter-link"', epub_index)
+        self.assertIn('class="toc-empty"', epub_index)
+        self.assertIn('data-i18n="book.noContents"', epub_index)
+        # EPUB jumps by chapter number, PDF by page number, same layout.
+        self.assertIn('id="epubTocChapter"', epub_index)
+        self.assertIn('data-i18n-placeholder="book.goToChapter"', epub_index)
+        self.assertIn("chapter_' + (chapter - 1)", epub_index)
+        self.assertIn('class="toc-empty"', pdf_index)
+        self.assertIn('id="pdfTocPage"', pdf_index)
+
+    def test_kindle_pdf_page_reader_degrades_for_encrypted_pdf(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            metadata = PDFMetadata(
+                title='A PDF', authors=(), tags=(), language='en',
+                pages=(PDFPageMetadata(1, 612.0, 792.0),),
+                encrypted=True, has_extractable_text=False, cover=None,
+            )
+            renderer = ReaderPageRenderer.from_pdf_metadata(
+                book_id='pdf-book', metadata=metadata, cover_path=None,
+                asset_manifest=assets,
+                urls=SiteURLs(), deployment_mode='ssg',
+            )
+            page = renderer.create_kindle_pdf_page(1, unsupported=True)
+        self.assertIn('data-i18n="pdfUnsupported"', page)
+        self.assertIn('href="/kindle-library.html"', page)
+        self.assertNotIn('id="kPdfPage"', page)
+
+    def test_ssg_kindle_library_links_pdf_books_with_image_pages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            books = (
+                LibraryBook('epub-book', 'EPUB Book', (), (), None),
+                LibraryBook(
+                    'pdf-book', 'PDF Book', (), (), None,
+                    source_format='pdf', kindle_pdf=True,
+                ),
+            )
+            publish_library_shell(
+                root, books, assets, SiteURLs(), kindle=True
+            )
+            page = (root / 'kindle-library.html').read_text(encoding='utf-8')
+            self.assertIn('href="/book/epub-book/kindle.html"', page)
+            self.assertIn('data-book="pdf-book"', page)
+            self.assertIn('data-format="pdf"', page)
+            self.assertIn('href="/book/pdf-book/kindle.html"', page)
+            pdf_row = page.split('data-book="pdf-book"', 1)[1].split('</li>', 1)[0]
+            self.assertIn('href="/book/pdf-book/kindle.html"', pdf_row)
+            self.assertNotIn('aria-disabled', pdf_row)
+            self.assertNotIn('data-i18n="pdfUnsupported"', pdf_row)
+            metadata = json.loads(
+                (root / 'book-metadata.json').read_text(encoding='utf-8')
+            )
+            pdf_entry = next(item for item in metadata if item['hash'] == 'pdf-book')
+            self.assertTrue(pdf_entry['kindlePdf'])
+
+    def test_ssg_kindle_library_lists_pdf_books_without_pages_as_unsupported(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            assets = AssetPublisher(
+                Path('epub_browser/assets'), directory,
+            ).publish()
+            books = (
+                LibraryBook('epub-book', 'EPUB Book', (), (), None),
+                LibraryBook(
+                    'pdf-book', 'PDF Book', (), (), None, source_format='pdf',
+                ),
+            )
+            publish_library_shell(
+                root, books, assets, SiteURLs(), kindle=True
+            )
+            page = (root / 'kindle-library.html').read_text(encoding='utf-8')
+            self.assertIn('href="/book/epub-book/kindle.html"', page)
+            self.assertIn('data-book="pdf-book"', page)
+            self.assertIn('data-format="pdf"', page)
+            self.assertIn('k-lib-unsupported', page)
+            self.assertIn('pdfUnsupported', page)
+            self.assertNotIn('/book/pdf-book/kindle', page)
 
     def test_ssg_chapter_template_embeds_kindle_entry_script(self):
         with tempfile.TemporaryDirectory() as directory:

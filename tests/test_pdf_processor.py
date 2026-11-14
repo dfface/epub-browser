@@ -21,6 +21,7 @@ from PIL import Image
 from epub_browser.pdf_processor import (
     PDFProcessingError,
     inspect_pdf,
+    pdf_kindle_supported,
     render_pdf_cover,
 )
 
@@ -367,6 +368,19 @@ class PDFProcessorTests(unittest.TestCase):
         self.assertEqual(metadata.title, "Open encryption")
         self.assertEqual(len(metadata.pages), 2)
         self.assertTrue(metadata.has_extractable_text)
+
+    def test_pdf_kindle_support_follows_pdfium_openability(self):
+        open_encrypted = self.fixture_pdf(
+            page_sizes=((200, 400),), password="",
+        )
+        self.assertTrue(pdf_kindle_supported(open_encrypted))
+        locked = self.fixture_pdf(
+            page_sizes=((200, 400),), password="secret",
+        )
+        self.assertFalse(pdf_kindle_supported(locked))
+        self.assertFalse(
+            pdf_kindle_supported(self.directory / "missing.pdf")
+        )
 
     def test_inspect_pdf_rejects_a_missing_signature_with_a_stable_error(self):
         source = self.directory / "not-a-document.pdf"

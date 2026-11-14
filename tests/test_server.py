@@ -18,6 +18,8 @@ from unittest import mock
 
 from starlette.testclient import TestClient
 
+from pypdf import PdfWriter
+
 from epub_browser.auth import (
     AuthConfig,
     AuthService,
@@ -34,6 +36,7 @@ from epub_browser.oidc import (
     OIDCStart,
 )
 from epub_browser.processor import SERVER_OUTPUT_REVISION, SERVER_OUTPUT_REVISION_FILE
+from epub_browser.server_library import PDF_OUTPUT_REVISION, PDF_OUTPUT_REVISION_FILE
 from epub_browser.runtime import RuntimeStatus
 from epub_browser.server import CachedStaticFiles, create_app, migrate_legacy_database
 from epub_browser.state import OIDCTransactionRecord, StateStore
@@ -5893,6 +5896,9 @@ class ServerKindleTests(unittest.TestCase):
     def _write_server_pdf_cache(self, public, book_id):
         pdf = public / "book" / book_id / "pdf"
         pdf.mkdir(parents=True)
+        (pdf.parent / PDF_OUTPUT_REVISION_FILE).write_text(
+            PDF_OUTPUT_REVISION + "\n", encoding="utf-8"
+        )
         (pdf / "metadata.json").write_text(
             json.dumps({
                 "title": None,
@@ -5914,6 +5920,10 @@ class ServerKindleTests(unittest.TestCase):
             }),
             encoding="utf-8",
         )
+        writer = PdfWriter()
+        writer.add_blank_page(width=612, height=792)
+        with (pdf / "document.pdf").open("wb") as stream:
+            writer.write(stream)
 
     def _login(self, username, password):
         client = TestClient(self.app)
@@ -5923,7 +5933,7 @@ class ServerKindleTests(unittest.TestCase):
         client.headers["X-CSRF-Token"] = session.json()["csrf_token"]
         return client
 
-    def test_kindle_library_resumes_only_visible_epubs(self):
+    def test_kindle_library_resumes_visible_epubs_and_pdfs(self):
         for book_id in ("book", "pdf"):
             saved = self.client.put(
                 f"/api/reading-progress/{book_id}", json={"chapter_index": 0}
@@ -5932,7 +5942,25 @@ class ServerKindleTests(unittest.TestCase):
         shelf = self.client.get("/kindle-library.html")
         self.assertIn("Continue reading", shelf.text)
         self.assertIn('href="/book/book/kindle_chapter_0.html#resume"', shelf.text)
-        self.assertNotIn("/book/pdf/kindle", shelf.text)
+        self.assertIn('href="/book/pdf/kindle_chapter.html#page-1"', shelf.text)
+        # PDFs stay visible with a format badge and a Kindle image link.
+        self.assertIn('data-book="pdf"', shelf.text)
+        self.assertIn('data-format="pdf"', shelf.text)
+        self.assertIn('class="k-lib-format"', shelf.text)
+        catalog = shelf.text.split('id="kCatalog"', 1)[1].split("</ul>", 1)[0]
+        pdf_row = catalog.split('data-book="pdf"', 1)[1].split("</li>", 1)[0]
+        self.assertIn('href="/book/pdf/kindle.html"', pdf_row)
+        self.assertNotIn('data-i18n="pdfUnsupported"', pdf_row)
+        self.assertNotIn("aria-disabled", pdf_row)
+        recent = shelf.text.split('id="kRecent"', 1)[1].split("</ul>", 1)[0]
+        self.assertIn('data-book="pdf"', recent)
+        self.assertIn('kindle_chapter.html#page-1', recent)
+
+    def test_kindle_catalog_search_includes_pdfs(self):
+        shelf = self.client.get("/kindle-library.html?q=PDF+Book")
+        catalog = shelf.text.split('id="kCatalog"', 1)[1].split("</ul>", 1)[0]
+        self.assertIn('data-book="pdf"', catalog)
+        self.assertIn('href="/book/pdf/kindle.html"', catalog)
 
     def test_kindle_continue_reading_uses_admin_limit(self):
         public = Path(self.directory.name)
@@ -5975,7 +6003,7 @@ class ServerKindleTests(unittest.TestCase):
         self.assertIn("Reading queue", panel(second, "kBookshelf"))
         self.assertEqual(panel(second, "kBookshelf").count('<li data-book='), 1)
         last = self.client.get("/kindle-library.html?catalog_page=999")
-        self.assertEqual(panel(last, "kAllBooks").count('<li data-book='), 2)
+        self.assertEqual(panel(last, "kAllBooks").count('<li data-book='), 3)
         descending = self.client.get("/kindle-library.html?sort=title_desc")
         catalog = panel(descending, "kAllBooks")
         self.assertLess(catalog.index('data-book="extra-12"'), catalog.index('data-book="extra-11"'))
@@ -6279,18 +6307,83 @@ class ServerKindleTests(unittest.TestCase):
         self.assertNotIn("bookshelf.js", shelf.text)
         self.assertNotIn("/assets/", shelf.text)
 
-    def test_kindle_pages_require_authentication_and_pdf_has_none(self):
+    def test_kindle_pages_require_authentication_for_pdf_too(self):
         anonymous = TestClient(self.app)
         self.addCleanup(anonymous.close)
+        for path in (
+            "/kindle-library.html",
+            "/book/book/kindle.html",
+            "/book/pdf/kindle.html",
+        ):
+            self.assertEqual(
+                anonymous.get(path, follow_redirects=False).status_code, 303
+            )
         self.assertEqual(
-            anonymous.get("/kindle-library.html", follow_redirects=False).status_code,
-            303,
+            anonymous.get(
+                "/book/pdf/kindle_pdf/page_1.jpg", follow_redirects=False
+            ).status_code,
+            403,
         )
+
+    def test_kindle_pdf_reader_serves_authenticated_image_pages(self):
+        index = self.client.get("/book/pdf/kindle_chapter.html")
+        self.assertEqual(index.status_code, 200)
+        self.assertIn('id="kPdfPage"', index.text)
+        self.assertIn("kindle_pdf/page_", index.text)
+        self.assertIn("/api/reading-progress/", index.text)
+        self.assertIn("window.kPdfShow(progress.chapter_index)", index.text)
+        self.assertIn("kPdfHadHash", index.text)
+        self.assertIn('id="kPdfNext"', index.text)
+        self.assertIn('href="kindle.html"', index.text)
+        self.assertNotIn("/vendor/pdfjs/", index.text)
+
+        toc = self.client.get("/book/pdf/kindle.html")
+        self.assertEqual(toc.status_code, 200)
+        self.assertIn("kindle_chapter.html#page-", toc.text)
+        self.assertIn('data-i18n="contents"', toc.text)
+        self.assertNotIn("/vendor/pdfjs/", toc.text)
         self.assertEqual(
-            anonymous.get("/book/book/kindle.html", follow_redirects=False).status_code,
-            303,
+            self.client.get("/book/book/kindle_chapter.html").status_code, 404
         )
-        self.assertEqual(self.client.get("/book/pdf/kindle.html").status_code, 404)
+
+        image = self.client.get("/book/pdf/kindle_pdf/page_1.jpg")
+        self.assertEqual(image.status_code, 200)
+        self.assertEqual(image.headers["content-type"], "image/jpeg")
+        self.assertTrue(image.content.startswith(b"\xff\xd8"))
+        self.assertEqual(
+            image.headers["cache-control"], "private, no-cache"
+        )
+        self.assertEqual(image.headers["x-content-type-options"], "nosniff")
+        # The page cache is reused, not re-rendered.
+        cached = self.client.get("/book/pdf/kindle_pdf/page_1.jpg")
+        self.assertEqual(cached.content, image.content)
+
+        for impossible in (
+            "/book/pdf/kindle_pdf/page_0.jpg",
+            "/book/pdf/kindle_pdf/page_2.jpg",
+            "/book/pdf/kindle_pdf/..%2Fdocument.pdf",
+        ):
+            self.assertEqual(self.client.get(impossible).status_code, 404)
+
+    def test_kindle_pdf_reader_degrades_when_document_cannot_be_opened(self):
+        public = Path(self.directory.name)
+        payload = json.loads(
+            (public / "book" / "pdf" / "pdf" / "metadata.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        payload["encrypted"] = True
+        (public / "book" / "pdf" / "pdf" / "metadata.json").write_text(
+            json.dumps(payload), encoding="utf-8"
+        )
+        (public / "book" / "pdf" / "pdf" / "document.pdf").unlink()
+        index = self.client.get("/book/pdf/kindle.html")
+        self.assertEqual(index.status_code, 200)
+        self.assertIn('data-i18n="pdfUnsupported"', index.text)
+        self.assertNotIn('id="kPdfPage"', index.text)
+        self.assertEqual(
+            self.client.get("/book/pdf/kindle_pdf/page_1.jpg").status_code, 404
+        )
 
     def test_kindle_surfaces_respect_restricted_visibility(self):
         # Grant the EPUB only to alice; Bob must be refused on every Kindle
@@ -6305,12 +6398,26 @@ class ServerKindleTests(unittest.TestCase):
             tag_ids=[],
             profile="auto",
         )
+        self.store.update_admin_book_settings(
+            "pdf",
+            title="PDF Book",
+            authors=[],
+            visibility="restricted",
+            user_ids=[],
+            tag_ids=[],
+            profile="auto",
+        )
         bob = self.store.create_user("bob", hash_password("bob-secret"))
         bob_client = self._login("bob", "bob-secret")
         shelf = bob_client.get("/kindle-library.html")
         self.assertEqual(shelf.status_code, 200)
         self.assertNotIn('href="/book/book/kindle.html"', shelf.text)
+        self.assertNotIn('href="/book/pdf/kindle.html"', shelf.text)
         self.assertEqual(bob_client.get("/book/book/kindle.html").status_code, 403)
+        self.assertEqual(bob_client.get("/book/pdf/kindle.html").status_code, 403)
+        self.assertEqual(
+            bob_client.get("/book/pdf/kindle_pdf/page_1.jpg").status_code, 403
+        )
         self.assertEqual(
             bob_client.get("/book/book/kindle_chapter_0.html").status_code, 403
         )

@@ -94,6 +94,17 @@ def library_metadata(
                 "authors": state_store._managed_authors(record.authors_json),
                 "tags": tag_names.get(record.book_id, []),
             })
+        kindle_pdf = False
+        if record.source_format == PDF_FORMAT and available:
+            try:
+                pdf_payload = json.loads(
+                    (book_root / "pdf" / "metadata.json").read_text(encoding="utf-8")
+                )
+                kindle_pdf = bool(pdf_payload.get("pages")) and not bool(
+                    pdf_payload.get("encrypted")
+                )
+            except (OSError, ValueError, AttributeError):
+                kindle_pdf = False
         cover = metadata.get("cover")
         books.append(
             {
@@ -109,6 +120,7 @@ def library_metadata(
                 ),
                 "rating": ratings.get(record.book_id),
                 "format": record.source_format,
+                **({"kindlePdf": True} if kindle_pdf else {}),
             }
         )
     return books
@@ -1525,6 +1537,14 @@ class ServerLibraryManager:
             self._remember_cache_validity(record.book_id)
         finally:
             shutil.rmtree(cold, ignore_errors=True)
+        # Lazily rendered Kindle PDF pages are derived cache: they follow the
+        # book entry so eviction cannot leave page images behind forever.
+        self._remove_kindle_pdf_cache(record.book_id)
+
+    def _remove_kindle_pdf_cache(self, book_id: str) -> None:
+        target = self.server_dir / "kindle-pdf" / book_id
+        if target.is_dir():
+            shutil.rmtree(target, ignore_errors=True)
 
     def acquire_book_cache(self, book_id: str, *, read=False, restore=True) -> None:
         """Pin this generation against eviction until its caller finishes."""

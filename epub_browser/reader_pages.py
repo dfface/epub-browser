@@ -88,8 +88,41 @@ body.sepia .k-surface{background:#f3e9d2;border-color:#86795e}
 .k-cover img{position:absolute;top:0;right:0;bottom:0;left:0;max-width:100%;max-height:100%;margin:auto}
 .k-cover-placeholder:before{content:"";position:absolute;top:0;bottom:0;left:13%;border-left:1px solid #777}
 .k-cover-placeholder:after{content:"";position:absolute;top:32%;left:28%;right:16%;height:14%;border-top:1px solid #777;border-bottom:1px solid #777}
-.k-reader-header{max-width:680px;margin:0 auto}
-.k-reader-settings{display:none;position:fixed;z-index:10}
+/* Reader chrome shared by EPUB chapters and PDF image pages. */
+.k-reader-header{box-sizing:border-box;max-width:680px;margin:0 auto;padding:0 16px}
+.k-reader-header a,.k-reader-header button{display:inline-block;box-sizing:border-box;min-width:44px;min-height:44px;
+  line-height:1.3;margin:0;padding:12px 0;font:inherit;color:inherit;background:none;border:0;text-decoration:none}
+.k-reader-header button{float:right;font-weight:bold}
+.k-reader-header a{float:left;margin-right:14px}
+.k-reader-header .k-running-title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:12px 0;font-weight:normal}
+.k-reader-header:after{content:"";display:block;clear:both}
+.k-reader-header,.k-reader-footer,.k-reader-settings{font:15px/1.4 Arial,sans-serif}
+.k-reader-footer{text-align:center;overflow:hidden}
+.k-reader-footer button{display:none}
+#kSettingsBackdrop,.k-settings-backdrop{display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:transparent}
+.k-reader-settings{display:none;position:fixed;z-index:10;box-sizing:border-box;left:8px;right:8px;bottom:8px;
+  max-width:540px;max-height:82%;margin:0 auto;padding:10px 12px;text-align:left;overflow:auto}
+.k-reader-settings a,.k-reader-settings button{display:inline-block;box-sizing:border-box;min-height:44px;
+  padding:10px 12px;margin:3px;border:1px solid #888;color:inherit;background:none;font:inherit;text-decoration:none}
+.k-settings-heading{overflow:hidden}
+.k-settings-heading h2{display:inline-block;margin:12px 3px 6px;font-size:1.05em}
+.k-settings-heading button{float:right;min-width:44px;font-size:1.25em;line-height:1}
+.k-settings-modes{padding:6px 0}
+.k-settings-modes button{font-weight:bold}
+.k-settings-modes button[aria-pressed="true"]{color:#fff;background:#111;border-color:#111}
+body.dark .k-settings-modes button[aria-pressed="true"]{color:#111;background:#eee;border-color:#eee}
+.k-reader-settings .k-settings-links{border-top:1px solid #888;padding-top:6px}
+body[data-k-reader] .k-reader-header{position:absolute;top:0;left:0;right:0;height:45px;max-width:680px}
+body[data-k-reader] .k-reader-footer{position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;
+  height:48px;max-width:680px;margin:0 auto;border-top:1px solid #888}
+body[data-k-reader] .k-reader-footer .k-chapter-links{display:none}
+body[data-k-reader] .k-reader-footer button{display:block;box-sizing:border-box;width:18%;height:44px;
+  border:0;background:none;color:inherit;font:inherit;font-size:1.45em}
+body[data-k-reader] .k-reader-footer button:disabled{opacity:.4}
+#kReaderPosition,#kPdfPosition{display:inline-block;margin-top:13px}
+.k-reader-header a:focus,.k-reader-header button:focus,.k-reader-footer button:focus{
+  outline:2px solid;outline-offset:-2px}
+body.sepia .k-reader-footer,body.dark .k-reader-footer{border-color:#666}
 body.sepia .k-header,body.dark .k-header{border-color:#666}
 .k-header a{color:inherit;text-decoration:none;font-weight:bold;font-size:15px}
 .k-content{padding:22px 20px 32px;max-width:640px;margin:0 auto;word-wrap:break-word;line-height:1.7}
@@ -300,52 +333,31 @@ body.sepia .k-book .k-toc a[aria-current]{background:#e6d8ba}
 body.dark .k-book .k-toc a[aria-current]{background:#333}
 .k-book .k-toc .sec{padding-top:13px;font-weight:bold}
 .k-book .k-toc li:last-child a{border-bottom:0}
+/* Shared empty TOC state for EPUB and PDF book pages. EPUB jumps by chapter
+   number, PDF by page number; both use the same layout and controls. */
+.k-toc-empty{margin:0;padding:18px 14px 10px;text-align:center;color:#555}
+body.sepia .k-toc-empty,body.dark .k-toc-empty{color:#bbb}
+.k-toc-empty p{margin:0 0 12px}
+.k-toc-jump{margin:0}
+.k-toc-jump input{width:5.5em;padding:10px;border:1px solid #888;border-radius:8px;
+  background:transparent;color:inherit;font-size:1em;text-align:center}
+.k-toc-jump button{margin-left:8px;padding:10px 16px;border:1px solid #888;border-radius:8px;
+  background:transparent;color:inherit;font-size:1em;font-weight:bold;cursor:pointer}
 @media (max-width:360px){.k-book-hero .k-cover{width:75px;height:104px;margin-right:12px}}
 """
 
 
 _KINDLE_CHAPTER_CSS = """
-.k-reader-header{box-sizing:border-box;padding:0 16px}
-.k-reader-header a,.k-reader-header button{display:inline-block;box-sizing:border-box;min-height:44px;
-  line-height:1.3;margin:0;padding:12px 0;font:inherit;color:inherit;background:none;border:0}
-.k-reader-header button{float:right;font-weight:bold}
-.k-reader-header a{float:left;margin-right:14px}
-.k-reader-header .k-running-title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:12px 0;font-weight:normal}
-.k-reader-header,.k-reader-footer,.k-reader-settings{font:15px/1.4 Arial,sans-serif}
-.k-reader-footer{text-align:center;overflow:hidden}
-.k-reader-footer button{display:none}
-#kSettingsBackdrop{display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:transparent}
-.k-reader-settings{box-sizing:border-box;left:8px;right:8px;bottom:8px;max-width:540px;max-height:82%;
-  margin:0 auto;padding:10px 12px;text-align:left;overflow:auto}
-.k-reader-settings a,.k-reader-settings button{display:inline-block;box-sizing:border-box;min-height:44px;
-  padding:10px 12px;margin:3px;border:1px solid #888;color:inherit;background:none;font:inherit;text-decoration:none}
-.k-settings-heading{overflow:hidden}
-.k-settings-heading h2{display:inline-block;margin:12px 3px 6px;font-size:1.05em}
-.k-settings-heading button{float:right;min-width:44px;font-size:1.25em;line-height:1}
-.k-settings-modes{padding:6px 0}
-.k-settings-modes button{font-weight:bold}
-.k-settings-modes button[aria-pressed="true"]{color:#fff;background:#111;border-color:#111}
-body.dark .k-settings-modes button[aria-pressed="true"]{color:#111;background:#eee;border-color:#eee}
-.k-reader-settings .k-settings-links{border-top:1px solid #888;padding-top:6px}
-.k-reader-header:after{content:"";display:block;clear:both}
 .k-content img{height:auto}
 #kViewport{min-height:100px}
-body[data-k-reader] .k-reader-header{position:absolute;top:0;left:0;right:0;height:45px;max-width:680px}
 body[data-k-reader] #kViewport{position:absolute;top:59px;bottom:61px;left:19px;right:19px;max-width:640px;
   margin:auto;overflow:auto;min-height:0}
 body[data-k-reader="pages"] #kViewport{overflow:hidden}
 body[data-k-reader="pages"] #kText{margin:0;padding:0;overflow:visible;min-height:0;
   -webkit-column-fill:auto;column-fill:auto}
 body[data-k-reader="pages"] #kText img{max-height:calc(100vh - 124px);object-fit:contain}
-body[data-k-reader] .k-reader-footer{position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;
-  height:48px;max-width:680px;margin:0 auto;border-top:1px solid #888}
-body[data-k-reader] .k-reader-footer .k-chapter-links{display:none}
-body[data-k-reader] .k-reader-footer button{display:block;box-sizing:border-box;width:18%;height:44px;
-  border:0;background:none;color:inherit;font:inherit;font-size:1.45em}
-body[data-k-reader] .k-reader-footer button:disabled{opacity:.4}
 #kTurnBack{float:left}
 #kTurnForward{float:right}
-#kReaderPosition{display:inline-block;margin-top:13px}
 body[data-k-reader] .k-content{padding:0 0 10px;min-height:85%;box-sizing:border-box}
 @media (max-width:360px){body[data-k-reader] #kViewport{left:14px;right:14px}}
 """
@@ -509,6 +521,291 @@ _KINDLE_CHAPTER_JS = """
       if (e.preventDefault) e.preventDefault();
     }
   };
+})();
+"""
+
+
+_KINDLE_PDF_CSS = """\
+body[data-k-pdf]{overflow:hidden}
+.k-pdf-reader{position:absolute;top:59px;bottom:61px;left:0;right:0;max-width:none;margin:0;padding:0}
+#kPdfViewport{position:absolute;top:0;right:0;bottom:0;left:0;overflow:auto;text-align:center;background:transparent}
+#kPdfPage{display:block;width:100%;height:auto;margin:0 auto}
+body[data-k-pdf-fit="page"] #kPdfPage{width:auto;height:auto;max-width:100%;max-height:100%}
+.k-scale-value{display:inline-block;min-width:4em;text-align:center;font-weight:bold;vertical-align:middle}
+.k-pdf-error{display:none;margin:12px;padding:12px;border:1px solid #888;border-radius:8px;text-align:center}
+.k-pdf-jump{padding:6px 0}
+.k-pdf-jump input{display:block;box-sizing:border-box;width:100%;min-height:44px;margin:0 0 6px;padding:10px 12px;
+  border:1px solid #888;border-radius:8px;background:transparent;color:inherit;font:inherit}
+.k-pdf-jump button{display:block;width:100%;margin:0}
+#kPdfPrev{float:left}
+#kPdfNext{float:right}
+"""
+
+_KINDLE_PDF_TOC_CSS = """\
+/* Reuse the EPUB book-page TOC layout; PDF only adds a right-aligned page
+   number inside each row, or an empty state with a page jump when the PDF
+   carries no outline metadata. */
+.k-pdf-toc a{overflow:hidden}
+.k-pdf-toc .k-pdf-toc-page{float:right;padding-left:12px;font-size:.9em;font-weight:bold}
+"""
+
+_KINDLE_PDF_JS = r"""
+var kPdfBook = %(book_hash)s;
+var kPdfPages = %(page_count)d;
+var kPdfLandscape = %(landscape)s;
+var kPdfIndex = 0;
+var kPdfSavedFit = getCookie('kindle_pdf_fit_' + kPdfBook);
+var kPdfLegacyZoom = parseInt(getCookie('kindle_pdf_zoom_' + kPdfBook), 10);
+var kPdfSavedScale = parseFloat(getCookie('kindle_pdf_scale_' + kPdfBook));
+var kPdfScale = isNaN(kPdfSavedScale) ? 1 : kPdfSavedScale;
+var kPdfFit = '';
+if (kPdfSavedFit === 'width' || kPdfSavedFit === 'page' || kPdfSavedFit === 'scale') {
+  kPdfFit = kPdfSavedFit;
+} else if (!isNaN(kPdfLegacyZoom)) {
+  if (kPdfLegacyZoom === 1) kPdfFit = 'page';
+  else if (kPdfLegacyZoom === 2) { kPdfFit = 'scale'; kPdfScale = 1.6; }
+  else kPdfFit = 'width';
+}
+if (!kPdfFit) {
+  if (kPdfLandscape) { kPdfFit = 'scale'; kPdfScale = 1.6; }
+  else kPdfFit = 'width';
+}
+if (kPdfScale < 0.5) kPdfScale = 0.5;
+if (kPdfScale > 3) kPdfScale = 3;
+window.kPdfHadHash = false;
+function kPdfPositionText(index) {
+  return (index + 1) + '/' + kPdfPages;
+}
+function kPdfPageAlt(index) {
+  var template = '';
+  if (window.kTranslate) template = window.kTranslate('pageOf');
+  if (!template) template = 'Page {number} of {total}';
+  return template.replace('{number}', String(index + 1)).replace('{total}', String(kPdfPages));
+}
+function kPdfCenterImage() {
+  var viewport = document.getElementById('kPdfViewport');
+  var image = document.getElementById('kPdfPage');
+  if (!viewport) return;
+  viewport.style.paddingTop = '0px';
+  if (kPdfFit !== 'width' || !image || !image.offsetHeight) return;
+  var spare = viewport.clientHeight - image.offsetHeight;
+  if (spare > 0) viewport.style.paddingTop = Math.floor(spare / 2) + 'px';
+}
+function kPdfShow(index) {
+  if (index < 0) index = 0;
+  if (index >= kPdfPages) index = kPdfPages - 1;
+  kPdfIndex = index;
+  var image = document.getElementById('kPdfPage');
+  var error = document.getElementById('kPdfError');
+  if (image) {
+    image.onload = function () {
+      if (error) error.style.display = 'none';
+      kPdfCenterImage();
+    };
+    image.onerror = function () {
+      if (error) error.style.display = 'block';
+    };
+    image.alt = kPdfPageAlt(index);
+    image.src = 'kindle_pdf/page_' + (index + 1) + '.jpg';
+  }
+  var position = document.getElementById('kPdfPosition');
+  if (position) position.textContent = kPdfPositionText(index);
+  var previous = document.getElementById('kPdfPrev');
+  var next = document.getElementById('kPdfNext');
+  if (previous) previous.disabled = index <= 0;
+  if (next) next.disabled = index >= kPdfPages - 1;
+  setCookie('kindle_pdf_pos_' + kPdfBook, String(index), 365);
+  if (window.kPdfReport) window.kPdfReport(index);
+  if (index + 1 < kPdfPages) {
+    var preload = new Image();
+    preload.src = 'kindle_pdf/page_' + (index + 2) + '.jpg';
+  }
+}
+window.kPdfShow = kPdfShow;
+function kPdfSettingsOpen() {
+  var panel = document.getElementById('kPdfSettings');
+  return !!panel && panel.style.display === 'block';
+}
+function kPdfTurn(delta) {
+  if (kPdfSettingsOpen()) return;
+  kPdfShow(kPdfIndex + delta);
+}
+window.kPdfTurn = kPdfTurn;
+function kPdfRenderZoom() {
+  var image = document.getElementById('kPdfPage');
+  document.body.setAttribute('data-k-pdf-fit', kPdfFit);
+  if (image) {
+    image.style.width = kPdfFit === 'scale' ? Math.round(kPdfScale * 100) + '%%' : '';
+  }
+  var choices = document.querySelectorAll('[data-k-pdf-fit]');
+  for (var i = 0; i < choices.length; i++) {
+    choices[i].setAttribute('aria-pressed',
+      choices[i].getAttribute('data-k-pdf-fit') === kPdfFit ? 'true' : 'false');
+  }
+  var readout = document.getElementById('kPdfScaleValue');
+  if (readout) {
+    var percent = 100;
+    if (kPdfFit == 'scale') percent = Math.round(kPdfScale * 100);
+    readout.textContent = percent + '%%';
+  }
+  kPdfCenterImage();
+}
+window.kPdfRenderZoom = kPdfRenderZoom;
+function kPdfApplyFit(fit) {
+  if (fit !== 'width' && fit !== 'page') fit = 'width';
+  kPdfFit = fit;
+  setCookie('kindle_pdf_fit_' + kPdfBook, fit, 365);
+  kPdfRenderZoom();
+}
+window.kPdfApplyFit = kPdfApplyFit;
+function kPdfZoomStep(delta) {
+  if (kPdfFit !== 'scale') kPdfScale = 1;
+  kPdfScale = Math.round((kPdfScale + delta * 0.25) * 100) / 100;
+  if (kPdfScale < 0.5) kPdfScale = 0.5;
+  if (kPdfScale > 3) kPdfScale = 3;
+  kPdfFit = 'scale';
+  setCookie('kindle_pdf_fit_' + kPdfBook, 'scale', 365);
+  setCookie('kindle_pdf_scale_' + kPdfBook, String(kPdfScale), 365);
+  kPdfRenderZoom();
+}
+window.kPdfZoomStep = kPdfZoomStep;
+function kPdfToggleSettings() {
+  var panel = document.getElementById('kPdfSettings');
+  var backdrop = document.getElementById('kPdfSettingsBackdrop');
+  var button = document.getElementById('kPdfSettingsButton');
+  if (!panel) return;
+  var open = panel.style.display !== 'block';
+  panel.style.display = open ? 'block' : 'none';
+  if (backdrop) backdrop.style.display = open ? 'block' : 'none';
+  if (button) button.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) {
+    var close = panel.getElementsByTagName('button')[0];
+    if (close) close.focus();
+  } else if (button) {
+    button.focus();
+  }
+}
+window.kPdfToggleSettings = kPdfToggleSettings;
+function kPdfJump() {
+  var input = document.getElementById('kPdfJumpInput');
+  if (!input) return;
+  var value = parseInt(input.value, 10);
+  if (isNaN(value)) return;
+  if (value < 1) value = 1;
+  if (value > kPdfPages) value = kPdfPages;
+  kPdfShow(value - 1);
+  input.value = '';
+  kPdfToggleSettings();
+}
+window.kPdfJump = kPdfJump;
+var kPdfHash = location.hash.match(/^#page-([0-9]+)$/);
+var kPdfSaved = parseInt(getCookie('kindle_pdf_pos_' + kPdfBook), 10);
+if (kPdfHash) {
+  kPdfShow(Number(kPdfHash[1]) - 1);
+  window.kPdfHadHash = true;
+} else if (!isNaN(kPdfSaved)) {
+  kPdfShow(kPdfSaved);
+} else {
+  kPdfShow(0);
+}
+kPdfRenderZoom();
+kRememberBook(kPdfBook);
+window.onresize = kPdfCenterImage;
+document.onkeydown = function (event) {
+  var e = event || window.event;
+  if (!e) return;
+  if (kPdfSettingsOpen()) {
+    if (e.keyCode === 27) {
+      kPdfToggleSettings();
+      return false;
+    }
+    if (e.keyCode === 9) {
+      var panel = document.getElementById('kPdfSettings');
+      var controls = panel.querySelectorAll('button, a[href], input');
+      var first = controls[0];
+      var last = controls[controls.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        last.focus();
+        return false;
+      }
+      if (!e.shiftKey && document.activeElement === last) {
+        first.focus();
+        return false;
+      }
+    }
+    return;
+  }
+  if (e.keyCode === 37) kPdfTurn(-1);
+  if (e.keyCode === 39) kPdfTurn(1);
+};
+"""
+
+_KINDLE_PDF_SERVER_REPORT_JS = """\
+(function () {
+  var bookHash = %(book_hash)s;
+  var pageIndex = window.kPdfIndex || 0;
+  var clientId = 'kindle-pdf-' + Math.floor(Math.random() * 1e9).toString(36);
+  var sequence = 0;
+  var csrfToken = '';
+  var lastBeat = new Date().getTime();
+  function kXhr(method, url, body, onDone) {
+    try {
+      var xhr = new XMLHttpRequest();
+      xhr.open(method, url, true);
+      if (body || method === 'PUT' || method === 'POST') {
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        if (csrfToken) xhr.setRequestHeader('X-CSRF-Token', csrfToken);
+      }
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState === 4 && xhr.status === 200 && onDone) {
+          onDone(xhr.responseText);
+        }
+      };
+      xhr.send(body);
+    } catch (e) {}
+  }
+  function kReport() {
+    if (!csrfToken) return;
+    kXhr(
+      'PUT',
+      '/api/reading-progress/' + encodeURIComponent(bookHash),
+      '{"chapter_index":' + pageIndex + '}'
+    );
+  }
+  function kHeartbeat() {
+    var now = new Date().getTime();
+    var elapsed = Math.max(1, Math.min(20, Math.round((now - lastBeat) / 1000)));
+    lastBeat = now;
+    if (!csrfToken) return;
+    sequence = sequence + 1;
+    kXhr(
+      'POST',
+      '/api/reading-sessions/' + encodeURIComponent(bookHash) + '/heartbeat',
+      '{"client_id":"' + clientId + '","client_sequence":' + sequence +
+        ',"chapter_index":' + pageIndex + ',"active_seconds":' + elapsed + '}'
+    );
+  }
+  window.kPdfReport = function (index) {
+    pageIndex = index;
+    kReport();
+  };
+  kXhr('GET', '/api/csrf', null, function (text) {
+    try { csrfToken = JSON.parse(text).csrf_token || ''; } catch (e) {}
+    // Server mode keeps the authoritative position: a local cookie is only a
+    // first-paint fallback, while an explicit #page-N deep link always wins.
+    kXhr('GET', '/api/reading-progress/' + encodeURIComponent(bookHash), null, function (response) {
+      try {
+        var progress = JSON.parse(response);
+        if (!window.kPdfHadHash && progress &&
+            progress.chapter_index !== undefined && progress.chapter_index !== null) {
+          window.kPdfShow(progress.chapter_index);
+        }
+      } catch (e) {}
+      kReport();
+      kHeartbeat();
+    });
+  });
+  setInterval(kHeartbeat, 15000);
 })();
 """
 
@@ -792,6 +1089,20 @@ def _kindle_i18n_messages(language, tools=None):
         "startReading": "book.startReading",
         "previousPage": "reader.previousPage",
         "nextPage": "reader.nextPage",
+        "pdfBadge": "pdf.formatBadge",
+        "pdfUnsupported": "kindle.pdfUnsupported",
+        "zoomIn": "pdf.zoomIn",
+        "zoomOut": "pdf.zoomOut",
+        "fitWidth": "pdf.fitWidth",
+        "fitPage": "pdf.fitPage",
+        "goToPage": "pdf.goToPage",
+        "jump": "reader.jump",
+        "pageOf": "pdf.pageOf",
+        "page": "pdf.page",
+        "noContents": "pdf.noContents",
+        "noContentsBook": "book.noContents",
+        "goToChapter": "book.goToChapter",
+        "pageLoadError": "pdf.pageLoadError",
     }
     labels = dict(dictionary, **{name: bundle.get(key) or english[key] for name, key in keys.items()})
     if tools is not None:
@@ -1249,56 +1560,117 @@ class ReaderPageRenderer:
             <h2 data-i18n="book.tableOfContents">Table of contents</h2>
             <div class="chapter-count" data-i18n="book.totalChapters" data-i18n-params='{{"count": {len(self.chapters)}}}'>Total: {len(self.chapters)}</div>
         </div>
-        <ul class="chapter-list">
 """
-
-        # OPF spine owns public chapter indexes.  EPUB navigation only
-        # contributes titles, anchors and non-navigable grouping nodes.
-        for toc_item in self._build_toc_data():
-            level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
-            toc_title = html.escape(
-                metadata_text(toc_item.get("title")), quote=False
-            )
-            toc_title_attributes = f' lang="{book_language}" dir="auto"'
-            if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT and toc_item.get('page_label'):
+        # Build the rows separately so EPUB and PDF share one empty state when
+        # there is no usable table-of-contents entry, instead of rendering an
+        # empty list box with no explanation.
+        pdf_layout = getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT
+        pdf_outline = self._pdf_outline_toc()
+        epub_toc = [] if pdf_layout else self._build_toc_data()
+        toc_rows = ""
+        if pdf_outline:
+            for entry in pdf_outline:
+                page_number = entry['page']
                 page_params = html.escape(
                     json.dumps(
-                        {'number': toc_item['page_label']},
+                        {'number': str(page_number)},
                         separators=(',', ':'),
                     ),
                     quote=True,
                 )
-                toc_title_attributes += (
-                    f' data-i18n="pdf.page" data-i18n-params="{page_params}"'
+                toc_rows += (
+                    f'        <li class="toc-level-0"><a class="chapter-link" '
+                    f'href="/book/{book_id_url}/chapter_{entry["chapter_index"]}.html" '
+                    f'id="eb_ci_{entry["chapter_index"]}" '
+                    f'data-chapter-index="{entry["chapter_index"]}">'
+                    f'<span class="chapter-title-with-sync"><span class="chapter-title" '
+                    f'lang="{book_language}" dir="auto">'
+                    f'{html.escape(metadata_text(entry["title"]), quote=False)}</span></span>'
+                    f'<span class="chapter-page" data-i18n="pdf.page" '
+                    f'data-i18n-params="{page_params}">Page {page_number}</span></a></li>\n'
                 )
-            outline_labels_html = ""
-            if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT and toc_item.get('outline_labels'):
-                outline_labels = " · ".join(
-                    html.escape(metadata_text(label), quote=False)
-                    for label in toc_item['outline_labels']
+        elif not pdf_layout:
+            for toc_item in epub_toc:
+                level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
+                toc_title = html.escape(
+                    metadata_text(toc_item.get("title")), quote=False
                 )
-                outline_labels_html = (
-                    f'<span class="chapter-outline-labels" lang="{book_language}" '
-                    f'dir="auto">{outline_labels}</span>'
-                )
-            if toc_item.get('kind') == 'section':
-                index_html += f'        <li class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}" dir="auto">{toc_title}</span></li>\n'
-                continue
+                toc_title_attributes = f' lang="{book_language}" dir="auto"'
+                outline_labels_html = ""
+                if toc_item.get('kind') == 'section':
+                    toc_rows += f'        <li class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}" dir="auto">{toc_title}</span></li>\n'
+                    continue
 
-            chapter_index = toc_item['chapter_index']
-            chapter_anchor = toc_item.get('anchor')
-            chapter_title_group = (
-                f'<span class="chapter-title-with-sync"><span class="chapter-title"'
-                f'{toc_title_attributes}>{toc_title}</span>{outline_labels_html}</span>'
-            )
-            if chapter_anchor is not None:
-                safe_anchor = urllib.parse.quote(str(chapter_anchor), safe='')
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
-            else:
-                index_html += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                chapter_index = toc_item['chapter_index']
+                chapter_anchor = toc_item.get('anchor')
+                chapter_title_group = (
+                    f'<span class="chapter-title-with-sync"><span class="chapter-title"'
+                    f'{toc_title_attributes}>{toc_title}</span>{outline_labels_html}</span>'
+                )
+                if chapter_anchor is not None:
+                    safe_anchor = urllib.parse.quote(str(chapter_anchor), safe='')
+                    toc_rows += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                else:
+                    toc_rows += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
 
-        index_html += f"""    </ul>
+        if toc_rows:
+            toc_body = f'        <ul class="chapter-list">\n{toc_rows}        </ul>\n'
+        elif pdf_layout:
+            page_count = len(self._pdf_pages) or len(self.chapters)
+            toc_body = f"""    <div class="toc-empty">
+        <p data-i18n="pdf.noContents">This PDF has no table of contents</p>
+        <form class="toc-jump" id="pdfTocJump">
+            <input id="pdfTocPage" type="number" min="1" max="{page_count}" inputmode="numeric" placeholder="Go to page" data-i18n-placeholder="pdf.goToPage" aria-label="Go to page" data-i18n-aria-label="pdf.goToPage">
+            <button type="submit" data-i18n="reader.jump">Jump</button>
+        </form>
+        <script>
+        (function () {{
+            var form = document.getElementById('pdfTocJump');
+            if (!form) return;
+            form.onsubmit = function () {{
+                var input = document.getElementById('pdfTocPage');
+                var page = parseInt(input.value, 10);
+                if (page >= 1 && page <= {page_count}) {{
+                    window.location.href = 'chapter_' + (page - 1) + '.html';
+                }}
+                return false;
+            }};
+        }})();
+        </script>
     </div>
+"""
+        else:
+            chapter_count = len(self.chapters)
+            if chapter_count:
+                toc_body = f"""    <div class="toc-empty">
+        <p data-i18n="book.noContents">This book has no table of contents</p>
+        <form class="toc-jump" id="epubTocJump">
+            <input id="epubTocChapter" type="number" min="1" max="{chapter_count}" inputmode="numeric" placeholder="Go to chapter" data-i18n-placeholder="book.goToChapter" aria-label="Go to chapter" data-i18n-aria-label="book.goToChapter">
+            <button type="submit" data-i18n="reader.jump">Jump</button>
+        </form>
+        <script>
+        (function () {{
+            var form = document.getElementById('epubTocJump');
+            if (!form) return;
+            form.onsubmit = function () {{
+                var input = document.getElementById('epubTocChapter');
+                var chapter = parseInt(input.value, 10);
+                if (chapter >= 1 && chapter <= {chapter_count}) {{
+                    window.location.href = 'chapter_' + (chapter - 1) + '.html';
+                }}
+                return false;
+            }};
+        }})();
+        </script>
+    </div>
+"""
+            else:
+                toc_body = """    <div class="toc-empty">
+        <p data-i18n="book.noContents">This book has no table of contents</p>
+    </div>
+"""
+
+        index_html += f"""{toc_body}    </div>
 </div>
 <div class="reading-controls" data-id="reading-controls">
     <button class="control-btn" id="scrollToTopBtn" type="button" aria-label="Top" data-i18n-aria-label="book.top">
@@ -1491,6 +1863,32 @@ document.addEventListener('DOMContentLoaded', function() {{
             return chapter_filename_map[posixpath.basename(urllib.parse.unquote(toc_src))]
         return None
 
+    def _pdf_outline_toc(self):
+        """Return outline-major PDF entries, or [] when the PDF has no outline.
+
+        PDF pages are still one chapter file each; the outline is only a
+        navigation index.  Both the book page and the Kindle page use this so
+        they never disagree about whether a PDF has a usable table of contents.
+        """
+        if getattr(self, 'source_format', EPUB_FORMAT) != PDF_FORMAT:
+            return []
+        entries = []
+        for item in self._build_toc_data():
+            page_label = str(item.get('page_label') or '').strip()
+            labels = [
+                str(label).strip()
+                for label in (item.get('outline_labels') or [])
+                if str(label).strip()
+            ]
+            if not page_label.isdigit() or not labels:
+                continue
+            entries.append({
+                'page': int(page_label),
+                'chapter_index': int(page_label) - 1,
+                'title': ' · '.join(labels),
+            })
+        return entries
+
     def _build_toc_data(self):
         """Return the EPUB-derived table of contents for either publisher."""
         if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT:
@@ -1651,6 +2049,34 @@ document.addEventListener('DOMContentLoaded', function() {{
                 )
                 toc_items.append(f'<li class="sec">{title}</li>')
         toc_html = "\n".join(toc_items)
+        go_to_chapter = html.escape(kindle_labels["goToChapter"], quote=True)
+        chapter_count = len(self.chapters)
+        if toc_items:
+            toc_body = (
+                f'<div class="k-toc" lang="{book_language}">'
+                f'<ul>{toc_html}</ul></div>'
+            )
+        elif chapter_count:
+            toc_body = (
+                '<div class="k-toc-empty">'
+                f'<p data-i18n="noContentsBook">'
+                f'{html.escape(kindle_labels["noContentsBook"])}</p>'
+                '<form class="k-toc-jump" onsubmit="return kChapterJump()">'
+                f'<input id="kChapterJump" type="number" min="1" max="{chapter_count}"'
+                ' inputmode="numeric"'
+                f' placeholder="{go_to_chapter}" data-i18n-placeholder="goToChapter"'
+                f' aria-label="{go_to_chapter}" data-i18n-aria-label="goToChapter">'
+                f'<button type="submit" data-i18n="jump">'
+                f'{html.escape(kindle_labels["jump"])}</button>'
+                '</form></div>'
+            )
+        else:
+            toc_body = (
+                '<div class="k-toc-empty">'
+                f'<p data-i18n="noContentsBook">'
+                f'{html.escape(kindle_labels["noContentsBook"])}</p>'
+                '</div>'
+            )
         resume_script = f"""
 function kSetResume(chapter) {{
   if (typeof chapter !== 'number' || chapter < 0 || chapter >= {len(self.chapters)}
@@ -1669,6 +2095,14 @@ function kSetResume(chapter) {{
       current.setAttribute('aria-current', 'location');
     }} else entries[i].removeAttribute('aria-current');
   }}
+}}
+function kChapterJump() {{
+  var input = document.getElementById('kChapterJump');
+  var chapter = parseInt(input ? input.value : '', 10);
+  if (chapter >= 1 && chapter <= {len(self.chapters)}) {{
+    window.location.href = 'kindle_chapter_' + (chapter - 1) + '.html';
+  }}
+  return false;
 }}
 var kindleRequestedChapter = location.hash.match(/^#chapter-([0-9]+)$/);
 if (kindleRequestedChapter) {{
@@ -1719,7 +2153,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
 </div>
 <section class="k-surface">
     <h2 data-i18n="contents">{html.escape(kindle_labels["contents"])}</h2>
-    <div class="k-toc" lang="{book_language}"><ul>{toc_html}</ul></div>
+    {toc_body}
 </section>
 </main>
 {render_kindle_dock(self.urls, locale or "en", tools=tools)}
@@ -1728,6 +2162,263 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
 {kindle_locale_script(lambda code: _kindle_i18n_messages(code, tools), use_initial_locale=locale is not None)}
 {resume_script}
 {kindle_server_resume_script}</script>
+</body>
+</html>
+"""
+
+    def create_kindle_pdf_toc_page(self, *, locale=None):
+        """Kindle 极简 PDF 目录页，与 EPUB 书籍页共享同一套布局。"""
+        kindle_labels = _kindle_i18n_messages(locale)
+        book_language = html.escape(self.lang or 'en', quote=True)
+        book_title_text = html.escape(metadata_text(self.book_title), quote=False)
+        book_hash_js = json.dumps(str(self.book_hash))
+        authors_html = ""
+        if self.authors:
+            authors_text = " & ".join(
+                html.escape(metadata_text(author), quote=False)
+                for author in self.authors
+            )
+            authors_html = f"<p>{authors_text}</p>"
+        page_count = len(self._pdf_pages) or len(self.chapters)
+        go_to_page = html.escape(kindle_labels["goToPage"], quote=True)
+        outline_rows = []
+        for entry in self._pdf_outline_toc():
+            page_label = str(entry["page"])
+            outline_rows.append(
+                f'<li class="lvl-0" data-k-pdf-page="{page_label}">'
+                f'<a href="kindle_chapter.html#page-{page_label}">'
+                f'{html.escape(metadata_text(entry["title"]), quote=False)}'
+                f'<span class="k-pdf-toc-page">{page_label}</span></a></li>'
+            )
+        if outline_rows:
+            toc_body = (
+                f'<div class="k-toc k-pdf-toc" lang="{book_language}">'
+                f'<ul>{"".join(outline_rows)}</ul></div>'
+            )
+        else:
+            toc_body = (
+                '<div class="k-toc-empty">'
+                f'<p data-i18n="noContents">'
+                f'{html.escape(kindle_labels["noContents"])}</p>'
+                '<form class="k-toc-jump" onsubmit="return kPdfTocJump()">'
+                f'<input id="kPdfTocPage" type="number" min="1" max="{page_count}"'
+                f' inputmode="numeric" placeholder="{go_to_page}"'
+                f' data-i18n-placeholder="goToPage" aria-label="{go_to_page}"'
+                ' data-i18n-aria-label="goToPage">'
+                f'<button type="submit" data-i18n="jump">'
+                f'{html.escape(kindle_labels["jump"])}</button>'
+                '</form></div>'
+            )
+        jump_script = f"""
+function kPdfTocJump() {{
+  var input = document.getElementById('kPdfTocPage');
+  var page = parseInt(input ? input.value : '', 10);
+  if (page >= 1 && page <= {page_count}) {{
+    window.location.href = 'kindle_chapter.html#page-' + page;
+  }}
+  return false;
+}}
+"""
+        cover_html = kindle_cover(self.get_metadata().cover)
+        action = (
+            '<a id="kResume" class="k-control k-book-action" href="kindle_chapter.html" accesskey="c">'
+            '<span id="kStartLabel" data-i18n="startReading">'
+            f'{html.escape(kindle_labels["startReading"])}</span>'
+            '<span id="kResumeLabel" style="display:none" data-i18n="continueReading">'
+            f'{html.escape(kindle_labels["continueReading"])}</span></a>'
+        )
+        resume_script = f"""
+var kPdfTocBook = {book_hash_js};
+function kPdfTocMark(page) {{
+  var entries = document.querySelectorAll('[data-k-pdf-page]');
+  var current;
+  for (var i = 0; i < entries.length; i++) {{
+    if (Number(entries[i].getAttribute('data-k-pdf-page')) === page) {{
+      if (!current) {{
+        current = entries[i];
+        current.setAttribute('aria-current', 'location');
+      }}
+    }} else entries[i].removeAttribute('aria-current');
+  }}
+  var resume = document.getElementById('kResume');
+  if (resume) resume.href = 'kindle_chapter.html#page-' + page;
+  document.getElementById('kStartLabel').style.display = 'none';
+  document.getElementById('kResumeLabel').style.display = 'inline';
+  if (current && current.getBoundingClientRect().bottom > window.innerHeight - 58) {{
+    current.scrollIntoView();
+  }}
+}}
+var kPdfTocSaved = parseInt(getCookie('kindle_pdf_pos_' + kPdfTocBook), 10);
+if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
+"""
+        return f"""<!DOCTYPE html>
+<html lang="{locale or 'en'}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{book_title_text}</title>
+<style>
+{_KINDLE_READER_CSS}
+{_KINDLE_BOOK_CSS}
+{_KINDLE_PDF_TOC_CSS}
+</style>
+</head>
+<body class="light">
+<main class="k-book">
+<div class="k-book-hero k-surface" lang="{book_language}">
+    {cover_html}
+    <h1>{book_title_text}</h1>
+    {authors_html}
+    <div lang="{locale or 'en'}" data-k-ui-language>{action}</div>
+</div>
+<section class="k-surface">
+    <h2 data-i18n="contents">{html.escape(kindle_labels["contents"])}</h2>
+    {toc_body}
+</section>
+</main>
+{render_kindle_dock(self.urls, locale or "en")}
+<script>
+{_KINDLE_READER_JS}
+{kindle_locale_script(_kindle_i18n_messages, use_initial_locale=locale is not None)}
+{resume_script}
+{jump_script}</script>
+</body>
+</html>
+"""
+
+    def create_kindle_pdf_page(
+        self, page_count, *, locale=None, unsupported=False, landscape=False
+    ):
+        """Kindle image-page reader for PDF books (ES5, no PDF.js)."""
+        kindle_labels = _kindle_i18n_messages(locale)
+        safe_book_title = metadata_text(self.book_title)
+        book_title_text = html.escape(safe_book_title, quote=False)
+        book_language = html.escape(self.lang or 'en', quote=True)
+        book_hash_js = json.dumps(str(self.book_hash))
+        library_url = html.escape(
+            self.urls.public("/kindle-library.html"), quote=True
+        )
+        locale_script = kindle_locale_script(
+            _kindle_i18n_messages, use_initial_locale=locale is not None
+        )
+        if unsupported:
+            message = html.escape(kindle_labels["pdfUnsupported"])
+            library = html.escape(kindle_labels["library"])
+            return f"""<!DOCTYPE html>
+<html lang="{locale or 'en'}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{book_title_text}</title>
+<style>
+{_KINDLE_READER_CSS}
+{_KINDLE_PDF_CSS}
+</style>
+</head>
+<body class="light">
+<main class="k-book">
+<section class="k-surface k-pdf-unsupported">
+    <h1>{book_title_text}</h1>
+    <p data-i18n="pdfUnsupported">{message}</p>
+    <p><a class="k-control" href="{library_url}" data-i18n="library">{library}</a></p>
+</section>
+</main>
+<script>
+{locale_script}</script>
+</body>
+</html>
+"""
+        page_count = max(1, int(page_count))
+        previous = html.escape(kindle_labels["previousPage"])
+        following = html.escape(kindle_labels["nextPage"])
+        settings = html.escape(kindle_labels["settings"])
+        done = html.escape(kindle_labels["done"])
+        fit_width = html.escape(kindle_labels["fitWidth"])
+        fit_page = html.escape(kindle_labels["fitPage"])
+        zoom_in = html.escape(kindle_labels["zoomIn"])
+        zoom_out = html.escape(kindle_labels["zoomOut"])
+        jump = html.escape(kindle_labels["jump"])
+        go_to_page = html.escape(kindle_labels["goToPage"])
+        page_load_error = html.escape(kindle_labels["pageLoadError"])
+        contents = html.escape(kindle_labels["contents"])
+        page_one_alt = html.escape(
+            kindle_labels["pageOf"]
+            .replace("{number}", "1")
+            .replace("{total}", str(page_count)),
+            quote=True,
+        )
+        pdf_script = _KINDLE_PDF_JS % {
+            "book_hash": book_hash_js,
+            "page_count": page_count,
+            "landscape": json.dumps(bool(landscape)),
+        }
+        server_report = ""
+        if self.deployment_mode == "server":
+            server_report = _KINDLE_PDF_SERVER_REPORT_JS % {
+                "book_hash": book_hash_js,
+            }
+        return f"""<!DOCTYPE html>
+<html lang="{locale or 'en'}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{book_title_text}</title>
+<style>
+{_KINDLE_READER_CSS}
+{_KINDLE_PDF_CSS}
+</style>
+</head>
+<body class="light" data-k-reader="scroll" data-k-pdf="1" data-k-pdf-fit="width">
+<header class="k-header k-reader-header">
+    <a href="kindle.html" data-i18n="contents">{contents}</a>
+    <button type="button" id="kPdfSettingsButton" onclick="kPdfToggleSettings()"
+            aria-controls="kPdfSettings" aria-expanded="false"
+            data-i18n-aria-label="settings" aria-label="{settings}">Aa</button><!-- i18n-allow-literal: stable data identifier -->
+    <span class="k-running-title" lang="{book_language}">{book_title_text}</span>
+</header>
+<main class="k-pdf-reader">
+    <div id="kPdfViewport">
+        <img id="kPdfPage" alt="{page_one_alt}">
+        <p class="k-pdf-error" id="kPdfError" role="alert" data-i18n="pageLoadError">{page_load_error}</p>
+    </div>
+</main>
+<footer class="k-reader-footer" id="kPdfFooter">
+    <button type="button" id="kPdfPrev" onclick="kPdfTurn(-1)" data-i18n-aria-label="previousPage" aria-label="{previous}">‹</button>
+    <span id="kPdfPosition" role="status" aria-live="polite">1/{page_count}</span>
+    <button type="button" id="kPdfNext" onclick="kPdfTurn(1)" data-i18n-aria-label="nextPage" aria-label="{following}">›</button>
+</footer>
+<div id="kPdfSettingsBackdrop" class="k-settings-backdrop" onclick="kPdfToggleSettings()" aria-hidden="true"></div>
+<div class="k-reader-settings k-surface" id="kPdfSettings" role="dialog" aria-modal="true" aria-labelledby="kPdfSettingsTitle">
+    <div class="k-settings-heading">
+        <h2 id="kPdfSettingsTitle" data-i18n="settings">{settings}</h2>
+        <button class="k-control" type="button" onclick="kPdfToggleSettings()" data-i18n-aria-label="done" aria-label="{done}">×</button>
+    </div>
+    <div class="k-settings-modes">
+        <button class="k-control" type="button" data-k-pdf-fit="width" onclick="kPdfApplyFit('width')"
+                aria-pressed="true" data-i18n="fitWidth">{fit_width}</button>
+        <button class="k-control" type="button" data-k-pdf-fit="page" onclick="kPdfApplyFit('page')"
+                aria-pressed="false" data-i18n="fitPage">{fit_page}</button>
+    </div>
+    <div class="k-settings-modes">
+        <button class="k-control" type="button" onclick="kPdfZoomStep(-1)"
+                data-i18n-aria-label="zoomOut" aria-label="{zoom_out}">−</button>
+        <span class="k-scale-value" id="kPdfScaleValue" aria-live="polite">100%</span>
+        <button class="k-control" type="button" onclick="kPdfZoomStep(1)"
+                data-i18n-aria-label="zoomIn" aria-label="{zoom_in}">+</button>
+    </div>
+    <form class="k-pdf-jump" onsubmit="kPdfJump();return false;">
+        <input id="kPdfJumpInput" type="text" inputmode="numeric" autocomplete="off"
+               placeholder="{go_to_page}" data-i18n-placeholder="goToPage"
+               data-i18n-aria-label="goToPage" aria-label="{go_to_page}">
+        <button class="k-control" type="submit" data-i18n="jump">{jump}</button>
+    </form>
+    <a class="k-control" href="#" onclick="kPdfToggleSettings();return false;" data-i18n="done">{done}</a>
+</div>
+<script>
+{_KINDLE_READER_JS}
+{locale_script}
+{pdf_script}
+{server_report}</script>
 </body>
 </html>
 """
@@ -1799,7 +2490,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     <nav class="k-nav k-chapter-links">{prev_link}{next_link}</nav>
     <button type="button" id="kTurnBack" onclick="kTurnPage(-1)" data-i18n-aria-label="previousPage" aria-label="{html.escape(kindle_labels["previousPage"])}">‹</button>
     <button type="button" id="kTurnForward" onclick="kTurnPage(1)" data-i18n-aria-label="nextPage" aria-label="{html.escape(kindle_labels["nextPage"])}">›</button>
-    <span id="kReaderPosition">{chapter_index + 1}/{len(self.chapters)}</span>
+    <span id="kReaderPosition" role="status" aria-live="polite">{chapter_index + 1}/{len(self.chapters)}</span>
 </footer>
 <div id="kSettingsBackdrop" onclick="kToggleSettings()" aria-hidden="true"></div>
 <div class="k-reader-settings k-surface" id="kSettings" role="dialog" aria-modal="true" aria-labelledby="kSettingsTitle">
