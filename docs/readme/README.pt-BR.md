@@ -570,6 +570,7 @@ A imagem executa o modo Server persistente com estes padrões:
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 Como a identidade incorporada pode atualizar arquivos EPUB ou PDF, monte a biblioteca com leitura e gravação. Monte o estado do Server com leitura e gravação e mantenha esse estado ao substituir o contêiner:
 

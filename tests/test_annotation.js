@@ -534,6 +534,88 @@ test('a page-local PDF selection uses the shared menu and dictionary action', ()
   assert.equal(interaction.getChapterIndexFromSource(source), 2);
 });
 
+test('Ctrl/Cmd+C copies the pending selection because the highlighter consumes the native range', () => {
+  const document = createAnnotationDialogDocument();
+  document.documentElement = document.body;
+  document.getElementById = () => null;
+  function Highlighter() {
+    this.on = () => {};
+    this.run = () => {};
+    this.stop = () => {};
+    this.remove = () => {};
+    this.removeAll = () => {};
+  }
+  Highlighter.event = { CREATE: 'create', CLICK: 'click' };
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) }, 'server', document,
+    { Highlighter, exposeHighlightInteraction: true },
+  );
+  const copied = [];
+  window.navigator.clipboard = { writeText: text => { copied.push(text); return Promise.resolve(); } };
+  const interaction = window.__testHighlightInteraction;
+  interaction.init();
+
+  const menu = document.createElement('div');
+  menu.className = 'annotation-selection-menu';
+  document.body.appendChild(menu);
+  interaction.activeDialog = menu;
+  interaction.pendingDraft = { id: 'draft-1', source: { id: 'draft-1', text: 'little prince' } };
+  let prevented = false;
+  document.listeners.keydown({
+    key: 'c', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false,
+    target: document.body, defaultPrevented: false,
+    preventDefault() { prevented = true; },
+  });
+
+  assert.equal(prevented, true);
+  assert.deepEqual(copied, ['little prince']);
+  assert.equal(interaction.pendingDraft, null);
+});
+
+test('Ctrl/Cmd+C is left to editable fields and to readers without a pending selection', () => {
+  const document = createAnnotationDialogDocument();
+  document.documentElement = document.body;
+  document.getElementById = () => null;
+  function Highlighter() {
+    this.on = () => {};
+    this.run = () => {};
+    this.stop = () => {};
+    this.remove = () => {};
+    this.removeAll = () => {};
+  }
+  Highlighter.event = { CREATE: 'create', CLICK: 'click' };
+  const window = loadAnnotationWindow(
+    { status: 200, body: JSON.stringify({ data: [] }) }, 'server', document,
+    { Highlighter, exposeHighlightInteraction: true },
+  );
+  const copied = [];
+  window.navigator.clipboard = { writeText: text => { copied.push(text); return Promise.resolve(); } };
+  const interaction = window.__testHighlightInteraction;
+  interaction.init();
+
+  const menu = document.createElement('div');
+  menu.className = 'annotation-selection-menu';
+  document.body.appendChild(menu);
+  interaction.activeDialog = menu;
+  interaction.pendingDraft = { id: 'draft-1', source: { id: 'draft-1', text: 'little prince' } };
+  let prevented = false;
+  document.listeners.keydown({
+    key: 'c', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false,
+    target: { tagName: 'TEXTAREA', isContentEditable: false }, defaultPrevented: false,
+    preventDefault() { prevented = true; },
+  });
+
+  interaction.pendingDraft = null;
+  document.listeners.keydown({
+    key: 'c', ctrlKey: true, metaKey: false, altKey: false, shiftKey: false,
+    target: document.body, defaultPrevented: false,
+    preventDefault() { prevented = true; },
+  });
+
+  assert.equal(prevented, false);
+  assert.deepEqual(copied, []);
+});
+
 test('note dialog keeps colors compact and lets readers expand every configured color', () => {
   const document = createAnnotationDialogDocument();
   const window = loadAnnotationWindow(

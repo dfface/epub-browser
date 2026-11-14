@@ -965,6 +965,7 @@
   "settings.arrowKeyNavigation": "Mit linker und rechter Pfeiltaste navigieren",
   "settings.spaceKeyNavigation": "Mit der Leertaste zur nächsten Seite oder zum nächsten Kapitel wechseln",
   "reader.locateCurrentChapter": "Aktuelles Kapitel finden",
+  "reader.locateCurrentSection": "Aktuellen Abschnitt finden",
   "annotations.addImageNote": "Bildnotiz hinzufügen",
   "annotations.imageNote": "Bildnotiz",
   "annotations.showMoreColors": "{count} weitere Farben anzeigen",

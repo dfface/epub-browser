@@ -2195,9 +2195,14 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     <nav class="toc-floating reader-drawer" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true"{ai_reading_indicators}>
         <div class="toc-header">
             <h3 data-i18n="reader.thisChapterContents">This chapter</h3>
-            <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
-                <i class="fas fa-times"></i>
-            </button>
+            <div class="toc-header-actions">
+                <button class="toc-current-chapter" id="tocLocateCurrent" type="button" aria-label="Locate current section" data-i18n-aria-label="reader.locateCurrentSection">
+                    <i class="fas fa-crosshairs" aria-hidden="true"></i>
+                </button>
+                <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
         </div>
         <ul class="toc-list" id="tocList">
             <!-- 动态生成的目录将放在这里 -->
@@ -2444,6 +2449,10 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
             <i class="fas fa-arrow-up"></i>
             <span class="control-name" data-i18n="reader.top">Top</span>
         </button>
+        <a class="control-btn" id="bookHomeShortcut" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome" title="Open book home" data-i18n-title="reader.openBookHome">
+            <i class="fas fa-book-open"></i>
+            <span class="control-name" data-i18n="reader.openBookHome">Book home</span>
+        </a>
     </div>
 
     <!-- 移动端控件 -->
@@ -2476,6 +2485,10 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
             <i class="fas fa-cog"></i>
             <span data-i18n="reader.settings">Settings</span>
         </button>
+        <a class="control-btn" id="mobileBookHomeShortcut" href="index.html" aria-label="Open book home" title="Open book home" data-i18n-aria-label="reader.openBookHome" data-i18n-title="reader.openBookHome">
+            <i class="fas fa-book-open"></i>
+            <span data-i18n="reader.openBookHome">Book home</span>
+        </a>
         <button class="control-btn" id="mobileTopBtn" type="button" aria-label="Top" title="Top" data-i18n-aria-label="reader.top" data-i18n-title="reader.top">
             <i class="fas fa-arrow-up"></i>
             <span data-i18n="reader.top">Top</span>

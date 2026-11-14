@@ -598,6 +598,7 @@ L’image exécute le mode Server persistant avec les valeurs par défaut suivan
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 Comme l’identité intégrée peut modifier les fichiers EPUB ou PDF, montez la bibliothèque en lecture-écriture. Montez également l’état du Server en lecture-écriture et conservez-le lors du remplacement du conteneur :
 

@@ -965,6 +965,7 @@
   "settings.arrowKeyNavigation": "ใช้ปุ่มลูกศรซ้ายและขวาเพื่อนำทาง",
   "settings.spaceKeyNavigation": "ใช้ Space เพื่อไปหน้าหรือบทถัดไป",
   "reader.locateCurrentChapter": "ค้นหาบทปัจจุบัน",
+  "reader.locateCurrentSection": "ค้นหาส่วนปัจจุบัน",
   "annotations.addImageNote": "เพิ่มบันทึกภาพ",
   "annotations.imageNote": "บันทึกภาพ",
   "annotations.showMoreColors": "แสดงสีเพิ่มอีก {count} สี",

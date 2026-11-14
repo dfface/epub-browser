@@ -944,7 +944,8 @@ def render_library_shell(
     <div class="controls" data-id="controls">
         <div class="library-toolbar">
             <div class="search-container">
-                <input type="search" class="search-box" placeholder="Search by book title, author, or tag..."
+                <input type="search" class="search-box" id="librarySearch"
+                    placeholder="Search by book title, author, or tag..."
                     aria-label="Search by book title, author, or tag"
                     data-i18n-placeholder="library.searchPlaceholder" data-i18n-aria-label="library.searchPlaceholder">
                 <i class="fas fa-search search-icon" aria-hidden="true"></i>

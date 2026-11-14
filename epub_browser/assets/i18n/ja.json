@@ -965,6 +965,7 @@
   "settings.arrowKeyNavigation": "左右の矢印キーで移動",
   "settings.spaceKeyNavigation": "スペースキーで次のページまたは章へ進む",
   "reader.locateCurrentChapter": "現在の章を表示",
+  "reader.locateCurrentSection": "現在の節を表示",
   "annotations.addImageNote": "画像メモを追加",
   "annotations.imageNote": "画像メモ",
   "annotations.showMoreColors": "残り{count}色を表示",

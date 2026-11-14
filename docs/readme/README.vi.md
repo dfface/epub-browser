@@ -580,6 +580,7 @@ Image chạy chế độ Server lâu dài với các mặc định sau:
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 Vì embedded identity có thể cập nhật tệp EPUB hoặc PDF, hãy mount thư viện ở chế độ đọc-ghi. Mount
 trạng thái Server ở chế độ đọc-ghi và giữ lại khi thay container:

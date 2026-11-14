@@ -513,6 +513,7 @@ epub-browser server /path/to/books \
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 嵌入式身分可能更新 EPUB 或 PDF 檔案，因此書庫應以可讀寫方式掛載。Server 狀態也必須以可讀寫方式掛載，並在替換容器時保留：
 

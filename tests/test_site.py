@@ -47,6 +47,7 @@ class SitePublicationTests(unittest.TestCase):
         self.assertIn("window.initScriptLibrary()", html)
         self.assertIn('id="libraryBookCount\"', html)
         self.assertIn('id="libraryTagCount\"', html)
+        self.assertIn('id="librarySearch"', html)
         self.assertRegex(
             html,
             r"window\.EpubBrowserBasePath=(?:[\"'`])/reader/(?:[\"'`])",

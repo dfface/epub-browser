@@ -561,6 +561,7 @@ The image runs persistent Server mode with these defaults:
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 Because embedded identity may update EPUB or PDF files, mount the library read-write. Mount Server state read-write and keep it across container replacement:
 

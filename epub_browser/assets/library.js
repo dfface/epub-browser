@@ -778,6 +778,14 @@ function initScript() {
             applyLibraryFilters();
             loadPinyinForSearch();
         });
+        window.addEventListener('keydown', function(event) {
+            if (event.defaultPrevented || event.altKey || event.shiftKey) return;
+            if (!(event.ctrlKey || event.metaKey)) return;
+            if (String(event.key || '').toLowerCase() !== 'k') return;
+            event.preventDefault();
+            searchBox.focus();
+            searchBox.select();
+        });
     }
     if (tagCloud && tagCloud.getAttribute('data-library-filter-listener') !== 'true') {
         tagCloud.setAttribute('data-library-filter-listener', 'true');

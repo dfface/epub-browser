@@ -594,6 +594,7 @@ epub-browser server /path/to/books \
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 एम्बेडेड पहचान EPUB या PDF फ़ाइलें अपडेट कर सकती है, इसलिए लाइब्रेरी को रीड-राइट
 माउंट करें। Server स्थिति रीड-राइट माउंट करें और कंटेनर बदलने पर भी उसे बनाए रखें:
