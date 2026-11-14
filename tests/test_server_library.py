@@ -889,6 +889,116 @@ class ServerLibraryManagerTests(unittest.TestCase):
         converter.assert_not_called()
         manager.shutdown()
 
+    def test_unchanged_mixed_library_reconcile_validates_each_cache_once(self):
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, pages=2)
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        records = manager.reconcile().active_books
+        self.assertEqual(
+            {record.source_format for record in records},
+            {"epub", "pdf"},
+        )
+        original_cache_valid = manager._cache_valid
+        checks = Counter()
+
+        def counting_cache_valid(record):
+            checks[record.book_id] += 1
+            return original_cache_valid(record)
+
+        manager._cache_valid = counting_cache_valid
+        summary = manager.reconcile()
+
+        self.assertEqual(summary.reused, len(records))
+        self.assertEqual(
+            dict(checks),
+            {record.book_id: 1 for record in records},
+        )
+
+    def test_changed_cache_is_revalidated_only_for_that_book(self):
+        pdf_source = self.source_dir / "document.pdf"
+        self._write_pdf(pdf_source, title="First", pages=2)
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        records = {
+            record.source_format: record
+            for record in manager.reconcile().active_books
+        }
+        original_cache_valid = manager._cache_valid
+        checks = Counter()
+
+        def counting_cache_valid(record):
+            checks[record.book_id] += 1
+            return original_cache_valid(record)
+
+        manager._cache_valid = counting_cache_valid
+        self._write_pdf(pdf_source, title="Second", pages=3)
+        summary = manager.reconcile()
+
+        self.assertEqual(summary.converted, 1)
+        self.assertEqual(
+            [record.book_id for record in summary.active_books].count(
+                records["pdf"].book_id
+            ),
+            1,
+        )
+        self.assertEqual(checks[records["epub"].book_id], 1)
+        self.assertLessEqual(checks[records["pdf"].book_id], 2)
+        book_root = manager.public_dir / "book" / records["pdf"].book_id
+        payload = json.loads(
+            (book_root / "pdf" / "metadata.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(payload["title"], "Second")
+        self.assertEqual(payload["page_count"], 3)
+
+    def test_evicted_cache_rescan_uses_marker_without_revalidation(self):
+        self.source.unlink()
+        first = self.source_dir / "first.pdf"
+        second = self.source_dir / "second.pdf"
+        self._write_pdf(first, title="First")
+        self._write_pdf(second, title="Second")
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        records = manager.reconcile().active_books
+        self.store.set_general_settings(book_cache_limit=1)
+        manager.trim_book_cache()
+        cold = next(
+            record for record in records if manager.book_cache_is_cold(record.book_id)
+        )
+        warm = next(record for record in records if record.book_id != cold.book_id)
+        original_cache_valid = manager._cache_valid
+        checks = Counter()
+
+        def counting_cache_valid(record):
+            checks[record.book_id] += 1
+            return original_cache_valid(record)
+
+        manager._cache_valid = counting_cache_valid
+        summary = manager.reconcile()
+
+        self.assertEqual(summary.reused, 2)
+        self.assertEqual({record.book_id for record in summary.active_books}, {
+            record.book_id for record in records
+        })
+        self.assertNotIn(cold.book_id, checks)
+        self.assertEqual(checks[warm.book_id], 1)
+        self.assertTrue(manager.book_cache_is_cold(cold.book_id))
+
+    def test_missing_epub_chapter_cache_is_detected_and_rebuilt(self):
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        record = manager.reconcile().active_books[0]
+        chapter = (
+            manager.public_dir / "book" / record.book_id
+            / "content" / "chapter_0.json"
+        )
+        chapter.unlink()
+
+        rebuilt = manager.reconcile()
+
+        self.assertEqual(rebuilt.converted, 1)
+        self.assertTrue(chapter.is_file())
+
     def test_reconcile_upgrades_unchanged_legacy_generated_output(self):
         manager = self._manager()
         record = manager.reconcile().active_books[0]
@@ -1125,19 +1235,19 @@ class ServerLibraryManagerTests(unittest.TestCase):
         )
         reuse_checked = threading.Event()
         release_reuse = threading.Event()
-        original_cache_valid = manager._cache_valid
-        cache_checks = 0
+        original_book_available = manager._book_available
+        availability_checks = 0
 
         def pause_after_reuse_check(record):
-            nonlocal cache_checks
-            valid = original_cache_valid(record)
-            cache_checks += 1
-            if cache_checks == 2:
+            nonlocal availability_checks
+            available = original_book_available(record)
+            availability_checks += 1
+            if availability_checks == 2:
                 reuse_checked.set()
                 release_reuse.wait(timeout=5)
-            return valid
+            return available
 
-        manager._cache_valid = pause_after_reuse_check
+        manager._book_available = pause_after_reuse_check
         result = []
         reconcile_thread = threading.Thread(
             target=lambda: result.append(manager.reconcile()),
