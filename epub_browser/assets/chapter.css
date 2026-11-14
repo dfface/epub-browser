@@ -2113,11 +2113,13 @@ body.pagination-mode {
         transform: translate(-50%, 0);
     }
 
-    .mobile-controls #mobileTopBtn {
+    .mobile-controls #mobileTopBtn,
+    .mobile-controls #mobileBookHomeShortcut {
         display: none;
     }
 
-    .mobile-controls #mobileTopBtn.is-visible {
+    .mobile-controls #mobileTopBtn.is-visible,
+    .mobile-controls #mobileBookHomeShortcut.is-visible {
         display: flex;
     }
 
@@ -2164,7 +2166,9 @@ body.pagination-mode {
 
 body.continuous-scroll-mode .reading-controls,
 body.continuous-scroll-mode #scrollToTopBtn,
-body.continuous-scroll-mode #mobileTopBtn {
+body.continuous-scroll-mode #bookHomeShortcut,
+body.continuous-scroll-mode #mobileTopBtn,
+body.continuous-scroll-mode #mobileBookHomeShortcut {
     display: none !important;
 }
 

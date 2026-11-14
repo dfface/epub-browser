@@ -965,6 +965,7 @@
   "settings.arrowKeyNavigation": "Dùng phím mũi tên trái và phải để điều hướng",
   "settings.spaceKeyNavigation": "Dùng Phím cách để sang trang hoặc chương tiếp theo",
   "reader.locateCurrentChapter": "Tìm chương hiện tại",
+  "reader.locateCurrentSection": "Tìm phần hiện tại",
   "annotations.addImageNote": "Thêm ghi chú ảnh",
   "annotations.imageNote": "Ghi chú ảnh",
   "annotations.showMoreColors": "Hiện thêm {count} màu",

@@ -2072,6 +2072,7 @@ function initScript() {
     var mobileTocBtn = document.getElementById('mobileTocBtn');
     var mobileBookHomeBtn = document.getElementById('mobileBookHomeBtn');
     var tocClose = document.getElementById('tocClose');
+    var tocLocateCurrent = document.getElementById('tocLocateCurrent');
     var bookHomeClose = document.getElementById('bookHomeClose');
     var bookHomeLocateCurrent = document.getElementById('bookHomeLocateCurrent');
     var tocList = document.getElementById('tocList');
@@ -2081,10 +2082,22 @@ function initScript() {
     
     generateToc();
     
-    function tocFloatingScrolling() {
-        var active = document.querySelector('.toc-list li.active');
+    function tocFloatingScrolling(force) {
         var list = document.getElementById('tocList');
-        if (active) list.scrollTop = active.offsetTop - 150;
+        if (!list) return;
+        var active = list.querySelector('li.active');
+        if (!active) {
+            if (force) list.scrollTop = 0;
+            return;
+        }
+        // Follow the reading position like the book contents drawer: only pull
+        // the list back when the active section is out of view, so a reader can
+        // browse the chapter contents manually until the locate button is used.
+        var itemTop = active.offsetTop;
+        var itemBottom = itemTop + active.offsetHeight;
+        if (force || itemTop < list.scrollTop || itemBottom > list.scrollTop + list.clientHeight) {
+            list.scrollTop = Math.max(0, itemTop - list.clientHeight / 2);
+        }
     }
 
     function bookHomeFloatingScrolling() {
@@ -2196,6 +2209,11 @@ function initScript() {
     tocClose.addEventListener('click', function() {
         closeReaderDrawers(true);
     });
+    if (tocLocateCurrent) {
+        tocLocateCurrent.addEventListener('click', function() {
+            updateTocHighlight(true);
+        });
+    }
     bookHomeClose.addEventListener('click', function() {
         closeReaderDrawers(true);
     });
@@ -2255,30 +2273,47 @@ function initScript() {
         }
     }
     
-    function updateTocHighlight() {
-        if (isPaginationMode) return;
+    function updateTocHighlight(focusLink) {
         var c = document.getElementById('eb-content');
+        if (!c) return;
         var heads = c.querySelectorAll('h2, h3, h4');
         var items = document.querySelectorAll('#tocFloating .toc-item');
-        var pos = window.scrollY + 150;
         var id = '';
-        for (var i = heads.length-1; i >=0; i--) {
-            var h = heads[i];
-            if (h.offsetTop <= pos) {
-                id = h.id;
-                break;
+        if (isPaginationMode) {
+            if (pageWidth > 0) {
+                for (var p = 0; p < heads.length; p++) {
+                    if (Math.floor(heads[p].offsetLeft / pageWidth) <= currentPage) {
+                        id = heads[p].id;
+                    } else {
+                        break;
+                    }
+                }
+            }
+        } else {
+            var pos = window.scrollY + 150;
+            for (var i = heads.length-1; i >=0; i--) {
+                var h = heads[i];
+                if (h.offsetTop <= pos) {
+                    id = h.id;
+                    break;
+                }
             }
         }
         items.forEach(function(it) { it.classList.remove('active'); });
         items.forEach(function(it) {
             var a = it.querySelector('a');
-            if (a && a.getAttribute('href') === '#' + id) it.classList.add('active');
+            if (a && a.getAttribute('href') === '#' + id) {
+                it.classList.add('active');
+                if (focusLink) a.focus();
+            }
         });
-        tocFloatingScrolling();
+        tocFloatingScrolling(Boolean(focusLink));
     }
     
     var scrollTopBtn = document.getElementById('scrollToTopBtn');
     var mobileTopBtn = document.getElementById('mobileTopBtn');
+    var bookHomeShortcut = document.getElementById('bookHomeShortcut');
+    var mobileBookHomeShortcut = document.getElementById('mobileBookHomeShortcut');
     if (scrollTopBtn) {
         scrollTopBtn.addEventListener('click', function() {
             window.scrollTo(0,0);
@@ -2288,10 +2323,15 @@ function initScript() {
         // Continuous-scroll setup runs before this block is reached. Resolve
         // lazily so its first visibility update cannot abort reader startup.
         if (!scrollTopBtn) scrollTopBtn = document.getElementById('scrollToTopBtn');
+        if (!bookHomeShortcut) bookHomeShortcut = document.getElementById('bookHomeShortcut');
+        if (!mobileBookHomeShortcut) mobileBookHomeShortcut = document.getElementById('mobileBookHomeShortcut');
         if (!mobileTopBtn) mobileTopBtn = document.getElementById('mobileTopBtn');
         var scrollTop = window.pageYOffset || document.documentElement.scrollTop || 0;
         var threshold = Math.max(320, (window.innerHeight || 0) * 0.75);
-        if (scrollTop > threshold && !document.body.classList.contains('pagination-mode') && !isContinuousScroll) {
+        var visible = scrollTop > threshold && !document.body.classList.contains('pagination-mode') && !isContinuousScroll;
+        if (bookHomeShortcut) bookHomeShortcut.classList.toggle('is-visible', visible);
+        if (mobileBookHomeShortcut) mobileBookHomeShortcut.classList.toggle('is-visible', visible);
+        if (visible) {
             if (scrollTopBtn) scrollTopBtn.classList.add('is-visible');
             if (mobileTopBtn) mobileTopBtn.classList.add('is-visible');
         } else {

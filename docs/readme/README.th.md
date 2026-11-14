@@ -551,6 +551,7 @@ address ของ Uvicorn ไว้ ดังนั้น `Forwarded` และ 
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 เนื่องจากการฝัง ID อาจอัปเดตไฟล์ EPUB หรือ PDF ให้ mount ไลบรารีแบบอ่านเขียน และ mount สถานะ Server
 แบบอ่านเขียนพร้อมเก็บข้อมูลนั้นไว้เมื่อเปลี่ยนคอนเทนเนอร์:

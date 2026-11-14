@@ -559,6 +559,7 @@ La imagen ejecuta el modo Server persistente con estos valores predeterminados:
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 Como la identidad integrada puede actualizar archivos EPUB o PDF, monta la biblioteca con permisos de lectura y escritura. Monta el estado del Server con permisos de lectura y escritura y consérvalo al sustituir el contenedor:
 

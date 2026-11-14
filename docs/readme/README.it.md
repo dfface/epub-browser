@@ -558,6 +558,7 @@ L'immagine esegue la modalità Server persistente con queste impostazioni predef
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 Poiché l'identità incorporata può aggiornare file EPUB o PDF, monta la libreria in lettura e scrittura. Monta lo stato del Server in lettura e scrittura e conservalo quando sostituisci il container:
 

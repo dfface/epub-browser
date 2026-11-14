@@ -965,6 +965,7 @@
   "settings.arrowKeyNavigation": "使用左右方向键导航",
   "settings.spaceKeyNavigation": "使用空格键前往下一页或下一章",
   "reader.locateCurrentChapter": "定位当前章节",
+  "reader.locateCurrentSection": "定位当前小节",
   "annotations.addImageNote": "添加图片笔记",
   "annotations.imageNote": "图片笔记",
   "annotations.showMoreColors": "展开其余 {count} 种颜色",

@@ -546,6 +546,11 @@
     }
   }
 
+  function isSearchShortcut(event) {
+    return Boolean(event) && !event.defaultPrevented && !event.altKey && !event.shiftKey &&
+      Boolean(event.ctrlKey || event.metaKey) && String(event.key || '').toLowerCase() === 'k';
+  }
+
   function initModal(modal, input) {
     var toggle = root.document.getElementById('bookSearchToggle');
     var close = root.document.getElementById('bookSearchClose');
@@ -560,13 +565,18 @@
       if (restore && typeof restore.focus === 'function') restore.focus();
     }
     function openModal() {
-      if (!modal.hidden) return;
+      if (!modal.hidden) {
+        focusInput(input);
+        ensureSearch();
+        return;
+      }
       opener = root.document.activeElement || toggle;
       modal.hidden = false;
       if (toggle) toggle.setAttribute('aria-expanded', 'true');
       focusInput(input);
       ensureSearch();
     }
+    state.openOverlay = openModal;
     state.closeOverlay = closeModal;
     if (toggle) toggle.addEventListener('click', openModal);
     if (close) close.addEventListener('click', closeModal);
@@ -624,6 +634,21 @@
           mobileToggle.addEventListener('click', function () { drawer.open(mobileToggle); });
         }
       }
+      state.openOverlay = function () {
+        if (!drawer) return;
+        if (panel.classList.contains('active')) {
+          focusInput(input);
+          ensureSearch();
+          return;
+        }
+        drawer.open(toggle);
+        // The reader drawer focuses its close button on the next frame, so
+        // focus the query field afterwards to keep the shortcut usable.
+        root.requestAnimationFrame(function () {
+          focusInput(input);
+          ensureSearch();
+        });
+      };
       state.closeOverlay = function () {
         root.EpubReaderDrawers.close(true);
       };
@@ -635,6 +660,11 @@
     } else if (modal) {
       initModal(modal, input);
     }
+    root.document.addEventListener('keydown', function (event) {
+      if (!isSearchShortcut(event) || typeof state.openOverlay !== 'function') return;
+      event.preventDefault();
+      state.openOverlay();
+    });
     var previous = root.document.getElementById('bookSearchPrev');
     var next = root.document.getElementById('bookSearchNext');
     var pagination = root.document.getElementById('bookSearchPagination');

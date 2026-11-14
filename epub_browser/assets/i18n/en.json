@@ -965,6 +965,7 @@
   "settings.arrowKeyNavigation": "Use Left and Right Arrow keys to navigate",
   "settings.spaceKeyNavigation": "Use Space for the next page or chapter",
   "reader.locateCurrentChapter": "Locate current chapter",
+  "reader.locateCurrentSection": "Locate current section",
   "annotations.addImageNote": "Add image note",
   "annotations.imageNote": "Image note",
   "annotations.showMoreColors": "Show {count} more colors",

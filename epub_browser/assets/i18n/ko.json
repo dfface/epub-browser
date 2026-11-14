@@ -965,6 +965,7 @@
   "settings.arrowKeyNavigation": "왼쪽 및 오른쪽 화살표 키로 이동",
   "settings.spaceKeyNavigation": "스페이스 키로 다음 페이지 또는 장으로 이동",
   "reader.locateCurrentChapter": "현재 장으로 이동",
+  "reader.locateCurrentSection": "현재 절로 이동",
   "annotations.addImageNote": "이미지 메모 추가",
   "annotations.imageNote": "이미지 메모",
   "annotations.showMoreColors": "색상 {count}개 더 보기",

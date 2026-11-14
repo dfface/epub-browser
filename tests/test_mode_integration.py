@@ -441,6 +441,13 @@ class ModeIntegrationTests(unittest.TestCase):
 
         self.assertIn('"--book-id-storage=embedded"', dockerfile)
 
+    def test_docker_server_enables_kindle_mode_by_default(self):
+        dockerfile = Path("Dockerfile").read_text(encoding="utf-8")
+        compose = Path("docker-compose.yml").read_text(encoding="utf-8")
+
+        self.assertIn('"--kindle"', dockerfile)
+        self.assertIn("--kindle", compose)
+
     def test_english_and_chinese_readmes_document_every_public_mode_option(self):
         documented_options = {
             "--output-dir",

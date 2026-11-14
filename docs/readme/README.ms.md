@@ -560,6 +560,7 @@ Imej menjalankan mod Server berterusan dengan lalai berikut:
 - `--no-browser`
 - `--host 0.0.0.0 --port 80`
 - `--book-id-storage embedded`
+- `--kindle`
 
 Oleh sebab identiti embedded boleh mengemas kini fail EPUB atau PDF, lekapkan perpustakaan sebagai baca-tulis. Lekapkan state Server sebagai baca-tulis dan kekalkannya semasa menggantikan kontena:
 
