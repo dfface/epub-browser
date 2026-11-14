@@ -3,18 +3,57 @@
 from __future__ import annotations
 
 import json
+import threading
+from collections import OrderedDict
+from dataclasses import dataclass, replace
 from pathlib import Path
+from typing import Optional
 from urllib.parse import quote
 
 from .asset_publisher import PublishedAssets
 from .pdf_processor import PDFMetadata, PDFPageMetadata
-from .reader_pages import ReaderPageRenderer
+from .reader_pages import ReaderPageRenderer, pdf_page_navigation
+from .server_library import PDF_OUTPUT_REVISION_FILE
 from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .urls import SiteURLs
+
+_PDF_DERIVED_CACHE_LIMIT = 16
+_PDF_DERIVED_CACHE: "OrderedDict[tuple, _PdfDerivedMetadata]" = OrderedDict()
+_PDF_DERIVED_CACHE_LOCK = threading.Lock()
 
 
 class ServerPageError(ValueError):
     """The derived content cache cannot safely render a reader page."""
+
+
+@dataclass(frozen=True)
+class _PdfDerivedMetadata:
+    """Page-derived state reused for one published PDF cache generation."""
+
+    metadata: PDFMetadata
+    cover_path: Optional[str]
+    chapters: list
+    toc: list
+
+
+def _pdf_metadata_with_overrides(metadata: PDFMetadata, overrides) -> PDFMetadata:
+    """Apply managed metadata per request without mutating the shared cache."""
+    changes = {}
+    if "title" in overrides:
+        changes["title"] = overrides["title"]
+    if "authors" in overrides:
+        changes["authors"] = tuple(overrides["authors"] or ())
+    if "tags" in overrides:
+        changes["tags"] = tuple(overrides["tags"] or ())
+    if not changes:
+        return metadata
+    return replace(metadata, **changes)
+
+
+def _clear_pdf_derived_cache() -> None:
+    """Drop process-local PDF metadata; intended for deterministic tests."""
+    with _PDF_DERIVED_CACHE_LOCK:
+        _PDF_DERIVED_CACHE.clear()
 
 
 class ServerPageRenderer:
@@ -152,10 +191,57 @@ class ServerPageRenderer:
         return self._epub_renderer()
 
     def _pdf_renderer(self) -> tuple[PDFMetadata, ReaderPageRenderer]:
+        derived = self._pdf_derived_metadata()
+        metadata = _pdf_metadata_with_overrides(
+            derived.metadata, self.metadata_overrides
+        )
+        renderer = ReaderPageRenderer.from_pdf_metadata(
+            book_id=self.book_id,
+            metadata=metadata,
+            cover_path=derived.cover_path,
+            asset_manifest=PublishedAssets(self._asset_manifest()),
+            urls=self.urls,
+            deployment_mode="server",
+            navigation=(derived.chapters, derived.toc),
+        )
+        return metadata, renderer
+
+    def _pdf_derived_metadata(self) -> _PdfDerivedMetadata:
+        """Reuse page-derived metadata until the published cache generation changes."""
+        path = self.pdf_dir / "metadata.json"
+        try:
+            stat_result = path.stat()
+        except OSError as error:
+            raise ServerPageError("PDF metadata cache is unavailable") from error
+        try:
+            revision = (
+                self.book_dir / PDF_OUTPUT_REVISION_FILE
+            ).read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeDecodeError):
+            revision = ""
+        key = (
+            str(self.book_dir),
+            stat_result.st_dev,
+            stat_result.st_ino,
+            stat_result.st_size,
+            stat_result.st_mtime_ns,
+            revision,
+        )
+        with _PDF_DERIVED_CACHE_LOCK:
+            cached = _PDF_DERIVED_CACHE.get(key)
+            if cached is not None:
+                _PDF_DERIVED_CACHE.move_to_end(key)
+                return cached
+        derived = self._load_pdf_derived()
+        with _PDF_DERIVED_CACHE_LOCK:
+            _PDF_DERIVED_CACHE[key] = derived
+            _PDF_DERIVED_CACHE.move_to_end(key)
+            while len(_PDF_DERIVED_CACHE) > _PDF_DERIVED_CACHE_LIMIT:
+                _PDF_DERIVED_CACHE.popitem(last=False)
+        return derived
+
+    def _load_pdf_derived(self) -> _PdfDerivedMetadata:
         payload = self._read_json(self.pdf_dir / "metadata.json")
-        for key in ("title", "authors", "tags"):
-            if key in self.metadata_overrides:
-                payload[key] = self.metadata_overrides[key]
         try:
             raw_pages = payload["pages"]
             if payload.get("page_count") != len(raw_pages):
@@ -181,17 +267,15 @@ class ServerPageRenderer:
                 has_extractable_text=bool(payload["has_extractable_text"]),
                 cover=None,
             )
-            renderer = ReaderPageRenderer.from_pdf_metadata(
-                book_id=self.book_id,
-                metadata=metadata,
-                cover_path=payload.get("cover"),
-                asset_manifest=PublishedAssets(self._asset_manifest()),
-                urls=self.urls,
-                deployment_mode="server",
-            )
         except (KeyError, TypeError, ValueError) as error:
             raise ServerPageError("PDF metadata cache is invalid") from error
-        return metadata, renderer
+        chapters, toc = pdf_page_navigation(pages)
+        return _PdfDerivedMetadata(
+            metadata=metadata,
+            cover_path=payload.get("cover"),
+            chapters=chapters,
+            toc=toc,
+        )
 
     def _asset_manifest(self) -> dict[str, str]:
         manifest = self._read_json(self.public_dir / "assets" / "asset-manifest.json")
