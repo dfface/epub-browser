@@ -83,6 +83,7 @@ function createHarness(options = {}) {
   const intersectionObservers = [];
   const importUrls = [];
   const textRequests = [];
+  let getTextContentCalls = 0;
   let cancelCount = 0;
   let textCancelCount = 0;
   const storageValues = new Map();
@@ -169,6 +170,7 @@ function createHarness(options = {}) {
               return renderTask;
             },
             getTextContent() {
+              getTextContentCalls += 1;
               const pageTexts = options.pageTexts || [];
               if (options.textError) return Promise.reject(new Error('broken text layer'));
               if (options.deferText && options.deferText.includes(pageNumber)) {
@@ -280,6 +282,7 @@ function createHarness(options = {}) {
     loadingTasks, resizeObservers, intersectionObservers, importUrls, storage, textRequests, installReaderControls,
     get cancelCount() { return cancelCount; },
     get textCancelCount() { return textCancelCount; },
+    get getTextContentCallCount() { return getTextContentCalls; },
     async flush() {
       for (let index = 0; index < 10; index += 1) await Promise.resolve();
     },
@@ -385,6 +388,64 @@ test('search resolves results to canonical PDF chapter URLs', async () => {
   const results = await harness.adapter.search('alpha');
 
   assert.deepEqual(results.map((item) => item.href), ['chapter_0.html', 'chapter_1.html']);
+});
+
+test('repeated PDF searches reuse cached page text instead of re-extracting', async () => {
+  const harness = createHarness({ pages: 3, pageTexts: ['alpha', 'beta', 'gamma'] });
+  // Keep the document entry alive across searches so the cache persists.
+  harness.document.appendChild(harness.page(1, { hasText: false }));
+  await harness.adapter.renderWithin(harness.document);
+
+  const before = harness.getTextContentCallCount;
+  await harness.adapter.search('alpha');
+  const firstCalls = harness.getTextContentCallCount - before;
+
+  await harness.adapter.search('beta');
+  const secondCalls = harness.getTextContentCallCount - before - firstCalls;
+
+  assert.equal(firstCalls, 3);
+  assert.equal(secondCalls, 0);
+});
+
+test('a cancelled PDF search leaves extracted text cached for the retry', async () => {
+  const harness = createHarness({ pages: 2, pageTexts: ['alpha', 'beta'], deferText: [2] });
+  harness.document.appendChild(harness.page(1, { hasText: false }));
+  await harness.adapter.renderWithin(harness.document);
+
+  const first = harness.adapter.search('alpha');
+  await harness.flush();
+  // Page 1 text is extracted and cached; page 2 is still pending.
+  assert.equal(harness.textRequests.length, 1);
+  assert.equal(harness.textRequests[0].pageNumber, 2);
+
+  harness.adapter.cancelSearch();
+  harness.textRequests[0].resolve({ items: [{ str: 'beta' }] });
+  await first;
+
+  const beforeRetry = harness.getTextContentCallCount;
+  const retry = harness.adapter.search('beta');
+  await harness.flush();
+  // Page 1 came from the cache; page 2 is deferred again and must be resolved.
+  assert.equal(harness.textRequests.length, 2);
+  harness.textRequests[1].resolve({ items: [{ str: 'beta' }] });
+  const results = await retry;
+
+  assert.deepEqual(results.map((item) => item.pageNumber), [2]);
+  assert.equal(harness.getTextContentCallCount - beforeRetry, 1);
+});
+
+test('switching the PDF document clears the reused page text cache', async () => {
+  const harness = createHarness({ pages: 1, pageTexts: ['alpha'] });
+  harness.document.appendChild(harness.page(1, { hasText: false }));
+  await harness.adapter.renderWithin(harness.document);
+
+  await harness.adapter.search('alpha');
+  const firstCalls = harness.getTextContentCallCount;
+
+  harness.window.EpubPDFConfig.documentUrl = 'replacement.pdf';
+  await harness.adapter.search('alpha');
+
+  assert.equal(harness.getTextContentCallCount - firstCalls, 1);
 });
 
 test('rotation and fit preferences do not mutate reading mode keys', async () => {
