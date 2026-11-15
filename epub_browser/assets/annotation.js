@@ -94,7 +94,10 @@
         
         highlighter = new Highlighter({
             $root: document.getElementById('eb-content') || document.documentElement,
-            exceptSelectors: ['pre', 'code', 'a', 'br'],
+            // `pre` keeps block code out of highlights; inline `code` stays
+            // paintable so a sentence with code in the middle is highlighted
+            // as one continuous range.
+            exceptSelectors: ['pre', 'a', 'br'],
             wrapTag: 'span',
             style: { className: CONFIG.ANNOTATION_CLASS }
         });
@@ -1904,7 +1907,7 @@
             while ((node = walker.nextNode())) {
                 var parent = node.parentElement;
                 if (!parent) continue;
-                var excluded = parent.closest && parent.closest('pre, code, a, .chapter-separator, script, style');
+                var excluded = parent.closest && parent.closest('pre, a, .chapter-separator, script, style');
                 if (excluded) continue;
                 var value = node.nodeValue || '';
                 if (!value) continue;

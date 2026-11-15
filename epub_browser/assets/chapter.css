@@ -404,6 +404,15 @@ body.reader-drawer-open {
         box-shadow: none;
     }
 
+    /* The sidebar is an overlay and never narrows the reading stage, so the
+       page stays centred on the full viewport and the sidebar covers the left
+       margin while the right margin stays empty.  Shift the page by half of
+       the sidebar gutter (20px offset + 220px panel) to balance both sides. */
+    body.desktop-chapter-sidebar:not(.ai-chat-open) .container {
+        position: relative;
+        left: calc((20px + 220px) / 2);
+    }
+
     body.desktop-chapter-sidebar-auto-hide #bookHomeFloating,
     body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating {
         left: 0;
