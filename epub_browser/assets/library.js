@@ -834,12 +834,22 @@ function initScript() {
     };
 
     if (sortControl) {
+        var sortPreferenceKey = 'epub-browser-library-sort';
         var url = new URL(window.location.href);
         var savedSort = url.searchParams.get('sort');
-        if (savedSort) sortControl.value = savedSort;
+        if (!savedSort) {
+            try { savedSort = localStorage.getItem(sortPreferenceKey); } catch (error) { savedSort = null; }
+        }
+        if (savedSort) {
+            var hasOption = Array.prototype.some.call(sortControl.options, function(option) {
+                return option.value === savedSort;
+            });
+            if (hasOption) sortControl.value = savedSort;
+        }
         if (!sortControl.value) sortControl.value = 'manual';
         sortControl.addEventListener('change', function() {
             currentPage = 1;
+            try { localStorage.setItem(sortPreferenceKey, selectedSort()); } catch (error) {}
             var location = new URL(window.location.href);
             location.searchParams.set('sort', selectedSort());
             window.history.replaceState(window.history.state, '', location.href);

@@ -12,7 +12,11 @@ BOOK_SORT_OPTIONS = {
     "created_desc": "library.sort.createdDesc",
     "updated_desc": "library.sort.updatedDesc",
 }
-LIBRARY_SORT_OPTIONS = {"manual": "library.sort.manual", **BOOK_SORT_OPTIONS}
+LIBRARY_SORT_OPTIONS = {
+    "manual": "library.sort.manual",
+    "shelf_first": "library.sort.shelfFirst",
+    **BOOK_SORT_OPTIONS,
+}
 
 
 def library_sort(value):
@@ -29,13 +33,26 @@ def book_sort_options(options, selected, locale="en"):
     )
 
 
-def sort_catalog(books, sort, manual_order=()):
+def sort_catalog(books, sort, manual_order=(), shelf_added=None):
     """Order visible book records before applying any page boundary."""
     ordered = list(books)  # The visible-books query supplies the ID tie-break order.
     if sort == "manual":
         if manual_order:
             ranks = {book_id: index for index, book_id in enumerate(manual_order)}
             ordered.sort(key=lambda book: ranks.get(book.book_id, -1))
+        return ordered
+    if sort == "shelf_first":
+        added = shelf_added or {}
+        ranks = {book_id: index for index, book_id in enumerate(manual_order)}
+
+        def shelf_key(book):
+            timestamp = added.get(book.book_id)
+            rank = ranks.get(book.book_id, -1)
+            if timestamp is None:
+                return (1, rank, 0.0, book.book_id)
+            return (0, -timestamp, rank, book.book_id)
+
+        ordered.sort(key=shelf_key)
         return ordered
 
     ordered.sort(key=lambda book: book.title.casefold(), reverse=sort == "title_desc")

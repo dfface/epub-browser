@@ -144,6 +144,7 @@
   "library.theme": "Тема",
   "library.sort.apply": "Применить",
   "library.sort.manual": "Ручной порядок",
+  "library.sort.shelfFirst": "Сначала с книжной полки",
   "library.sort.label": "Сортировать по",
   "library.sort.titleAsc": "Названию (А–Я)",
   "library.sort.titleDesc": "Названию (Я–А)",

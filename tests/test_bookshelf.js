@@ -45,3 +45,31 @@ test('SSG bookshelf stays local and never initializes auth', async () => {
   assert.equal(response, null);
   assert.equal(root.requests.length, 0);
 });
+
+test('legacy shelf documents receive deterministic added timestamps', () => {
+  const shelf = {
+    items: ['root-book'],
+    groups: {
+      folder: { items: ['nested-book'], groups: {}, order: ['nested-book'] },
+    },
+    order: ['folder', 'root-book'],
+  };
+
+  Bookshelf.ensureAddedTimestamps(shelf);
+
+  assert.deepEqual(shelf.added, { 'nested-book': 1, 'root-book': 2 });
+});
+
+test('existing added timestamps are preserved while missing books are backfilled', () => {
+  const shelf = {
+    items: ['old-book', 'new-book'],
+    groups: {},
+    order: ['old-book', 'new-book'],
+    added: { 'new-book': 1731600000000 },
+  };
+
+  Bookshelf.ensureAddedTimestamps(shelf);
+
+  assert.equal(shelf.added['new-book'], 1731600000000);
+  assert.equal(shelf.added['old-book'], 1);
+});
