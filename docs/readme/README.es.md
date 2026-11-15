@@ -163,6 +163,8 @@ Cada libro EPUB (los PDF quedan excluidos) incorpora tres páginas adicionales:
 - la página del libro `/book/<id>/kindle.html`
 - la página del capítulo `/book/<id>/kindle_chapter_N.html`
 
+![Modo mínimo de Kindle: estantería, página del libro y página del capítulo.](assets/kindle-minimal-mode.png)
+
 Estas páginas están optimizadas para tinta electrónica: marcado mínimo, temas aplicados solo con CSS,
 scripts compatibles con ES5, sin Service Worker y sin framework. Puedes leer sin JavaScript; el cambio
 de tema (Claro / Sepia / Oscuro), el tamaño de fuente (A- / A+) y la localización de la interfaz usan

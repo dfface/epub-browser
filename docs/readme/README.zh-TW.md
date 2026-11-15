@@ -150,6 +150,8 @@ AI 閱讀與 Ask AI。
 - 書籍頁 `/book/<id>/kindle.html`
 - 章節頁 `/book/<id>/kindle_chapter_N.html`
 
+![Kindle 極簡模式：書架、書籍頁與章節頁。](assets/kindle-minimal-mode.png)
+
 這些頁面針對 e-Ink 調校：極簡標記、純 CSS 主題、相容 ES5 的指令碼、無 Service
 Worker、無框架。即使完全不執行 JavaScript 也能閱讀；主題切換（淺色 / 米黃 / 深色）、
 字級調整（A- / A+）與介面本地化，都是以純 HTML 為基礎，再疊加輕量內嵌指令碼。

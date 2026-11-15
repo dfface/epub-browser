@@ -160,6 +160,8 @@ EPUB पुस्तकों के लिए Server मोड पाठक क
 - पुस्तक पृष्ठ `/book/<id>/kindle.html`
 - अध्याय पृष्ठ `/book/<id>/kindle_chapter_N.html`
 
+![Kindle मिनिमल मोड: शेल्फ, पुस्तक पृष्ठ और अध्याय पृष्ठ.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/kindle-minimal-mode.png)
+
 ये पृष्ठ e-Ink के अनुरूप हैं: न्यूनतम मार्कअप, केवल CSS थीम, ES5-संगत स्क्रिप्ट,
 कोई Service Worker नहीं और कोई फ्रेमवर्क नहीं। आप बिना JavaScript के पढ़ सकते हैं;
 थीम बदलना (Light / Sepia / Dark), फ़ॉन्ट आकार (A- / A+) और इंटरफ़ेस स्थानीयकरण

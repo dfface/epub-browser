@@ -177,6 +177,8 @@ Chaque livre EPUB (les livres PDF sont exclus) reçoit trois pages supplémentai
 - la page du livre `/book/<id>/kindle.html`
 - la page de chapitre `/book/<id>/kindle_chapter_N.html`
 
+![Mode minimal Kindle : l’étagère, la page du livre et la page du chapitre.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/kindle-minimal-mode.png)
+
 Ces pages sont adaptées à l’encre électronique : balisage minimal, thèmes en CSS
 uniquement, scripts compatibles ES5, sans Service Worker ni framework. La lecture
 fonctionne sans aucun JavaScript. Le changement de thème (Clair / Sépia / Sombre),

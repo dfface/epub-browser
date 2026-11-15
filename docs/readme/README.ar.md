@@ -160,6 +160,8 @@ PDF فصلاً في القارئ، ويعرضها PDF.js محلياً داخل �
 - صفحة الكتاب `/book/<id>/kindle.html`
 - صفحة الفصل `/book/<id>/kindle_chapter_N.html`
 
+![وضع Kindle المبسّط: رف الكتب وصفحة الكتاب وصفحة الفصل.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/kindle-minimal-mode.png)
+
 هذه الصفحات مضبوطة لشاشات e-Ink: ترميز محدود، وسمات بـCSS فقط، وسكربتات متوافقة
 مع ES5، ولا Service Worker ولا إطار عمل. يمكنك القراءة من دون JavaScript إطلاقاً؛
 أما تبديل السمة (فاتح / بني فاتح / داكن)، وحجم الخط (A- / A+)، وتوطين الواجهة

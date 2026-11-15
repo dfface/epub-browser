@@ -154,6 +154,8 @@ Kindle e-Ink รุ่นเก่า (และเบราว์เซอร�
 - หน้าหนังสือ `/book/<id>/kindle.html`
 - หน้าบท `/book/<id>/kindle_chapter_N.html`
 
+![โหมดมินิมอล Kindle: ชั้นหนังสือ หน้าหนังสือ และหน้าบท](assets/kindle-minimal-mode.png)
+
 เพจเหล่านี้ปรับสำหรับ e-Ink โดยเฉพาะ: markup น้อย การเปลี่ยนธีมด้วย CSS เท่านั้น สคริปต์ที่เข้ากันได้กับ
 ES5 ไม่มี Service Worker และไม่มี framework คุณอ่านได้โดยไม่ใช้ JavaScript เลย ส่วนการเปลี่ยนธีม
 (Light / Sepia / Dark) ขนาดตัวอักษร (A- / A+) และการแปลอินเทอร์เฟซ ใช้ inline script ขนาดเล็กเสริมจาก HTML พื้นฐาน

@@ -164,6 +164,8 @@ Each EPUB book (PDF books are excluded) gains three extra pages:
 - the book page `/book/<id>/kindle.html`
 - the chapter page `/book/<id>/kindle_chapter_N.html`
 
+![Kindle minimal mode: the shelf, book page, and chapter page.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/kindle-minimal-mode.png)
+
 These pages are tuned for e-Ink: minimal markup, CSS-only theming, ES5-compatible
 scripts, no Service Worker, and no framework. You can read without any JavaScript;
 theme switching (Light / Sepia / Dark), font sizing (A- / A+), and interface

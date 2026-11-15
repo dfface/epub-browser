@@ -161,6 +161,8 @@ Setiap buku EPUB (buku PDF tidak disertakan) memperoleh tiga halaman tambahan:
 - halaman buku `/book/<id>/kindle.html`
 - halaman bab `/book/<id>/kindle_chapter_N.html`
 
+![Mode minimal Kindle: rak buku, halaman buku, dan halaman bab.](assets/kindle-minimal-mode.png)
+
 Halaman ini disesuaikan untuk e-Ink: markup minimal, tema hanya dengan CSS, skrip yang
 kompatibel dengan ES5, tanpa Service Worker, dan tanpa framework. Anda dapat membaca tanpa
 JavaScript sama sekali; pergantian tema (Terang / Sepia / Gelap), pengaturan ukuran font

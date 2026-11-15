@@ -172,6 +172,8 @@ Jedes EPUB-Buch (PDF-Bücher sind ausgeschlossen) erhält drei zusätzliche Seit
 - die Buchseite `/book/<id>/kindle.html`
 - die Kapitelseite `/book/<id>/kindle_chapter_N.html`
 
+![Kindle-Minimalmodus: Regal, Buchseite und Kapitelseite.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/kindle-minimal-mode.png)
+
 Diese Seiten sind auf E-Ink abgestimmt: minimales Markup, Designs nur mit CSS,
 ES5-kompatible Skripte, kein Service Worker und kein Framework. Das Lesen
 funktioniert ganz ohne JavaScript. Der Wechsel des Designs (Hell / Sepia /

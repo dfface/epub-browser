@@ -162,6 +162,8 @@ Mỗi cuốn EPUB (không bao gồm PDF) có thêm ba trang:
 - trang sách `/book/<id>/kindle.html`
 - trang chương `/book/<id>/kindle_chapter_N.html`
 
+![Chế độ tối giản Kindle: kệ sách, trang sách và trang chương.](assets/kindle-minimal-mode.png)
+
 Các trang này được tối ưu cho e-Ink: markup tối giản, đổi chủ đề chỉ bằng CSS, script tương thích
 ES5, không Service Worker và không framework. Bạn có thể đọc mà hoàn toàn không cần JavaScript;
 chuyển chủ đề (Light / Sepia / Dark), cỡ chữ (A- / A+) và bản địa hóa giao diện dùng các inline

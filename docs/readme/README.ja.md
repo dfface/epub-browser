@@ -159,6 +159,8 @@ PDF では、AI 読書と Ask AI を意図的に非表示にしています。
 - 書籍ページ `/book/<id>/kindle.html`
 - 章ページ `/book/<id>/kindle_chapter_N.html`
 
+![Kindle ミニマルモード：本棚、書籍ページ、章ページ。](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/kindle-minimal-mode.png)
+
 これらのページは e-Ink 向けに調整されています。最小限のマークアップ、CSS のみのテーマ、
 ES5 互換スクリプトを採用し、Service Worker とフレームワークは使用しません。JavaScript がなくても読書できます。
 テーマ切り替え（Light / Sepia / Dark）、フォントサイズ（A- / A+）、インターフェースのローカライズは、

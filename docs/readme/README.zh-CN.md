@@ -150,6 +150,8 @@ PDF 则明确隐藏 AI 阅读与 Ask AI。
 - 书籍页 `/book/<id>/kindle.html`
 - 章节页 `/book/<id>/kindle_chapter_N.html`
 
+![Kindle 极简模式：书架、书籍页与章节页。](assets/kindle-minimal-mode.png)
+
 这些页面针对 e-Ink 调优：精简的 HTML 标记、纯 CSS 主题、兼容 ES5 的脚本，
 不使用 Service Worker 或框架。即使完全不运行 JavaScript 也能阅读；主题切换
 （浅色 / 米黄 / 深色）、字号调节（A- / A+）与界面本地化，都是通过纯 HTML 之上的

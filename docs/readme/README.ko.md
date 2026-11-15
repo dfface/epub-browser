@@ -157,6 +157,8 @@ Server 모드에서는 EPUB 도서에 장별 가이드, 근거 구절과 연결�
 - 도서 페이지 `/book/<id>/kindle.html`
 - 장 페이지 `/book/<id>/kindle_chapter_N.html`
 
+![Kindle 미니멀 모드: 책장, 도서 페이지, 장 페이지.](https://raw.githubusercontent.com/dfface/epub-browser/main/docs/readme/assets/kindle-minimal-mode.png)
+
 이 페이지들은 e-Ink에 맞게 최소한의 마크업, CSS 전용 테마, ES5 호환 스크립트를 사용하며
 Service Worker와 프레임워크는 사용하지 않습니다. JavaScript 없이도 읽을 수 있습니다.
 테마 전환(Light / Sepia / Dark), 글꼴 크기(A- / A+), 인터페이스 현지화는
