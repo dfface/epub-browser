@@ -119,7 +119,14 @@ function initScript() {
     var lastMetadataBooks = [];
     var orderedBooks = null;
     var pageBooks = [];
-    var currentPage = 1;
+
+    function initialLibraryPage() {
+        if (!window.location || !window.location.href) return 1;
+        var value = parseInt(new URL(window.location.href).searchParams.get('page'), 10);
+        return isFinite(value) && value > 0 ? value : 1;
+    }
+
+    var currentPage = initialLibraryPage();
     var libraryPageTarget = 24;
     var libraryPageSize = libraryPageTarget;
     var bookGrid = document.querySelector('.book-grid');
@@ -731,6 +738,26 @@ function initScript() {
             jumpInput.max = totalPages;
             jumpInput.value = currentPage;
         }
+        syncLibraryPageUrl();
+    }
+
+    // Keep the current page in the URL (next to sort) so that going back from a
+    // book, or reloading, returns to the same page instead of page one.
+    function syncLibraryPageUrl() {
+        if (!window.location || !window.location.href ||
+            !window.history || typeof window.history.replaceState !== 'function') {
+            return;
+        }
+        var url = new URL(window.location.href);
+        if (currentPage > 1) {
+            if (url.searchParams.get('page') === String(currentPage)) return;
+            url.searchParams.set('page', String(currentPage));
+        } else if (url.searchParams.has('page')) {
+            url.searchParams.delete('page');
+        } else {
+            return;
+        }
+        window.history.replaceState(window.history.state, '', url.href);
     }
 
     function goToLibraryPage(page) {
@@ -852,6 +879,7 @@ function initScript() {
             try { localStorage.setItem(sortPreferenceKey, selectedSort()); } catch (error) {}
             var location = new URL(window.location.href);
             location.searchParams.set('sort', selectedSort());
+            location.searchParams.delete('page');
             window.history.replaceState(window.history.state, '', location.href);
             setBookDragEnabled(false);
             if (serverMode) {
