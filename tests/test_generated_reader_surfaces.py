@@ -238,6 +238,14 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             for marker in shared_markers:
                 self.assertEqual(pdf_html.count(marker), epub_html.count(marker), marker)
 
+            # Drilling into a book's insights must offer the way back to the
+            # overview on both formats, exactly like the book page does.
+            for chapter_html in (epub_html, pdf_html):
+                self.assertIn(
+                    'data-reading-insights data-reading-insights-show-overview',
+                    chapter_html,
+                )
+
             for asset_name in (
                 'chapter', 'annotation-position', 'annotation',
                 'annotation-hub', 'dictionary', 'reading-insights',

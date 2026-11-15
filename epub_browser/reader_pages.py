@@ -2729,7 +2729,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
             if self.deployment_mode == "server" and pdf_page is None and self.ai_reading_enabled else ""
         )
         reading_insights_navigation = (
-            f'<button type="button" class="app-nav-link" data-reading-insights data-book-id="{book_id_attribute}" '
+            f'<button type="button" class="app-nav-link" data-reading-insights data-reading-insights-show-overview data-book-id="{book_id_attribute}" '
             'aria-haspopup="dialog"><i class="fas fa-chart-column" '
             'aria-hidden="true"></i><span data-i18n="readingInsights.navigation">Reading insights</span></button>'
             if self.deployment_mode == "server" else ""
