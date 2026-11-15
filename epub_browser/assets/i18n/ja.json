@@ -144,6 +144,7 @@
   "library.theme": "テーマ",
   "library.sort.apply": "適用",
   "library.sort.manual": "手動順",
+  "library.sort.shelfFirst": "本棚を優先",
   "library.sort.label": "並べ替え基準",
   "library.sort.titleAsc": "タイトル (A ～ Z)",
   "library.sort.titleDesc": "タイトル (Z-A)",

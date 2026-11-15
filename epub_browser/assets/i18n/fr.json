@@ -144,6 +144,7 @@
   "library.theme": "Thème",
   "library.sort.apply": "Appliquer",
   "library.sort.manual": "Ordre manuel",
+  "library.sort.shelfFirst": "Étagère d'abord",
   "library.sort.label": "Trier par",
   "library.sort.titleAsc": "Titre (A–Z)",
   "library.sort.titleDesc": "Titre (Z–A)",

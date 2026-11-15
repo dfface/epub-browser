@@ -4389,9 +4389,12 @@ window.location.assign(payload.redirect||'/');
         return response({'chat': turn}, 202)
 
     def sort_visible_catalog(principal, records, sort):
-        return sort_catalog(
-            records, sort, store.library_order(principal.user_id) if sort == "manual" else (),
-        )
+        manual_order = store.library_order(principal.user_id) if sort in ("manual", "shelf_first") else ()
+        shelf_added = None
+        if sort == "shelf_first":
+            _version, shelf = bookshelf_document(principal.user_id)
+            shelf_added = bookshelf_added_timestamps(shelf)
+        return sort_catalog(records, sort, manual_order, shelf_added=shelf_added)
 
     async def filtered_library_metadata(request):
         principal = require_principal(request)
@@ -5665,6 +5668,55 @@ window.location.assign(payload.redirect||'/');
             return 0, {"items": [], "groups": {}, "order": []}
         version, serialized = row
         return version, json.loads(serialized)
+
+    def bookshelf_added_timestamps(shelf):
+        """Map shelf book ids to their addition timestamps.
+
+        Legacy documents have no ``added`` map, so fall back to the current
+        display order: later entries are treated as more recently added.
+        """
+        raw = shelf.get("added") if isinstance(shelf, dict) else None
+        if not isinstance(raw, dict):
+            raw = {}
+        added = {}
+        seen = set()
+        counter = 0
+
+        def visit(container):
+            nonlocal counter
+            if not isinstance(container, dict):
+                return
+            groups = container.get("groups") if isinstance(container.get("groups"), dict) else {}
+            items = container.get("items") if isinstance(container.get("items"), list) else []
+            order = container.get("order")
+            if not isinstance(order, list):
+                order = list(items) + list(groups.keys())
+
+            def add_book(book_id):
+                nonlocal counter
+                if not isinstance(book_id, str) or book_id in seen:
+                    return
+                seen.add(book_id)
+                counter += 1
+                value = raw.get(book_id)
+                if isinstance(value, (int, float)) and not isinstance(value, bool) and value == value:
+                    added[book_id] = float(value)
+                else:
+                    added[book_id] = float(counter)
+
+            for entry in order:
+                if entry in groups:
+                    visit(groups[entry])
+                else:
+                    add_book(entry)
+            for book_id in items:
+                add_book(book_id)
+            for group_id, group in groups.items():
+                if group_id not in order:
+                    visit(group)
+
+        visit(shelf)
+        return added
 
     def bookshelf_contains(book_hash, shelf):
         if not isinstance(shelf, dict):

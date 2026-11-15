@@ -144,6 +144,7 @@
   "library.theme": "थीम",
   "library.sort.apply": "लागू करें",
   "library.sort.manual": "मैन्युअल क्रम",
+  "library.sort.shelfFirst": "बुकशेल्फ़ पहले",
   "library.sort.label": "क्रमबद्ध करें",
   "library.sort.titleAsc": "शीर्षक (A–Z)",
   "library.sort.titleDesc": "शीर्षक (Z–A)",

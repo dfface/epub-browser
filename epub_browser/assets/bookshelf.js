@@ -1,10 +1,45 @@
 /* Server mode keeps the bookshelf document in the server database, never in localStorage. */
+function emptyBookshelf() {
+    return { items: [], groups: {}, order: [], added: {} };
+}
+
+function ensureAddedTimestamps(shelfData) {
+    if (!shelfData || typeof shelfData !== 'object') return shelfData;
+    if (!shelfData.added || typeof shelfData.added !== 'object') shelfData.added = {};
+    var seen = Object.create(null);
+    var index = 0;
+
+    function visit(container) {
+        if (!container || typeof container !== 'object') return;
+        var groups = container.groups && typeof container.groups === 'object' ? container.groups : {};
+        var items = Array.isArray(container.items) ? container.items : [];
+        var order = Array.isArray(container.order) ? container.order : items.concat(Object.keys(groups));
+
+        function addBook(id) {
+            if (typeof id !== 'string' || seen[id]) return;
+            seen[id] = true;
+            index += 1;
+            if (typeof shelfData.added[id] !== 'number' || !isFinite(shelfData.added[id])) {
+                shelfData.added[id] = index;
+            }
+        }
+
+        order.forEach(function(id) {
+            if (groups[id]) visit(groups[id]);
+            else addBook(id);
+        });
+        items.forEach(addBook);
+        Object.keys(groups).forEach(function(id) {
+            if (order.indexOf(id) === -1) visit(groups[id]);
+        });
+    }
+
+    visit(shelfData);
+    return shelfData;
+}
+
 (function(root) {
     var state = { version: 0, data: null, savedData: null };
-
-    function emptyBookshelf() {
-        return { items: [], groups: {}, order: [] };
-    }
 
     function copy(data) {
         return JSON.parse(JSON.stringify(data || emptyBookshelf()));
@@ -242,7 +277,7 @@ function initBookshelf() {
     // 获取书架数据
     function getBookshelf() {
         if (isServerMode) {
-            return window.EpubBookshelfStore.data() || { items: [], groups: {}, order: [] };
+            return ensureAddedTimestamps(window.EpubBookshelfStore.data() || emptyBookshelf());
         }
         var data = localStorage.getItem(BOOKSHELF_KEY);
         if (data) {
@@ -251,9 +286,9 @@ function initBookshelf() {
             if (!shelfData.order) {
                 shelfData.order = [...(shelfData.items || []), ...Object.keys(shelfData.groups || {})];
             }
-            return shelfData;
+            return ensureAddedTimestamps(shelfData);
         }
-        return { items: [], groups: {}, order: [] };
+        return emptyBookshelf();
     }
     
     // 保存书架数据
@@ -542,6 +577,7 @@ function initBookshelf() {
         if (!target.order) target.order = [];
         target.items.push(bookHash);
         target.order.push(bookHash);
+        shelfData.added[bookHash] = Date.now();
         if (!await persistBookshelf(shelfData)) return false;
         var bookInfo = getBookInfo(bookHash);
         refreshBookshelfViews();
@@ -559,6 +595,7 @@ function initBookshelf() {
         if (target.order) {
             target.order = target.order.filter(function(id) { return id !== bookHash; });
         }
+        delete shelfData.added[bookHash];
         if (!await persistBookshelf(shelfData)) return false;
         var bookInfo = getBookInfo(bookHash);
         refreshBookshelfViews();
@@ -1228,6 +1265,7 @@ function initBookshelf() {
             destructive: true
         })) {
             delete parentGroups[targetId];
+            (targetGroup.items || []).forEach(function(id) { delete shelfData.added[id]; });
             
             if (currentGroupPath.length > 0) {
                 if (parentGroup.order) {
@@ -1428,6 +1466,7 @@ if (typeof module === 'object' && module.exports) {
         coverUrl: bookshelfCoverUrl,
         bookFormat: bookshelfBookFormat,
         bookMatchesSearch: bookshelfBookMatchesSearch,
-        syncRequest: bookshelfSyncRequest
+        syncRequest: bookshelfSyncRequest,
+        ensureAddedTimestamps: ensureAddedTimestamps
     };
 }

@@ -5146,6 +5146,57 @@ class ServerCacheTests(unittest.TestCase):
             {"in_shelf": False},
         )
 
+    def _publish_shelf_sort_fixtures(self):
+        for book_id in ("book", "shared-book"):
+            book_root = Path(self.directory.name) / "book" / book_id
+            book_root.mkdir(parents=True, exist_ok=True)
+            (book_root / "index.html").write_text("book", encoding="utf-8")
+
+    def test_library_metadata_shelf_first_sorts_by_added_time(self):
+        self._publish_shelf_sort_fixtures()
+        self.client.put(
+            "/api/bookshelf",
+            json={
+                "version": 0,
+                "data": {
+                    "items": ["demo", "shared-book"],
+                    "groups": {},
+                    "order": ["demo", "shared-book"],
+                    "added": {"demo": 1000, "shared-book": 3000},
+                },
+            },
+        )
+        hashes = [
+            item["hash"]
+            for item in self.client.get("/api/library-metadata?sort=shelf_first").json()
+        ]
+        self.assertEqual(hashes, ["shared-book", "demo", "book"])
+
+    def test_library_metadata_shelf_first_derives_legacy_added_order(self):
+        self._publish_shelf_sort_fixtures()
+        self.client.put(
+            "/api/bookshelf",
+            json={
+                "version": 0,
+                "data": {
+                    "items": ["demo"],
+                    "groups": {
+                        "folder": {
+                            "items": ["shared-book"],
+                            "groups": {},
+                            "order": ["shared-book"],
+                        },
+                    },
+                    "order": ["demo", "folder"],
+                },
+            },
+        )
+        hashes = [
+            item["hash"]
+            for item in self.client.get("/api/library-metadata?sort=shelf_first").json()
+        ]
+        self.assertEqual(hashes, ["shared-book", "demo", "book"])
+
     def test_server_bookshelf_ignores_spoofed_username_and_uses_principal(self):
         created = self.client.put(
             "/api/bookshelf",

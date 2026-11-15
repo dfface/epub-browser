@@ -144,6 +144,7 @@
   "library.theme": "Design",
   "library.sort.apply": "Anwenden",
   "library.sort.manual": "Manuelle Reihenfolge",
+  "library.sort.shelfFirst": "Bücherregal zuerst",
   "library.sort.label": "Sortieren nach",
   "library.sort.titleAsc": "Titel (A–Z)",
   "library.sort.titleDesc": "Titel (Z–A)",
