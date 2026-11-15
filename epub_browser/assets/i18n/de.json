@@ -145,6 +145,7 @@
   "library.sort.apply": "Anwenden",
   "library.sort.manual": "Manuelle Reihenfolge",
   "library.sort.shelfFirst": "Bücherregal zuerst",
+  "library.sort.shelfOrder": "Regalreihenfolge",
   "library.sort.pdfFirst": "PDF zuerst",
   "library.sort.label": "Sortieren nach",
   "library.sort.titleAsc": "Titel (A–Z)",

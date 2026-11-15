@@ -145,6 +145,7 @@
   "library.sort.apply": "تطبيق",
   "library.sort.manual": "ترتيب يدوي",
   "library.sort.shelfFirst": "الكتب على الرف أولاً",
+  "library.sort.shelfOrder": "ترتيب الرف",
   "library.sort.pdfFirst": "PDF أولاً",
   "library.sort.label": "الترتيب حسب",
   "library.sort.titleAsc": "العنوان (أ–ي)",

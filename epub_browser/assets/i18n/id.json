@@ -145,6 +145,7 @@
   "library.sort.apply": "Terapkan",
   "library.sort.manual": "Urutan manual",
   "library.sort.shelfFirst": "Rak buku lebih dulu",
+  "library.sort.shelfOrder": "Urutan rak buku",
   "library.sort.pdfFirst": "PDF lebih dulu",
   "library.sort.label": "Urutkan berdasarkan",
   "library.sort.titleAsc": "Judul (A–Z)",
