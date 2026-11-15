@@ -145,6 +145,7 @@
   "library.sort.apply": "Применить",
   "library.sort.manual": "Ручной порядок",
   "library.sort.shelfFirst": "Сначала с книжной полки",
+  "library.sort.shelfOrder": "Порядок на полке",
   "library.sort.pdfFirst": "Сначала PDF",
   "library.sort.label": "Сортировать по",
   "library.sort.titleAsc": "Названию (А–Я)",

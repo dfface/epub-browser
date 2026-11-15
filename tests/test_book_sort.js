@@ -100,6 +100,28 @@ test('shelf_first keeps the manual order for non-shelf books', () => {
     assert.deepEqual(ids(ordered), ['a', 'd', 'c', 'b']);
 });
 
+test('shelf_order follows the shelf arrangement, not the added time', () => {
+    const sort = loadBookSort({
+        bookshelf: JSON.stringify({
+            items: ['b', 'd'],
+            groups: { g: { items: ['c'], groups: {}, order: ['c'] } },
+            order: ['g', 'b', 'd'],
+            added: { b: 300, c: 200, d: 100 },
+        }),
+    });
+    const ordered = sort.sortBooks([book('a'), book('b'), book('c'), book('d')], 'shelf_order', 'en');
+    assert.deepEqual(ids(ordered), ['c', 'b', 'd', 'a']);
+});
+
+test('shelf_order keeps the manual order for non-shelf books', () => {
+    const sort = loadBookSort({
+        bookshelf: JSON.stringify({ items: ['a'], groups: {}, order: ['a'], added: { a: 5 } }),
+        'book-grid-sortable-order': JSON.stringify(['c', 'b']),
+    });
+    const ordered = sort.sortBooks([book('a'), book('b'), book('c'), book('d')], 'shelf_order', 'en');
+    assert.deepEqual(ids(ordered), ['a', 'd', 'c', 'b']);
+});
+
 test('shelf_first tolerates missing or malformed shelf data', () => {
     const sort = loadBookSort({ bookshelf: '{invalid' });
     const ordered = sort.sortBooks([book('b'), book('a')], 'shelf_first', 'en');

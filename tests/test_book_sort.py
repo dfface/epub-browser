@@ -46,6 +46,32 @@ class ShelfFirstSortTests(unittest.TestCase):
         self.assertEqual([book.book_id for book in ordered], ["a", "b"])
 
 
+class ShelfOrderSortTests(unittest.TestCase):
+    def test_shelf_books_follow_the_arrangement_order(self):
+        books = [record("a"), record("b"), record("c"), record("d")]
+        ordered = sort_catalog(
+            books,
+            "shelf_order",
+            ("d", "c", "b", "a"),
+            shelf_order=["c", "a", "d"],
+            shelf_added={"a": 300.0, "c": 200.0, "d": 100.0},
+        )
+        self.assertEqual([book.book_id for book in ordered], ["c", "a", "d", "b"])
+
+    def test_non_shelf_books_follow_manual_order(self):
+        books = [record("a"), record("b"), record("c"), record("d")]
+        ordered = sort_catalog(
+            books,
+            "shelf_order",
+            ("c", "b"),
+            shelf_order=["a"],
+        )
+        self.assertEqual([book.book_id for book in ordered], ["a", "d", "c", "b"])
+
+    def test_shelf_order_is_an_allowed_library_sort(self):
+        self.assertEqual(library_sort("shelf_order"), "shelf_order")
+
+
 class PdfFirstSortTests(unittest.TestCase):
     def test_pdf_books_come_first_with_newest_books_in_each_group(self):
         books = [

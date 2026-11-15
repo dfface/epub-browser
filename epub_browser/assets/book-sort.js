@@ -19,7 +19,11 @@
             data = null;
         }
         var added = data && data.added && typeof data.added === 'object' ? data.added : {};
-        var state = { added: Object.create(null), inShelf: Object.create(null) };
+        var state = {
+            added: Object.create(null),
+            inShelf: Object.create(null),
+            order: Object.create(null)
+        };
         var seen = Object.create(null);
         var index = 0;
 
@@ -34,6 +38,7 @@
                 seen[id] = true;
                 index += 1;
                 state.inShelf[id] = true;
+                state.order[id] = index;
                 var value = added[id];
                 state.added[id] = typeof value === 'number' && isFinite(value) ? value : index;
             }
@@ -54,10 +59,11 @@
 
     function sortBooks(books, sort, locale) {
         var ranks = Object.create(null);
-        if (sort === 'manual' || sort === 'shelf_first') {
+        var shelfSort = sort === 'shelf_first' || sort === 'shelf_order';
+        if (sort === 'manual' || shelfSort) {
             manualOrder().forEach(function(id, index) { ranks[id] = index; });
         }
-        var shelf = sort === 'shelf_first' ? shelfState() : null;
+        var shelf = shelfSort ? shelfState() : null;
         var titleCollator = typeof Intl !== 'undefined' && Intl.Collator
             ? new Intl.Collator(locale || undefined, { sensitivity: 'base' }) : null;
         function compare(left, right) {
@@ -73,12 +79,14 @@
 
         return books.slice().sort(function(left, right) {
             var difference;
-            if (sort === 'shelf_first') {
+            if (shelfSort) {
                 var leftInShelf = shelf.inShelf[left.hash] ? 0 : 1;
                 var rightInShelf = shelf.inShelf[right.hash] ? 0 : 1;
                 difference = leftInShelf - rightInShelf;
                 if (!difference && leftInShelf === 0) {
-                    difference = (shelf.added[right.hash] || 0) - (shelf.added[left.hash] || 0);
+                    difference = sort === 'shelf_order'
+                        ? (shelf.order[left.hash] || 0) - (shelf.order[right.hash] || 0)
+                        : (shelf.added[right.hash] || 0) - (shelf.added[left.hash] || 0);
                 }
                 if (!difference) {
                     var leftShelfRank = ranks[left.hash];

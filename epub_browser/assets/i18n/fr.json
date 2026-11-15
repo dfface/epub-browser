@@ -145,6 +145,7 @@
   "library.sort.apply": "Appliquer",
   "library.sort.manual": "Ordre manuel",
   "library.sort.shelfFirst": "Étagère d'abord",
+  "library.sort.shelfOrder": "Ordre de l’étagère",
   "library.sort.pdfFirst": "PDF d’abord",
   "library.sort.label": "Trier par",
   "library.sort.titleAsc": "Titre (A–Z)",

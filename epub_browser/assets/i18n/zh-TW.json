@@ -145,6 +145,7 @@
   "library.sort.apply": "套用",
   "library.sort.manual": "手動排序",
   "library.sort.shelfFirst": "書架優先",
+  "library.sort.shelfOrder": "書架順序",
   "library.sort.pdfFirst": "PDF 優先",
   "library.sort.label": "排序依據",
   "library.sort.titleAsc": "標題 (A–Z)",
