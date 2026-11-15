@@ -17,6 +17,12 @@
         '3': 1000,
         '4': 1200
     };
+    var DESKTOP_CHAPTER_SIDEBAR = {
+        minWidth: 220,
+        maxWidth: 320,
+        gap: 24,
+        offset: 20
+    };
 
     function normalizePageWidth(value) {
         var key = String(value || '');
@@ -32,6 +38,22 @@
             rootElement.setAttribute('data-reader-page-width', preset);
         }
         return preset;
+    }
+
+    // The desktop sidebar shares the horizontal budget with the reading column
+    // and a gutter on both sides. It gets whatever is left after the page
+    // width, the outer offset and the gutters, and only exists when that is at
+    // least the minimum; leftover space widens it up to the maximum.
+    function desktopChapterSidebarWidth(viewportWidth, pageWidth) {
+        var viewport = Number(viewportWidth);
+        var page = Number(pageWidth);
+        if (!isFinite(viewport) || !isFinite(page) || viewport <= 0 || page <= 0) {
+            return 0;
+        }
+        var available = viewport - page -
+            DESKTOP_CHAPTER_SIDEBAR.gap * 2 - DESKTOP_CHAPTER_SIDEBAR.offset;
+        if (available < DESKTOP_CHAPTER_SIDEBAR.minWidth) return 0;
+        return Math.min(available, DESKTOP_CHAPTER_SIDEBAR.maxWidth);
     }
 
     function getPaginationPageWidth(container) {
@@ -381,6 +403,7 @@
         chapterNavigationPresentation: chapterNavigationPresentation,
         continuousChapterPresentation: continuousChapterPresentation,
         createNavigationBehaviorController: createNavigationBehaviorController,
+        desktopChapterSidebarWidth: desktopChapterSidebarWidth,
         getPaginationPageWidth: getPaginationPageWidth,
         getPaginationScrollLeft: getPaginationScrollLeft,
         initNavigationBehavior: initNavigationBehavior,

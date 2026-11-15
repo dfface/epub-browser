@@ -85,7 +85,7 @@ function assertValidSelector(selector) {
   }
 }
 
-function createLibraryHarness(responses, mode = 'server') {
+function createLibraryHarness(responses, mode = 'server', url = 'http://localhost/reader/') {
   const bookGrid = element('div');
   bookGrid.className = 'book-grid';
   const loading = element('div');
@@ -189,11 +189,18 @@ function createLibraryHarness(responses, mode = 'server') {
   };
   const windowListeners = {};
   const animationFrames = [];
+  const location = { href: url };
+  const history = {
+    state: null,
+    replaceState(state, title, nextUrl) { location.href = String(nextUrl); },
+  };
   const window = {
     navigator: { userAgent: 'Kindle' },
     EpubBrowserBasePath: '/reader/',
     EpubBrowserMode: mode,
     document,
+    location,
+    history,
     localStorage,
     addEventListener(type, listener) {
       windowListeners[type] = windowListeners[type] || [];
@@ -209,7 +216,7 @@ function createLibraryHarness(responses, mode = 'server') {
   vm.runInNewContext(fs.readFileSync('epub_browser/assets/library.js', 'utf8'), {
     window, document, navigator: window.navigator, localStorage,
     XMLHttpRequest: FakeXMLHttpRequest, JSON, Date, console: { error() {}, log() {} },
-    setTimeout() {}, decodeURIComponent, prompt() { return null; },
+    setTimeout() {}, decodeURIComponent, URL, prompt() { return null; },
   });
   return {
     window, searchBox, bookshelfModal, pager, previous, next, jumpForm, jumpInput,
@@ -361,6 +368,23 @@ test('pages through the sorted catalogue and searches across pages', () => {
   harness.searchBox.dispatch('input');
   assert.deepEqual(harness.cardIds(), ['book-24']);
   assert.equal(harness.pager.hidden, true);
+});
+
+test('restores the library page from the URL and keeps it in sync', () => {
+  const books = Array.from({ length: 25 }, (_, index) => ({
+    hash: 'book-' + index, title: 'Book ' + index, authors: [], tags: [],
+    url: '/book/' + index + '/', cover: null,
+  }));
+  const harness = createLibraryHarness([books], 'server', 'http://localhost/reader/?page=2');
+
+  harness.window.initScriptLibrary();
+  assert.deepEqual(harness.cardIds(), ['book-24']);
+
+  harness.previous.dispatch('click');
+  assert.equal(harness.window.location.href, 'http://localhost/reader/');
+
+  harness.next.dispatch('click');
+  assert.equal(harness.window.location.href, 'http://localhost/reader/?page=2');
 });
 
 test('Ctrl/Cmd+K focuses the library search box', () => {

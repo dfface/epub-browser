@@ -9,6 +9,7 @@ const {
   chapterNavigationPresentation,
   continuousChapterPresentation,
   createNavigationBehaviorController,
+  desktopChapterSidebarWidth,
   getPaginationPageWidth,
   getPaginationScrollLeft,
   paginationWidthChanged,
@@ -196,6 +197,24 @@ test('normalizes page-width presets and applies their exact reading width', () =
   assert.equal(applyPageWidth(root, '2'), '2');
   assert.equal(properties.get('--reader-page-width'), '820px');
   assert.equal(root['data-reader-page-width'], '2');
+});
+
+test('desktop chapter sidebar only uses width the page leaves over', () => {
+  // Page width + outer offset + two gutters + the 220px minimum is the floor.
+  assert.equal(desktopChapterSidebarWidth(1287, 1000), 0);
+  assert.equal(desktopChapterSidebarWidth(1288, 1000), 220);
+  assert.equal(desktopChapterSidebarWidth(1360, 1000), 292);
+  // Surplus widens the list, but never past 320px.
+  assert.equal(desktopChapterSidebarWidth(1462, 1000), 320);
+  assert.equal(desktopChapterSidebarWidth(1920, 1000), 320);
+  // A wider reading column needs a wider window before the sidebar fits.
+  assert.equal(desktopChapterSidebarWidth(1462, 1200), 0);
+  assert.equal(desktopChapterSidebarWidth(1488, 1200), 220);
+  // The narrowest preset makes the sidebar available from 968px.
+  assert.equal(desktopChapterSidebarWidth(967, 680), 0);
+  assert.equal(desktopChapterSidebarWidth(968, 680), 220);
+  assert.equal(desktopChapterSidebarWidth(1000, 680), 252);
+  assert.equal(desktopChapterSidebarWidth(undefined, 1000), 0);
 });
 
 test('pagination keeps the container fractional width as its page stride', () => {

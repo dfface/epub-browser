@@ -64,6 +64,13 @@
             return left < right ? -1 : left > right ? 1 : 0;
         }
 
+        function titleDifference(left, right) {
+            var leftTitle = String(left.title || '');
+            var rightTitle = String(right.title || '');
+            return titleCollator ? titleCollator.compare(leftTitle, rightTitle)
+                : leftTitle.toLowerCase().localeCompare(rightTitle.toLowerCase());
+        }
+
         return books.slice().sort(function(left, right) {
             var difference;
             if (sort === 'shelf_first') {
@@ -83,16 +90,19 @@
                 var leftRank = ranks[left.hash];
                 var rightRank = ranks[right.hash];
                 difference = (leftRank === undefined ? -1 : leftRank) - (rightRank === undefined ? -1 : rightRank);
+            } else if (sort === 'pdf_first') {
+                difference = (left.format === 'pdf' ? 0 : 1) - (right.format === 'pdf' ? 0 : 1);
+                if (!difference) {
+                    difference = compare(right.created_at || '', left.created_at || '');
+                }
+                if (!difference) difference = titleDifference(left, right);
             } else {
                 if (sort === 'created_desc' || sort === 'updated_desc') {
                     var field = sort === 'created_desc' ? 'created_at' : 'updated_at';
                     difference = compare(right[field] || '', left[field] || '');
                     if (difference) return difference;
                 }
-                var leftTitle = String(left.title || '');
-                var rightTitle = String(right.title || '');
-                difference = titleCollator ? titleCollator.compare(leftTitle, rightTitle)
-                    : leftTitle.toLowerCase().localeCompare(rightTitle.toLowerCase());
+                difference = titleDifference(left, right);
                 if (sort === 'title_desc') difference = -difference;
             }
             return difference || compare(left.hash, right.hash);

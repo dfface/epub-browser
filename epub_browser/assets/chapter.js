@@ -405,8 +405,25 @@ function initScript() {
 
     applyDesktopToolbarPreference();
 
+    function readerPageWidthPx() {
+        var value = parseFloat(
+            window.getComputedStyle(document.documentElement).getPropertyValue('--reader-page-width')
+        );
+        return isFinite(value) && value > 0 ? value : 1000;
+    }
+
+    function desktopChapterSidebarFits() {
+        if (!window.EpubReaderLayout || !window.EpubReaderLayout.desktopChapterSidebarWidth) {
+            return window.innerWidth >= 1360;
+        }
+        return window.EpubReaderLayout.desktopChapterSidebarWidth(
+            window.innerWidth,
+            readerPageWidthPx()
+        ) > 0;
+    }
+
     function applyDesktopChapterSidebar() {
-        var isVisible = showDesktopChapterSidebar && !isPaginationMode;
+        var isVisible = showDesktopChapterSidebar && !isPaginationMode && desktopChapterSidebarFits();
         document.body.classList.toggle('desktop-chapter-sidebar', isVisible);
         if (window.EpubReaderLayout && window.EpubReaderLayout.applyDesktopChapterSidebarAutoHide) {
             window.EpubReaderLayout.applyDesktopChapterSidebarAutoHide(
@@ -496,6 +513,15 @@ function initScript() {
     }
     updatePageWidth(pageWidthPreset, false);
     applyDesktopChapterSidebar();
+
+    var desktopChapterSidebarResizeFrame = null;
+    window.addEventListener('resize', function() {
+        if (desktopChapterSidebarResizeFrame !== null) return;
+        desktopChapterSidebarResizeFrame = window.requestAnimationFrame(function() {
+            desktopChapterSidebarResizeFrame = null;
+            applyDesktopChapterSidebar();
+        });
+    }, { passive: true });
     if (isPaginationMode) {
         updateFontSize(fontSize);
     } else {
@@ -2106,8 +2132,7 @@ function initScript() {
 
     function isPersistentBookDrawer(panel) {
         return panel === bookHomeFloating &&
-            document.body.classList.contains('desktop-chapter-sidebar') &&
-            window.innerWidth >= 1360;
+            document.body.classList.contains('desktop-chapter-sidebar');
     }
 
     function registerReaderDrawer(options) {
@@ -2590,6 +2615,7 @@ function initScript() {
             if (!window.epubBrowserCache) window.epubBrowserCache = {};
             window.epubBrowserCache.page_width = pageWidthPreset;
             updatePageWidth(pageWidthPreset, true);
+            applyDesktopChapterSidebar();
         });
         if (window.EpubPDFConfig) {
             pageWidthSlider.addEventListener('change', function() {

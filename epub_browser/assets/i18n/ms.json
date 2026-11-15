@@ -145,6 +145,7 @@
   "library.sort.apply": "Guna",
   "library.sort.manual": "Susunan manual",
   "library.sort.shelfFirst": "Rak buku dahulu",
+  "library.sort.pdfFirst": "PDF dahulu",
   "library.sort.label": "Isih mengikut",
   "library.sort.titleAsc": "Tajuk (A–Z)",
   "library.sort.titleDesc": "Tajuk (Z–A)",

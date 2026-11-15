@@ -145,6 +145,7 @@
   "library.sort.apply": "应用",
   "library.sort.manual": "手动排序",
   "library.sort.shelfFirst": "书架优先",
+  "library.sort.pdfFirst": "PDF 优先",
   "library.sort.label": "排序方式",
   "library.sort.titleAsc": "书名（A → Z）",
   "library.sort.titleDesc": "书名（Z → A）",
