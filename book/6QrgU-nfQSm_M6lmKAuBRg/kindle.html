@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>毛泽东选集</title>
+<style>
+body{margin:0;padding:0;background-color:#fff!important;color:#111!important;font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.65}
+body.sepia{background-color:#f3e9d2!important;color:#3c2f1a!important}
+body.dark{background-color:#161616!important;color:#c9c9c9!important}
+/* Nested controls share an 8px corner inside 12px panels with a 4px inset. */
+.k-surface,#kRecent li:first-child a,#kCatalog a{border-radius:12px}
+.k-surface{box-sizing:border-box;border:1px solid #aaa;border-bottom-width:2px;background:#fff}
+body.dark .k-surface{background:#161616;border-color:#777}
+body.sepia .k-surface{background:#f3e9d2;border-color:#86795e}
+.k-control{display:inline-block;box-sizing:border-box;min-height:44px;padding:10px 14px;
+  color:inherit;background:transparent;border:1px solid #888;border-radius:8px;text-decoration:none;font:inherit}
+.k-dock{position:fixed;z-index:5;bottom:0;left:0;right:0;margin:0 auto;
+  max-width:720px;display:table;width:100%;height:58px;table-layout:fixed;padding:3px;border-radius:12px 12px 0 0;
+  font:16px/1.3 Arial,sans-serif}
+.k-dock>a{display:table-cell;height:49px;vertical-align:middle;text-align:center;color:inherit;
+  text-decoration:none;font-size:.85em;word-wrap:break-word;border:1px solid transparent;border-radius:8px}
+.k-dock [aria-current]{border-color:currentColor;font-weight:bold}
+#kFontSizeValue{display:inline-block;min-width:48px;text-align:center}
+.k-control:focus,.k-surface a:focus,.k-surface button:focus{outline:2px solid;outline-offset:2px}
+.k-header{padding:10px 16px;border-bottom:1px solid;line-height:1.4;font-family:Arial,sans-serif}
+.k-header a,.k-header button{display:inline-block;min-height:24px;padding:9px 0}
+.k-header button{float:right;background:none;border:0;color:inherit;font:inherit;text-decoration:underline}
+.k-cover{display:block;position:relative;box-sizing:border-box;overflow:hidden;border:1px solid #777;border-radius:3px;text-align:center}
+.k-cover img{position:absolute;top:0;right:0;bottom:0;left:0;max-width:100%;max-height:100%;margin:auto}
+.k-cover-placeholder:before{content:"";position:absolute;top:0;bottom:0;left:13%;border-left:1px solid #777}
+.k-cover-placeholder:after{content:"";position:absolute;top:32%;left:28%;right:16%;height:14%;border-top:1px solid #777;border-bottom:1px solid #777}
+/* Reader chrome shared by EPUB chapters and PDF image pages. */
+.k-reader-header{box-sizing:border-box;max-width:680px;margin:0 auto;padding:0 16px}
+.k-reader-header a,.k-reader-header button{display:inline-block;box-sizing:border-box;min-width:44px;min-height:44px;
+  line-height:1.3;margin:0;padding:12px 0;font:inherit;color:inherit;background:none;border:0;text-decoration:none}
+.k-reader-header button{float:right;font-weight:bold}
+.k-reader-header a{float:left;margin-right:14px}
+.k-reader-header .k-running-title{display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:12px 0;font-weight:normal}
+.k-reader-header:after{content:"";display:block;clear:both}
+.k-reader-header,.k-reader-footer,.k-reader-settings{font:15px/1.4 Arial,sans-serif}
+.k-reader-footer{text-align:center;overflow:hidden}
+.k-reader-footer button{display:none}
+#kSettingsBackdrop,.k-settings-backdrop{display:none;position:fixed;top:0;right:0;bottom:0;left:0;z-index:9;background:transparent}
+.k-reader-settings{display:none;position:fixed;z-index:10;box-sizing:border-box;left:8px;right:8px;bottom:8px;
+  max-width:540px;max-height:82%;margin:0 auto;padding:10px 12px;text-align:left;overflow:auto}
+.k-reader-settings a,.k-reader-settings button{display:inline-block;box-sizing:border-box;min-height:44px;
+  padding:10px 12px;margin:3px;border:1px solid #888;color:inherit;background:none;font:inherit;text-decoration:none}
+.k-settings-heading{overflow:hidden}
+.k-settings-heading h2{display:inline-block;margin:12px 3px 6px;font-size:1.05em}
+.k-settings-heading button{float:right;min-width:44px;font-size:1.25em;line-height:1}
+.k-settings-modes{padding:6px 0}
+.k-settings-modes button{font-weight:bold}
+.k-settings-modes button[aria-pressed="true"]{color:#fff;background:#111;border-color:#111}
+body.dark .k-settings-modes button[aria-pressed="true"]{color:#111;background:#eee;border-color:#eee}
+.k-reader-settings .k-settings-links{border-top:1px solid #888;padding-top:6px}
+body[data-k-reader] .k-reader-header{position:absolute;top:0;left:0;right:0;height:45px;max-width:680px}
+body[data-k-reader] .k-reader-footer{position:absolute;bottom:0;left:0;right:0;box-sizing:border-box;
+  height:48px;max-width:680px;margin:0 auto;border-top:1px solid #888}
+body[data-k-reader] .k-reader-footer .k-chapter-links{display:none}
+body[data-k-reader] .k-reader-footer button{display:block;box-sizing:border-box;width:18%;height:44px;
+  border:0;background:none;color:inherit;font:inherit;font-size:1.45em}
+body[data-k-reader] .k-reader-footer button:disabled{opacity:.4}
+#kReaderPosition,#kPdfPosition{display:inline-block;margin-top:13px}
+.k-reader-header a:focus,.k-reader-header button:focus,.k-reader-footer button:focus{
+  outline:2px solid;outline-offset:-2px}
+body.sepia .k-reader-footer,body.dark .k-reader-footer{border-color:#666}
+body.sepia .k-header,body.dark .k-header{border-color:#666}
+.k-header a{color:inherit;text-decoration:none;font-weight:bold;font-size:15px}
+.k-content{padding:22px 20px 32px;max-width:640px;margin:0 auto;word-wrap:break-word;line-height:1.7}
+body.sepia .k-content{color:#3c2f1a!important}
+body.dark .k-content{color:#c9c9c9!important}
+body[data-k-font="serif"] #kText,body[data-k-font="serif"] #kText *{font-family:Georgia,"Times New Roman",serif!important}
+body[data-k-font="sans"] #kText,body[data-k-font="sans"] #kText *{font-family:Arial,sans-serif!important}
+.k-content img{max-width:100%;height:auto}
+.k-content a{color:inherit;text-decoration:underline}
+.k-nav{overflow:hidden;border-top:1px solid #999;padding:12px 14px;max-width:640px;margin:0 auto}
+body.sepia .k-nav,body.dark .k-nav{border-color:#666}
+.k-nav a{color:inherit;text-decoration:none;padding:10px 14px;border:1px solid;font-family:Arial,sans-serif}
+.k-nav .prev{float:left}
+.k-nav .next{float:right}
+.k-toc{padding:4px 16px 30px;max-width:640px;margin:0 auto}
+.k-toc ul{list-style:none;margin:0;padding:0}
+.k-toc li{padding:5px 0;line-height:1.45}
+.k-toc li[class^="lvl-"] a{padding:9px 0;border-bottom:1px solid #888}
+.k-toc li.lvl-1{padding-left:16px}
+.k-toc li.lvl-2{padding-left:32px}
+.k-toc li.lvl-3{padding-left:48px}
+.k-toc a{color:inherit;text-decoration:none;display:block}
+.k-toc .sec{color:#666;font-size:14px}
+body.dark .k-toc .sec{color:#9a9a9a}
+
+
+.k-book{box-sizing:border-box;max-width:720px;margin:0 auto;padding:14px 14px 76px;font-family:Arial,sans-serif}
+.k-book-hero{padding:16px;overflow:hidden;margin-bottom:14px}
+.k-book-hero .k-cover{float:left;width:105px;height:146px;margin-right:18px}
+.k-book-hero h1{font:700 1.55em/1.25 Georgia,serif;margin:4px 0 6px;word-wrap:break-word}
+.k-book-hero p{font-size:.9em;margin:0 0 10px}
+.k-book-action{display:inline-block;min-height:24px;padding:10px 16px;background:#111;color:#fff;
+  font-size:16px;font-weight:bold;text-decoration:none;border:1px solid #111}
+body.dark .k-book-action{background:#eee;color:#111;border-color:#eee}
+.k-book h2{font-size:1.05em;margin:0;padding:10px 14px;border-bottom:1px solid #999}
+.k-book .k-toc{padding:0 14px 6px;max-width:none}
+.k-book .k-toc li{padding-top:0;padding-bottom:0}
+.k-book .k-toc li a{padding-top:13px;padding-bottom:13px}
+.k-book .k-toc a[aria-current="location"]{box-shadow:inset 3px 0 currentColor;
+  padding-left:12px;padding-right:8px;font-weight:bold;background:#e9e9e9}
+body.sepia .k-book .k-toc a[aria-current]{background:#e6d8ba}
+body.dark .k-book .k-toc a[aria-current]{background:#333}
+.k-book .k-toc .sec{padding-top:13px;font-weight:bold}
+.k-book .k-toc li:last-child a{border-bottom:0}
+/* Shared empty TOC state for EPUB and PDF book pages. EPUB jumps by chapter
+   number, PDF by page number; both use the same layout and controls. */
+.k-toc-empty{margin:0;padding:18px 14px 10px;text-align:center;color:#555}
+body.sepia .k-toc-empty,body.dark .k-toc-empty{color:#bbb}
+.k-toc-empty p{margin:0 0 12px}
+.k-toc-jump{margin:0}
+.k-toc-jump input{width:5.5em;padding:10px;border:1px solid #888;border-radius:8px;
+  background:transparent;color:inherit;font-size:1em;text-align:center}
+.k-toc-jump button{margin-left:8px;padding:10px 16px;border:1px solid #888;border-radius:8px;
+  background:transparent;color:inherit;font-size:1em;font-weight:bold;cursor:pointer}
+@media (max-width:360px){.k-book-hero .k-cover{width:75px;height:104px;margin-right:12px}}
+
+</style>
+</head>
+<body class="light">
+<main class="k-book">
+<div class="k-book-hero k-surface" lang="zh-CN">
+    <span class="k-cover"><img src="resources/OEBPS/Images/cover.jpg" alt=""></span>
+    <h1>毛泽东选集</h1>
+    <p>毛泽东</p>
+    <div lang="en" data-k-ui-language><a id="kResume" class="k-control k-book-action" href="kindle_chapter_0.html" accesskey="c"><span id="kStartLabel" data-i18n="startReading">Start reading</span><span id="kResumeLabel" style="display:none" data-i18n="continueReading">Continue reading</span></a></div>
+</div>
+<section class="k-surface">
+    <h2 data-i18n="contents">Table of contents</h2>
+    <div class="k-toc" lang="zh-CN"><ul><li class="lvl-0"><a href="kindle_chapter_4.html" data-k-toc-chapter="4">第一卷</a></li>
+<li class="lvl-1"><a href="kindle_chapter_5.html" data-k-toc-chapter="5">第二版出版说明</a></li>
+<li class="lvl-1"><a href="kindle_chapter_6.html" data-k-toc-chapter="6">本书出版的说明</a></li>
+<li class="lvl-1"><a href="kindle_chapter_7.html" data-k-toc-chapter="7">第一次国内革命战争时期</a></li>
+<li class="lvl-2"><a href="kindle_chapter_8.html" data-k-toc-chapter="8">中国社会各阶级的分析</a></li>
+<li class="lvl-2"><a href="kindle_chapter_9.html" data-k-toc-chapter="9">湖南农民运动考察报告</a></li>
+<li class="lvl-1"><a href="kindle_chapter_10.html" data-k-toc-chapter="10">第二次国内革命战争时期</a></li>
+<li class="lvl-2"><a href="kindle_chapter_11.html" data-k-toc-chapter="11">中国的红色政权为什么能够存在？</a></li>
+<li class="lvl-2"><a href="kindle_chapter_12.html" data-k-toc-chapter="12">井冈山的斗争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_13.html" data-k-toc-chapter="13">关于纠正党内的错误思想</a></li>
+<li class="lvl-2"><a href="kindle_chapter_14.html" data-k-toc-chapter="14">星星之火，可以燎原</a></li>
+<li class="lvl-2"><a href="kindle_chapter_15.html" data-k-toc-chapter="15">反对本本主义</a></li>
+<li class="lvl-2"><a href="kindle_chapter_16.html" data-k-toc-chapter="16">必须注意经济工作</a></li>
+<li class="lvl-2"><a href="kindle_chapter_17.html" data-k-toc-chapter="17">怎样分析农村阶级</a></li>
+<li class="lvl-2"><a href="kindle_chapter_18.html" data-k-toc-chapter="18">我们的经济政策</a></li>
+<li class="lvl-2"><a href="kindle_chapter_19.html" data-k-toc-chapter="19">关心群众生活，注意工作方法</a></li>
+<li class="lvl-2"><a href="kindle_chapter_20.html" data-k-toc-chapter="20">论反对日本帝国主义的策略</a></li>
+<li class="lvl-2"><a href="kindle_chapter_21.html" data-k-toc-chapter="21">中国革命战争的战略问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_22.html" data-k-toc-chapter="22">关于蒋介石声明的声明</a></li>
+<li class="lvl-2"><a href="kindle_chapter_23.html" data-k-toc-chapter="23">中国共产党在抗日时期的任务</a></li>
+<li class="lvl-2"><a href="kindle_chapter_24.html" data-k-toc-chapter="24">为争取千百万群众进入抗日民族统一战线而斗争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_25.html" data-k-toc-chapter="25">实践论</a></li>
+<li class="lvl-2"><a href="kindle_chapter_26.html" data-k-toc-chapter="26">矛盾论</a></li>
+<li class="lvl-0"><a href="kindle_chapter_27.html" data-k-toc-chapter="27">第二卷</a></li>
+<li class="lvl-1"><a href="kindle_chapter_28.html" data-k-toc-chapter="28">抗日战争时期（上）</a></li>
+<li class="lvl-2"><a href="kindle_chapter_29.html" data-k-toc-chapter="29">反对日本进攻的方针、办法和前途</a></li>
+<li class="lvl-2"><a href="kindle_chapter_30.html" data-k-toc-chapter="30">为动员一切力量争取抗战胜利而斗争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_31.html" data-k-toc-chapter="31">反对自由主义</a></li>
+<li class="lvl-2"><a href="kindle_chapter_32.html" data-k-toc-chapter="32">国共合作成立后的迫切任务</a></li>
+<li class="lvl-2"><a href="kindle_chapter_33.html" data-k-toc-chapter="33">和英国记者贝特兰的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_34.html" data-k-toc-chapter="34">上海太原失陷以后抗日战争的形势和任务</a></li>
+<li class="lvl-2"><a href="kindle_chapter_35.html" data-k-toc-chapter="35">陕甘宁边区政府、第八路军后方留守处布告</a></li>
+<li class="lvl-2"><a href="kindle_chapter_36.html" data-k-toc-chapter="36">抗日游击战争的战略问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_37.html" data-k-toc-chapter="37">论持久战</a></li>
+<li class="lvl-2"><a href="kindle_chapter_38.html" data-k-toc-chapter="38">中国共产党在民族战争中的地位</a></li>
+<li class="lvl-2"><a href="kindle_chapter_39.html" data-k-toc-chapter="39">统一战线中的独立自主问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_40.html" data-k-toc-chapter="40">战争和战略问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_41.html" data-k-toc-chapter="41">五四运动</a></li>
+<li class="lvl-2"><a href="kindle_chapter_42.html" data-k-toc-chapter="42">青年运动的方向</a></li>
+<li class="lvl-2"><a href="kindle_chapter_43.html" data-k-toc-chapter="43">反对投降活动</a></li>
+<li class="lvl-2"><a href="kindle_chapter_44.html" data-k-toc-chapter="44">必须制裁反动派</a></li>
+<li class="lvl-2"><a href="kindle_chapter_45.html" data-k-toc-chapter="45">关于国际新形势对新华日报记者的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_46.html" data-k-toc-chapter="46">和中央社、扫荡报、新民报三记者的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_47.html" data-k-toc-chapter="47">苏联利益和人类利益的一致</a></li>
+<li class="lvl-2"><a href="kindle_chapter_48.html" data-k-toc-chapter="48">《共产党人》发刊词</a></li>
+<li class="lvl-2"><a href="kindle_chapter_49.html" data-k-toc-chapter="49">目前形势和党的任务</a></li>
+<li class="lvl-2"><a href="kindle_chapter_50.html" data-k-toc-chapter="50">大量吸收知识分子</a></li>
+<li class="lvl-2"><a href="kindle_chapter_51.html" data-k-toc-chapter="51">中国革命和中国共产党</a></li>
+<li class="lvl-2"><a href="kindle_chapter_52.html" data-k-toc-chapter="52">斯大林是中国人民的朋友</a></li>
+<li class="lvl-2"><a href="kindle_chapter_53.html" data-k-toc-chapter="53">纪念白求恩</a></li>
+<li class="lvl-2"><a href="kindle_chapter_54.html" data-k-toc-chapter="54">新民主主义论</a></li>
+<li class="lvl-2"><a href="kindle_chapter_55.html" data-k-toc-chapter="55">克服投降危险，力争时局好转</a></li>
+<li class="lvl-2"><a href="kindle_chapter_56.html" data-k-toc-chapter="56">团结一切抗日力量，反对反共顽固派</a></li>
+<li class="lvl-2"><a href="kindle_chapter_57.html" data-k-toc-chapter="57">向国民党的十点要求</a></li>
+<li class="lvl-2"><a href="kindle_chapter_58.html" data-k-toc-chapter="58">《中国工人》发刊词</a></li>
+<li class="lvl-2"><a href="kindle_chapter_59.html" data-k-toc-chapter="59">必须强调团结和进步</a></li>
+<li class="lvl-2"><a href="kindle_chapter_60.html" data-k-toc-chapter="60">新民主主义的宪政</a></li>
+<li class="lvl-2"><a href="kindle_chapter_61.html" data-k-toc-chapter="61">抗日根据地的政权问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_62.html" data-k-toc-chapter="62">目前抗日统一战线中的策略问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_63.html" data-k-toc-chapter="63">放手发展抗日力量，抵抗反共顽固派的进攻</a></li>
+<li class="lvl-2"><a href="kindle_chapter_64.html" data-k-toc-chapter="64">团结到底</a></li>
+<li class="lvl-2"><a href="kindle_chapter_65.html" data-k-toc-chapter="65">论政策</a></li>
+<li class="lvl-2"><a href="kindle_chapter_66.html" data-k-toc-chapter="66">为皖南事变发表的命令和谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_67.html" data-k-toc-chapter="67">打退第二次反共高潮后的时局</a></li>
+<li class="lvl-2"><a href="kindle_chapter_68.html" data-k-toc-chapter="68">关于打退第二次反共高潮的总结</a></li>
+<li class="lvl-0"><a href="kindle_chapter_69.html" data-k-toc-chapter="69">第三卷</a></li>
+<li class="lvl-1"><a href="kindle_chapter_70.html" data-k-toc-chapter="70">抗日战争时期（下）</a></li>
+<li class="lvl-2"><a href="kindle_chapter_71.html" data-k-toc-chapter="71">《农村调查》的序言和跋</a></li>
+<li class="lvl-2"><a href="kindle_chapter_72.html" data-k-toc-chapter="72">改造我们的学习</a></li>
+<li class="lvl-2"><a href="kindle_chapter_73.html" data-k-toc-chapter="73">揭破远东慕尼黑的阴谋</a></li>
+<li class="lvl-2"><a href="kindle_chapter_74.html" data-k-toc-chapter="74">关于反法西斯的国际统一战线</a></li>
+<li class="lvl-2"><a href="kindle_chapter_75.html" data-k-toc-chapter="75">在陕甘宁边区参议会的演说</a></li>
+<li class="lvl-2"><a href="kindle_chapter_76.html" data-k-toc-chapter="76">整顿党的作风</a></li>
+<li class="lvl-2"><a href="kindle_chapter_77.html" data-k-toc-chapter="77">反对党八股</a></li>
+<li class="lvl-2"><a href="kindle_chapter_78.html" data-k-toc-chapter="78">在延安文艺座谈会上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_79.html" data-k-toc-chapter="79">一个极其重要的政策</a></li>
+<li class="lvl-2"><a href="kindle_chapter_80.html" data-k-toc-chapter="80">第二次世界大战的转折点</a></li>
+<li class="lvl-2"><a href="kindle_chapter_81.html" data-k-toc-chapter="81">祝十月革命二十五周年</a></li>
+<li class="lvl-2"><a href="kindle_chapter_82.html" data-k-toc-chapter="82">抗日时期的经济问题和财政问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_83.html" data-k-toc-chapter="83">关于领导方法的若干问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_84.html" data-k-toc-chapter="84">质问国民党</a></li>
+<li class="lvl-2"><a href="kindle_chapter_85.html" data-k-toc-chapter="85">开展根据地的减租、生产和拥政爱民运动</a></li>
+<li class="lvl-2"><a href="kindle_chapter_86.html" data-k-toc-chapter="86">评国民党十一中全会和三届二次国民参政会</a></li>
+<li class="lvl-2"><a href="kindle_chapter_87.html" data-k-toc-chapter="87">组织起来</a></li>
+<li class="lvl-2"><a href="kindle_chapter_88.html" data-k-toc-chapter="88">学习和时局</a></li>
+<li class="lvl-2"><a href="kindle_chapter_90.html" data-k-toc-chapter="90">为人民服务</a></li>
+<li class="lvl-2"><a href="kindle_chapter_91.html" data-k-toc-chapter="91">评蒋介石在双十节的演说</a></li>
+<li class="lvl-2"><a href="kindle_chapter_92.html" data-k-toc-chapter="92">文化工作中的统一战线</a></li>
+<li class="lvl-2"><a href="kindle_chapter_93.html" data-k-toc-chapter="93">必须学会做经济工作</a></li>
+<li class="lvl-2"><a href="kindle_chapter_94.html" data-k-toc-chapter="94">游击区也能够进行生产</a></li>
+<li class="lvl-2"><a href="kindle_chapter_95.html" data-k-toc-chapter="95">两个中国之命运</a></li>
+<li class="lvl-2"><a href="kindle_chapter_96.html" data-k-toc-chapter="96">论联合政府</a></li>
+<li class="lvl-2"><a href="kindle_chapter_97.html" data-k-toc-chapter="97">愚公移山</a></li>
+<li class="lvl-2"><a href="kindle_chapter_98.html" data-k-toc-chapter="98">论军队生产自给，兼论整风和生产两大运动的重要性</a></li>
+<li class="lvl-2"><a href="kindle_chapter_99.html" data-k-toc-chapter="99">赫尔利和蒋介石的双簧已经破产</a></li>
+<li class="lvl-2"><a href="kindle_chapter_100.html" data-k-toc-chapter="100">评赫尔利政策的危险</a></li>
+<li class="lvl-2"><a href="kindle_chapter_101.html" data-k-toc-chapter="101">给福斯特同志的电报</a></li>
+<li class="lvl-2"><a href="kindle_chapter_102.html" data-k-toc-chapter="102">对日寇的最后一战</a></li>
+<li class="lvl-0"><a href="kindle_chapter_103.html" data-k-toc-chapter="103">第四卷</a></li>
+<li class="lvl-1"><a href="kindle_chapter_104.html" data-k-toc-chapter="104">第三次国内革命战争时期</a></li>
+<li class="lvl-2"><a href="kindle_chapter_105.html" data-k-toc-chapter="105">抗日战争胜利后的时局和我们的方针</a></li>
+<li class="lvl-2"><a href="kindle_chapter_106.html" data-k-toc-chapter="106">蒋介石在挑动内战</a></li>
+<li class="lvl-2"><a href="kindle_chapter_107.html" data-k-toc-chapter="107">第十八集团军总司令给蒋介石的两个电报</a></li>
+<li class="lvl-2"><a href="kindle_chapter_108.html" data-k-toc-chapter="108">评蒋介石发言人谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_109.html" data-k-toc-chapter="109">中共中央关于同国民党进行和平谈判的通知</a></li>
+<li class="lvl-2"><a href="kindle_chapter_110.html" data-k-toc-chapter="110">关于重庆谈判</a></li>
+<li class="lvl-2"><a href="kindle_chapter_111.html" data-k-toc-chapter="111">国民党进攻的真相</a></li>
+<li class="lvl-2"><a href="kindle_chapter_112.html" data-k-toc-chapter="112">减租和生产是保卫解放区的两件大事</a></li>
+<li class="lvl-2"><a href="kindle_chapter_113.html" data-k-toc-chapter="113">一九四六年解放区工作的方针</a></li>
+<li class="lvl-2"><a href="kindle_chapter_114.html" data-k-toc-chapter="114">建立巩固的东北根据地</a></li>
+<li class="lvl-2"><a href="kindle_chapter_115.html" data-k-toc-chapter="115">关于目前国际形势的几点估计</a></li>
+<li class="lvl-2"><a href="kindle_chapter_116.html" data-k-toc-chapter="116">以自卫战争粉碎蒋介石的进攻</a></li>
+<li class="lvl-2"><a href="kindle_chapter_117.html" data-k-toc-chapter="117">和美国记者安娜·路易斯·斯特朗的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_118.html" data-k-toc-chapter="118">集中优势兵力，各个歼灭敌人</a></li>
+<li class="lvl-2"><a href="kindle_chapter_119.html" data-k-toc-chapter="119">美国“调解”真相和中国内战前途</a></li>
+<li class="lvl-2"><a href="kindle_chapter_120.html" data-k-toc-chapter="120">三个月总结</a></li>
+<li class="lvl-2"><a href="kindle_chapter_121.html" data-k-toc-chapter="121">迎接中国革命的新高潮</a></li>
+<li class="lvl-2"><a href="kindle_chapter_122.html" data-k-toc-chapter="122">中共中央关于暂时放弃延安和保卫陕甘宁边区的两个文件</a></li>
+<li class="lvl-2"><a href="kindle_chapter_123.html" data-k-toc-chapter="123">关于西北战场的作战方针</a></li>
+<li class="lvl-2"><a href="kindle_chapter_124.html" data-k-toc-chapter="124">蒋介石政府已处在全民的包围中</a></li>
+<li class="lvl-2"><a href="kindle_chapter_125.html" data-k-toc-chapter="125">解放战争第二年的战略方针</a></li>
+<li class="lvl-2"><a href="kindle_chapter_126.html" data-k-toc-chapter="126">中国人民解放军宣言</a></li>
+<li class="lvl-2"><a href="kindle_chapter_127.html" data-k-toc-chapter="127">中国人民解放军总部关于重行颁布三大纪律八项注意的训令</a></li>
+<li class="lvl-2"><a href="kindle_chapter_128.html" data-k-toc-chapter="128">目前形势和我们的任务</a></li>
+<li class="lvl-2"><a href="kindle_chapter_129.html" data-k-toc-chapter="129">关于建立报告制度</a></li>
+<li class="lvl-2"><a href="kindle_chapter_130.html" data-k-toc-chapter="130">关于目前党的政策中的几个重要问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_131.html" data-k-toc-chapter="131">军队内部的民主运动</a></li>
+<li class="lvl-2"><a href="kindle_chapter_132.html" data-k-toc-chapter="132">在不同地区实施土地法的不同策略</a></li>
+<li class="lvl-2"><a href="kindle_chapter_133.html" data-k-toc-chapter="133">纠正土地改革宣传中的“左”倾错误</a></li>
+<li class="lvl-2"><a href="kindle_chapter_134.html" data-k-toc-chapter="134">新解放区土地改革要点</a></li>
+<li class="lvl-2"><a href="kindle_chapter_135.html" data-k-toc-chapter="135">关于工商业政策</a></li>
+<li class="lvl-2"><a href="kindle_chapter_136.html" data-k-toc-chapter="136">关于民族资产阶级和开明绅士问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_137.html" data-k-toc-chapter="137">评西北大捷兼论解放军的新式整军运动</a></li>
+<li class="lvl-2"><a href="kindle_chapter_138.html" data-k-toc-chapter="138">关于情况的通报</a></li>
+<li class="lvl-2"><a href="kindle_chapter_139.html" data-k-toc-chapter="139">在晋绥干部会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_140.html" data-k-toc-chapter="140">对晋绥日报编辑人员的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_141.html" data-k-toc-chapter="141">再克洛阳后给洛阳前线指挥部的电报</a></li>
+<li class="lvl-2"><a href="kindle_chapter_142.html" data-k-toc-chapter="142">新解放区农村工作的策略问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_143.html" data-k-toc-chapter="143">一九四八年的土地改革工作和整党工作</a></li>
+<li class="lvl-2"><a href="kindle_chapter_144.html" data-k-toc-chapter="144">关于辽沈战役的作战方针</a></li>
+<li class="lvl-2"><a href="kindle_chapter_145.html" data-k-toc-chapter="145">关于健全党委制</a></li>
+<li class="lvl-2"><a href="kindle_chapter_146.html" data-k-toc-chapter="146">中共中央关于九月会议的通知</a></li>
+<li class="lvl-2"><a href="kindle_chapter_147.html" data-k-toc-chapter="147">关于淮海战役的的作战方针</a></li>
+<li class="lvl-2"><a href="kindle_chapter_148.html" data-k-toc-chapter="148">全世界革命力量团结起来，反对帝国主义的侵略</a></li>
+<li class="lvl-2"><a href="kindle_chapter_149.html" data-k-toc-chapter="149">中国军事形势的重大变化</a></li>
+<li class="lvl-2"><a href="kindle_chapter_150.html" data-k-toc-chapter="150">关于平津战役的作战方针</a></li>
+<li class="lvl-2"><a href="kindle_chapter_151.html" data-k-toc-chapter="151">敦促杜聿明等投降书</a></li>
+<li class="lvl-2"><a href="kindle_chapter_152.html" data-k-toc-chapter="152">将革命进行到底</a></li>
+<li class="lvl-2"><a href="kindle_chapter_153.html" data-k-toc-chapter="153">评战犯求和</a></li>
+<li class="lvl-2"><a href="kindle_chapter_154.html" data-k-toc-chapter="154">中共中央毛泽东主席关于时局的声明</a></li>
+<li class="lvl-2"><a href="kindle_chapter_155.html" data-k-toc-chapter="155">中共发言人评南京行政院的决议</a></li>
+<li class="lvl-2"><a href="kindle_chapter_156.html" data-k-toc-chapter="156">中共发言人关于命令国民党反动政府重新逮捕前日本侵华军总司令冈村宁次和逮捕国民党内战罪犯的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_157.html" data-k-toc-chapter="157">中共发言人关于和平条件必须包括惩办日本战犯和国民党战犯的声明</a></li>
+<li class="lvl-2"><a href="kindle_chapter_158.html" data-k-toc-chapter="158">把军队变为工作队</a></li>
+<li class="lvl-2"><a href="kindle_chapter_159.html" data-k-toc-chapter="159">四分五裂的反动派为什么还要空喊“全面和平”？</a></li>
+<li class="lvl-2"><a href="kindle_chapter_160.html" data-k-toc-chapter="160">国民党反动派由“呼吁和平”变为呼吁战争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_161.html" data-k-toc-chapter="161">评国民党对战争责任问题的几种答案</a></li>
+<li class="lvl-2"><a href="kindle_chapter_162.html" data-k-toc-chapter="162">在中国共产党第七届中央委员会第二次全体会议上的报告</a></li>
+<li class="lvl-2"><a href="kindle_chapter_163.html" data-k-toc-chapter="163">党委会的工作方法</a></li>
+<li class="lvl-2"><a href="kindle_chapter_164.html" data-k-toc-chapter="164">南京政府向何处去？</a></li>
+<li class="lvl-2"><a href="kindle_chapter_165.html" data-k-toc-chapter="165">向全国进军的命令</a></li>
+<li class="lvl-2"><a href="kindle_chapter_166.html" data-k-toc-chapter="166">中国人民解放军布告</a></li>
+<li class="lvl-2"><a href="kindle_chapter_167.html" data-k-toc-chapter="167">中国人民解放军总部发言人为英国军舰暴行发表的声明</a></li>
+<li class="lvl-2"><a href="kindle_chapter_168.html" data-k-toc-chapter="168">在新政治协商会议筹备会上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_169.html" data-k-toc-chapter="169">论人民民主专政</a></li>
+<li class="lvl-2"><a href="kindle_chapter_170.html" data-k-toc-chapter="170">丢掉幻想，准备斗争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_171.html" data-k-toc-chapter="171">别了，司徒雷登</a></li>
+<li class="lvl-2"><a href="kindle_chapter_172.html" data-k-toc-chapter="172">为什么要讨论白皮书？</a></li>
+<li class="lvl-2"><a href="kindle_chapter_173.html" data-k-toc-chapter="173">“友谊”，还是侵略？</a></li>
+<li class="lvl-2"><a href="kindle_chapter_174.html" data-k-toc-chapter="174">唯心历史观的破产</a></li>
+<li class="lvl-0"><a href="kindle_chapter_175.html" data-k-toc-chapter="175">第五卷</a></li>
+<li class="lvl-1"><a href="kindle_chapter_177.html" data-k-toc-chapter="177">出版说明</a></li>
+<li class="lvl-1"><a href="kindle_chapter_178.html" data-k-toc-chapter="178">社会主义革命和社会主义建设时期（一）</a></li>
+<li class="lvl-2"><a href="kindle_chapter_179.html" data-k-toc-chapter="179">中国人民站起来了</a></li>
+<li class="lvl-2"><a href="kindle_chapter_180.html" data-k-toc-chapter="180">中国人民大团结万岁</a></li>
+<li class="lvl-2"><a href="kindle_chapter_181.html" data-k-toc-chapter="181">人民英雄们永垂不朽</a></li>
+<li class="lvl-2"><a href="kindle_chapter_182.html" data-k-toc-chapter="182">永远保持艰苦奋斗的作风</a></li>
+<li class="lvl-2"><a href="kindle_chapter_183.html" data-k-toc-chapter="183">征询对待富农策略问题的意见</a></li>
+<li class="lvl-2"><a href="kindle_chapter_184.html" data-k-toc-chapter="184">为争取国家财政经济状况的基本好转而斗争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_185.html" data-k-toc-chapter="185">不要四面出击</a></li>
+<li class="lvl-2"><a href="kindle_chapter_186.html" data-k-toc-chapter="186">做一个完全的革命派</a></li>
+<li class="lvl-2"><a href="kindle_chapter_187.html" data-k-toc-chapter="187">你们是全民族的模范人物</a></li>
+<li class="lvl-2"><a href="kindle_chapter_188.html" data-k-toc-chapter="188">给中国人民志愿军的命令</a></li>
+<li class="lvl-2"><a href="kindle_chapter_189.html" data-k-toc-chapter="189">中国人民志愿军要爱护朝鲜的一山一水一草一木</a></li>
+<li class="lvl-2"><a href="kindle_chapter_190.html" data-k-toc-chapter="190">中共中央政治局扩大会议决议要点</a></li>
+<li class="lvl-2"><a href="kindle_chapter_191.html" data-k-toc-chapter="191">镇压反革命必须实行党的群众路线</a></li>
+<li class="lvl-2"><a href="kindle_chapter_192.html" data-k-toc-chapter="192">镇压反革命必须打得稳，打得准，打得狠</a></li>
+<li class="lvl-2"><a href="kindle_chapter_193.html" data-k-toc-chapter="193">应当重视电影《武训传》的讨论</a></li>
+<li class="lvl-2"><a href="kindle_chapter_194.html" data-k-toc-chapter="194">三大运动的伟大胜利</a></li>
+<li class="lvl-2"><a href="kindle_chapter_195.html" data-k-toc-chapter="195">关于“三反”“五反”的斗争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_196.html" data-k-toc-chapter="196">把农业互助合作当作一件大事去做</a></li>
+<li class="lvl-2"><a href="kindle_chapter_197.html" data-k-toc-chapter="197">元旦祝词</a></li>
+<li class="lvl-2"><a href="kindle_chapter_198.html" data-k-toc-chapter="198">中共中央关于西藏工作方针的指示</a></li>
+<li class="lvl-2"><a href="kindle_chapter_199.html" data-k-toc-chapter="199">工人阶级与资产阶级的矛盾是国内的主要矛盾</a></li>
+<li class="lvl-2"><a href="kindle_chapter_200.html" data-k-toc-chapter="200">团结起来，划清敌我界限</a></li>
+<li class="lvl-2"><a href="kindle_chapter_201.html" data-k-toc-chapter="201">祝贺中国人民志愿军的重大胜利</a></li>
+<li class="lvl-2"><a href="kindle_chapter_202.html" data-k-toc-chapter="202">反对官僚主义、命令主义和违法乱纪</a></li>
+<li class="lvl-2"><a href="kindle_chapter_203.html" data-k-toc-chapter="203">批判大汉族主义</a></li>
+<li class="lvl-2"><a href="kindle_chapter_204.html" data-k-toc-chapter="204">解决“五多”问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_205.html" data-k-toc-chapter="205">对刘少奇、杨尚昆破坏纪律擅自以中央名义发出文件的批评</a></li>
+<li class="lvl-2"><a href="kindle_chapter_206.html" data-k-toc-chapter="206">批判离开总路线的右倾观点</a></li>
+<li class="lvl-2"><a href="kindle_chapter_207.html" data-k-toc-chapter="207">青年团的工作要照顾青年的特点</a></li>
+<li class="lvl-2"><a href="kindle_chapter_208.html" data-k-toc-chapter="208">关于国家资本主义</a></li>
+<li class="lvl-2"><a href="kindle_chapter_209.html" data-k-toc-chapter="209">党在过渡时期的总路线</a></li>
+<li class="lvl-2"><a href="kindle_chapter_210.html" data-k-toc-chapter="210">反对党内的资产阶级思想</a></li>
+<li class="lvl-2"><a href="kindle_chapter_211.html" data-k-toc-chapter="211">改造资本主义工商业的必经之路</a></li>
+<li class="lvl-2"><a href="kindle_chapter_212.html" data-k-toc-chapter="212">抗美援朝的伟大胜利和今后的任务</a></li>
+<li class="lvl-2"><a href="kindle_chapter_213.html" data-k-toc-chapter="213">批判梁漱溟的反动思想</a></li>
+<li class="lvl-2"><a href="kindle_chapter_214.html" data-k-toc-chapter="214">关于农业互助合作的两次谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_215.html" data-k-toc-chapter="215">关于中华人民共和国宪法草案</a></li>
+<li class="lvl-2"><a href="kindle_chapter_216.html" data-k-toc-chapter="216">为建设一个伟大的社会主义国家而奋斗</a></li>
+<li class="lvl-2"><a href="kindle_chapter_217.html" data-k-toc-chapter="217">关于《红楼梦》研究问题的信</a></li>
+<li class="lvl-2"><a href="kindle_chapter_218.html" data-k-toc-chapter="218">原子弹吓不倒中国人民</a></li>
+<li class="lvl-2"><a href="kindle_chapter_219.html" data-k-toc-chapter="219">在中国共产党全国代表会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_220.html" data-k-toc-chapter="220">驳“舆论一律”</a></li>
+<li class="lvl-2"><a href="kindle_chapter_221.html" data-k-toc-chapter="221">《关于胡风反革命集团的材料》的序言和按语</a></li>
+<li class="lvl-2"><a href="kindle_chapter_222.html" data-k-toc-chapter="222">关于农业合作化问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_223.html" data-k-toc-chapter="223">农业合作化必须依靠党团员和贫农下中农</a></li>
+<li class="lvl-2"><a href="kindle_chapter_224.html" data-k-toc-chapter="224">农业合作化的一场辩论和当前的阶级斗争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_225.html" data-k-toc-chapter="225">《中国农村的社会主义高潮》的序言</a></li>
+<li class="lvl-2"><a href="kindle_chapter_226.html" data-k-toc-chapter="226">《中国农村的社会主义高潮》的按语</a></li>
+<li class="lvl-2"><a href="kindle_chapter_227.html" data-k-toc-chapter="227">征询对农业十七条的意见</a></li>
+<li class="lvl-2"><a href="kindle_chapter_228.html" data-k-toc-chapter="228">加快手工业的社会主义改造</a></li>
+<li class="lvl-2"><a href="kindle_chapter_229.html" data-k-toc-chapter="229">论十大关系</a></li>
+<li class="lvl-2"><a href="kindle_chapter_230.html" data-k-toc-chapter="230">美帝国主义是纸老虎</a></li>
+<li class="lvl-2"><a href="kindle_chapter_231.html" data-k-toc-chapter="231">增强党的团结，继承党的传统</a></li>
+<li class="lvl-2"><a href="kindle_chapter_232.html" data-k-toc-chapter="232">我们党的—些历史经验</a></li>
+<li class="lvl-2"><a href="kindle_chapter_233.html" data-k-toc-chapter="233">纪念孙中山先生</a></li>
+<li class="lvl-2"><a href="kindle_chapter_234.html" data-k-toc-chapter="234">在中国共产党第八届中央委员会第二次全体会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_235.html" data-k-toc-chapter="235">在省市自治区党委书记会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_236.html" data-k-toc-chapter="236">关于正确处理人民内部矛盾的问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_237.html" data-k-toc-chapter="237">在中国共产党全国宣传工作会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_238.html" data-k-toc-chapter="238">坚持艰苦奋斗，密切联系群众</a></li>
+<li class="lvl-2"><a href="kindle_chapter_239.html" data-k-toc-chapter="239">事情正在起变化</a></li>
+<li class="lvl-2"><a href="kindle_chapter_240.html" data-k-toc-chapter="240">中国共产党是全中国人民的领导核心</a></li>
+<li class="lvl-2"><a href="kindle_chapter_241.html" data-k-toc-chapter="241">组织力量反击右派分子的猖狂进攻</a></li>
+<li class="lvl-2"><a href="kindle_chapter_242.html" data-k-toc-chapter="242">文汇报的资产阶级方向应当批判</a></li>
+<li class="lvl-2"><a href="kindle_chapter_243.html" data-k-toc-chapter="243">打退资产阶级右派的进攻</a></li>
+<li class="lvl-2"><a href="kindle_chapter_244.html" data-k-toc-chapter="244">一九五七年夏季的形势</a></li>
+<li class="lvl-2"><a href="kindle_chapter_245.html" data-k-toc-chapter="245">做革命的促进派</a></li>
+<li class="lvl-2"><a href="kindle_chapter_246.html" data-k-toc-chapter="246">坚定地相信群众的大多数</a></li>
+<li class="lvl-2"><a href="kindle_chapter_247.html" data-k-toc-chapter="247">党内团结的辩证方法</a></li>
+<li class="lvl-2"><a href="kindle_chapter_248.html" data-k-toc-chapter="248">一切反动派都是纸老虎</a></li>
+<li class="lvl-0"><a href="kindle_chapter_249.html" data-k-toc-chapter="249">第六卷（静火版）</a></li>
+<li class="lvl-1"><a href="kindle_chapter_250.html" data-k-toc-chapter="250">出版说明</a></li>
+<li class="lvl-1"><a href="kindle_chapter_251.html" data-k-toc-chapter="251">静火有言</a></li>
+<li class="lvl-1"><a href="kindle_chapter_252.html" data-k-toc-chapter="252">社会主义革命和社会主义建设时期（二）</a></li>
+<li class="lvl-2"><a href="kindle_chapter_253.html" data-k-toc-chapter="253">关于中国人民志愿军撤出朝鲜问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_254.html" data-k-toc-chapter="254">工作方法六十条（草案）</a></li>
+<li class="lvl-2"><a href="kindle_chapter_255.html" data-k-toc-chapter="255">在成都会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_256.html" data-k-toc-chapter="256">干部要以普通劳动者的姿态出现</a></li>
+<li class="lvl-2"><a href="kindle_chapter_257.html" data-k-toc-chapter="257">要搞一点原子弹氢弹</a></li>
+<li class="lvl-2"><a href="kindle_chapter_258.html" data-k-toc-chapter="258">西藏要准备对付那里的可能的全局叛乱</a></li>
+<li class="lvl-2"><a href="kindle_chapter_259.html" data-k-toc-chapter="259">介绍一封信</a></li>
+<li class="lvl-2"><a href="kindle_chapter_260.html" data-k-toc-chapter="260">同苏联驻华大使尤金的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_261.html" data-k-toc-chapter="261">关于国际形势问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_262.html" data-k-toc-chapter="262">中华人民共和国国防部告台湾同胞书</a></li>
+<li class="lvl-2"><a href="kindle_chapter_263.html" data-k-toc-chapter="263">中华人民共和国国防部命令</a></li>
+<li class="lvl-2"><a href="kindle_chapter_264.html" data-k-toc-chapter="264">中华人民共和国国防部再告台湾同胞书</a></li>
+<li class="lvl-2"><a href="kindle_chapter_265.html" data-k-toc-chapter="265">关于社会主义商品生产问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_266.html" data-k-toc-chapter="266">记者头脑要冷静</a></li>
+<li class="lvl-2"><a href="kindle_chapter_267.html" data-k-toc-chapter="267">在武昌会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_268.html" data-k-toc-chapter="268">关于帝国主义和一切反动派是不是真老虎的问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_269.html" data-k-toc-chapter="269">在八届六中全会上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_270.html" data-k-toc-chapter="270">马列主义基本原理至今未变，个别结论可以改变</a></li>
+<li class="lvl-2"><a href="kindle_chapter_271.html" data-k-toc-chapter="271">在第二次郑州会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_272.html" data-k-toc-chapter="272">党内通信——建议召开县五级干部大会</a></li>
+<li class="lvl-2"><a href="kindle_chapter_273.html" data-k-toc-chapter="273">关于西藏平叛</a></li>
+<li class="lvl-2"><a href="kindle_chapter_274.html" data-k-toc-chapter="274">党内通信——致六级干部的公开信</a></li>
+<li class="lvl-2"><a href="kindle_chapter_275.html" data-k-toc-chapter="275">关于西藏问题和台湾问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_276.html" data-k-toc-chapter="276">经济建设是科学，要老老实实学习</a></li>
+<li class="lvl-2"><a href="kindle_chapter_277.html" data-k-toc-chapter="277">要政治家办报</a></li>
+<li class="lvl-2"><a href="kindle_chapter_278.html" data-k-toc-chapter="278">如实公开报道灾情</a></li>
+<li class="lvl-2"><a href="kindle_chapter_279.html" data-k-toc-chapter="279">庐山会议讨论的十八个问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_280.html" data-k-toc-chapter="280">在庐山会议上的多次讲话、批语</a></li>
+<li class="lvl-2"><a href="kindle_chapter_281.html" data-k-toc-chapter="281">对彭德怀九月九日信的批示</a></li>
+<li class="lvl-2"><a href="kindle_chapter_282.html" data-k-toc-chapter="282">争取比较长的和平时间是可能的</a></li>
+<li class="lvl-2"><a href="kindle_chapter_283.html" data-k-toc-chapter="283">同澳共总书记夏基的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_284.html" data-k-toc-chapter="284">读苏联《政治经济学教科书》的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_285.html" data-k-toc-chapter="285">坚决制止重刮“共产风”等违法乱纪行为</a></li>
+<li class="lvl-2"><a href="kindle_chapter_286.html" data-k-toc-chapter="286">同蒙哥马利的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_287.html" data-k-toc-chapter="287">十年总结</a></li>
+<li class="lvl-2"><a href="kindle_chapter_288.html" data-k-toc-chapter="288">同斯诺的谈话——中国人的精神面貌改变了</a></li>
+<li class="lvl-2"><a href="kindle_chapter_289.html" data-k-toc-chapter="289">彻底纠正“五风”</a></li>
+<li class="lvl-2"><a href="kindle_chapter_290.html" data-k-toc-chapter="290">永远不许一平二调</a></li>
+<li class="lvl-2"><a href="kindle_chapter_291.html" data-k-toc-chapter="291">坚决退赔，刹住“共产风”</a></li>
+<li class="lvl-2"><a href="kindle_chapter_292.html" data-k-toc-chapter="292">大兴调查研究之风</a></li>
+<li class="lvl-2"><a href="kindle_chapter_293.html" data-k-toc-chapter="293">要做系统的由历史到现状的调查研究</a></li>
+<li class="lvl-2"><a href="kindle_chapter_294.html" data-k-toc-chapter="294">总结经验，教育干部</a></li>
+<li class="lvl-2"><a href="kindle_chapter_295.html" data-k-toc-chapter="295">中国在联合国只能有一个代表</a></li>
+<li class="lvl-2"><a href="kindle_chapter_296.html" data-k-toc-chapter="296">在七千人大会上的讲话——关于党的民主集中制</a></li>
+<li class="lvl-2"><a href="kindle_chapter_297.html" data-k-toc-chapter="297">在北戴河中央工作会议中心小组会上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_298.html" data-k-toc-chapter="298">在八届十中全会上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_299.html" data-k-toc-chapter="299">干部参加劳动的伟大意义</a></li>
+<li class="lvl-2"><a href="kindle_chapter_300.html" data-k-toc-chapter="300">人的正确思想是从哪里来的？</a></li>
+<li class="lvl-2"><a href="kindle_chapter_301.html" data-k-toc-chapter="301">论反对官僚主义</a></li>
+<li class="lvl-2"><a href="kindle_chapter_302.html" data-k-toc-chapter="302">支持美国黑人反对种族歧视斗争的声明</a></li>
+<li class="lvl-2"><a href="kindle_chapter_303.html" data-k-toc-chapter="303">受压迫的人民总是要起来的</a></li>
+<li class="lvl-2"><a href="kindle_chapter_304.html" data-k-toc-chapter="304">革命和建设都要靠自己</a></li>
+<li class="lvl-2"><a href="kindle_chapter_305.html" data-k-toc-chapter="305">关于文艺工作的批示</a></li>
+<li class="lvl-2"><a href="kindle_chapter_306.html" data-k-toc-chapter="306">加强相互学习，克服固步自封、骄傲自满</a></li>
+<li class="lvl-2"><a href="kindle_chapter_307.html" data-k-toc-chapter="307">不搞科学技术，生产力无法提高</a></li>
+<li class="lvl-2"><a href="kindle_chapter_308.html" data-k-toc-chapter="308">我国还可能要走一段资本主义复辟的道路</a></li>
+<li class="lvl-2"><a href="kindle_chapter_309.html" data-k-toc-chapter="309">中法之间有共同点</a></li>
+<li class="lvl-2"><a href="kindle_chapter_310.html" data-k-toc-chapter="310">关于教育革命的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_311.html" data-k-toc-chapter="311">以农业为基础，以工业为主导</a></li>
+<li class="lvl-2"><a href="kindle_chapter_312.html" data-k-toc-chapter="312">支持被压迫人民反对帝国主义的战争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_313.html" data-k-toc-chapter="313">和王海蓉同志的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_314.html" data-k-toc-chapter="314">哪里有压迫哪里就有反抗</a></li>
+<li class="lvl-2"><a href="kindle_chapter_315.html" data-k-toc-chapter="315">接见日本社会党人士的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_316.html" data-k-toc-chapter="316">关于九评苏共中央的公开信的节录</a></li>
+<li class="lvl-2"><a href="kindle_chapter_317.html" data-k-toc-chapter="317">中华人民共和国政府声明</a></li>
+<li class="lvl-2"><a href="kindle_chapter_318.html" data-k-toc-chapter="318">打破核垄断，消灭核武器</a></li>
+<li class="lvl-2"><a href="kindle_chapter_319.html" data-k-toc-chapter="319">中国的大跃进</a></li>
+<li class="lvl-2"><a href="kindle_chapter_320.html" data-k-toc-chapter="320">同斯诺的谈话——关于越南战争</a></li>
+<li class="lvl-2"><a href="kindle_chapter_321.html" data-k-toc-chapter="321">官僚主义者阶级是革命对象</a></li>
+<li class="lvl-2"><a href="kindle_chapter_322.html" data-k-toc-chapter="322">我们希望阿拉伯国家团结起来</a></li>
+<li class="lvl-2"><a href="kindle_chapter_323.html" data-k-toc-chapter="323">把医疗卫生工作的重点放到农村去</a></li>
+<li class="lvl-2"><a href="kindle_chapter_324.html" data-k-toc-chapter="324">人民给政府饭吃，吃了饭就要为人民服务</a></li>
+<li class="lvl-2"><a href="kindle_chapter_325.html" data-k-toc-chapter="325">胜利的信念是从斗争中得来的</a></li>
+<li class="lvl-2"><a href="kindle_chapter_326.html" data-k-toc-chapter="326">突出政治，反对折衷主义</a></li>
+<li class="lvl-2"><a href="kindle_chapter_327.html" data-k-toc-chapter="327">上面要靠党的领导，下面要靠广大群众</a></li>
+<li class="lvl-0"><a href="kindle_chapter_328.html" data-k-toc-chapter="328">第七卷（静火版）</a></li>
+<li class="lvl-1"><a href="kindle_chapter_329.html" data-k-toc-chapter="329">出版说明</a></li>
+<li class="lvl-1"><a href="kindle_chapter_330.html" data-k-toc-chapter="330">静火有言</a></li>
+<li class="lvl-1"><a href="kindle_chapter_331.html" data-k-toc-chapter="331">文化大革命时期</a></li>
+<li class="lvl-2"><a href="kindle_chapter_332.html" data-k-toc-chapter="332">关于农业机械化——备战备荒为人民</a></li>
+<li class="lvl-2"><a href="kindle_chapter_333.html" data-k-toc-chapter="333">在中央政治局常委扩大会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_334.html" data-k-toc-chapter="334">对中宣部和北京市委的批评</a></li>
+<li class="lvl-2"><a href="kindle_chapter_335.html" data-k-toc-chapter="335">学校一律要实行半工半读</a></li>
+<li class="lvl-2"><a href="kindle_chapter_336.html" data-k-toc-chapter="336">部队文艺工作座谈会纪要</a></li>
+<li class="lvl-2"><a href="kindle_chapter_337.html" data-k-toc-chapter="337">为什么要搞文化大革命</a></li>
+<li class="lvl-2"><a href="kindle_chapter_338.html" data-k-toc-chapter="338">各行各业均应一业为主兼学别样——五·七指示</a></li>
+<li class="lvl-2"><a href="kindle_chapter_339.html" data-k-toc-chapter="339">中国共产党中央委员会通知——五·一六通知</a></li>
+<li class="lvl-2"><a href="kindle_chapter_340.html" data-k-toc-chapter="340">同胡志明的谈话——不搞清官贪官，搞文化大革命</a></li>
+<li class="lvl-2"><a href="kindle_chapter_341.html" data-k-toc-chapter="341">给江青的信</a></li>
+<li class="lvl-2"><a href="kindle_chapter_342.html" data-k-toc-chapter="342">凡是镇压学生运动的人，都没有好下场</a></li>
+<li class="lvl-2"><a href="kindle_chapter_343.html" data-k-toc-chapter="343">工作组要撤，文化革命要依靠革命师生</a></li>
+<li class="lvl-2"><a href="kindle_chapter_344.html" data-k-toc-chapter="344">给清华大学附属中学红卫兵的信</a></li>
+<li class="lvl-2"><a href="kindle_chapter_345.html" data-k-toc-chapter="345">不许镇压学生运动</a></li>
+<li class="lvl-2"><a href="kindle_chapter_346.html" data-k-toc-chapter="346">炮打司令部——我的一张大字报</a></li>
+<li class="lvl-2"><a href="kindle_chapter_347.html" data-k-toc-chapter="347">中国共产党中央委员会关于无产阶级文化大革命的决定</a></li>
+<li class="lvl-2"><a href="kindle_chapter_348.html" data-k-toc-chapter="348">在中共八届十一中全会闭幕会上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_349.html" data-k-toc-chapter="349">对四位外国专家的大字报的批语</a></li>
+<li class="lvl-2"><a href="kindle_chapter_350.html" data-k-toc-chapter="350">驻外机关也要革命化</a></li>
+<li class="lvl-2"><a href="kindle_chapter_351.html" data-k-toc-chapter="351">在中央工作会议上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_352.html" data-k-toc-chapter="352">斗争要文明些，坚持文斗，不用武斗</a></li>
+<li class="lvl-2"><a href="kindle_chapter_353.html" data-k-toc-chapter="353">对刘少奇到学校做公开检查的批示</a></li>
+<li class="lvl-2"><a href="kindle_chapter_354.html" data-k-toc-chapter="354">对《文汇报》、《解放日报》夺权事件的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_355.html" data-k-toc-chapter="355">论夺权</a></li>
+<li class="lvl-2"><a href="kindle_chapter_356.html" data-k-toc-chapter="356">人民解放军应该支持左派广大群众</a></li>
+<li class="lvl-2"><a href="kindle_chapter_357.html" data-k-toc-chapter="357">接见卡博和巴卢库时的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_358.html" data-k-toc-chapter="358">对上海文化大革命的指示</a></li>
+<li class="lvl-2"><a href="kindle_chapter_359.html" data-k-toc-chapter="359">批评“二月逆流”</a></li>
+<li class="lvl-2"><a href="kindle_chapter_360.html" data-k-toc-chapter="360">论革命的“三结合”</a></li>
+<li class="lvl-2"><a href="kindle_chapter_361.html" data-k-toc-chapter="361">关于两条路线斗争的基本问题</a></li>
+<li class="lvl-2"><a href="kindle_chapter_362.html" data-k-toc-chapter="362">是义和团侵略了帝国主义了吗？</a></li>
+<li class="lvl-2"><a href="kindle_chapter_363.html" data-k-toc-chapter="363">中央军委关于支左工作十条命令</a></li>
+<li class="lvl-2"><a href="kindle_chapter_364.html" data-k-toc-chapter="364">接见阿尔巴尼亚军事代表团时的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_365.html" data-k-toc-chapter="365">论无产阶级专政下继续革命</a></li>
+<li class="lvl-2"><a href="kindle_chapter_366.html" data-k-toc-chapter="366">在听了氢弹会议汇报后的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_367.html" data-k-toc-chapter="367">视察华北、中南和华东地区时的重要指示</a></li>
+<li class="lvl-2"><a href="kindle_chapter_368.html" data-k-toc-chapter="368">接见刚果（布）总理努马扎莱的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_369.html" data-k-toc-chapter="369">关于“九大”和整党问题的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_370.html" data-k-toc-chapter="370">祝贺越南南方民族解放阵线成立七周年的电报</a></li>
+<li class="lvl-2"><a href="kindle_chapter_371.html" data-k-toc-chapter="371">关于国家机关的改革和革命委员会的基本经验</a></li>
+<li class="lvl-2"><a href="kindle_chapter_372.html" data-k-toc-chapter="372">支持美国黑人抗暴斗争的声明</a></li>
+<li class="lvl-2"><a href="kindle_chapter_373.html" data-k-toc-chapter="373">学校教育革命的方向——要和工农兵结合</a></li>
+<li class="lvl-2"><a href="kindle_chapter_374.html" data-k-toc-chapter="374">接见首都红代会“五大领袖”时的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_375.html" data-k-toc-chapter="375">医学教育革命的方向——赤脚医生就是好</a></li>
+<li class="lvl-2"><a href="kindle_chapter_376.html" data-k-toc-chapter="376">广大干部下放劳动是一种重新学习的极好机会</a></li>
+<li class="lvl-2"><a href="kindle_chapter_377.html" data-k-toc-chapter="377">在中共八届扩大的十二中全会上的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_378.html" data-k-toc-chapter="378">赞成越南又打又谈的方针</a></li>
+<li class="lvl-2"><a href="kindle_chapter_379.html" data-k-toc-chapter="379">关于知识青年到农村去的号召</a></li>
+<li class="lvl-2"><a href="kindle_chapter_380.html" data-k-toc-chapter="380">对中国共产党第九次全国代表大会的讲话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_381.html" data-k-toc-chapter="381">关于战备疏散的指示</a></li>
+<li class="lvl-2"><a href="kindle_chapter_382.html" data-k-toc-chapter="382">祝贺越南南方民族解放阵线成立九周年的电报</a></li>
+<li class="lvl-2"><a href="kindle_chapter_383.html" data-k-toc-chapter="383">与黎笋的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_384.html" data-k-toc-chapter="384">全世界人民团结起来，打败美国侵略者及其一切走狗</a></li>
+<li class="lvl-2"><a href="kindle_chapter_385.html" data-k-toc-chapter="385">发展自己的工业和农业不要依靠外国</a></li>
+<li class="lvl-2"><a href="kindle_chapter_386.html" data-k-toc-chapter="386">帝国主义怕第三世界</a></li>
+<li class="lvl-2"><a href="kindle_chapter_387.html" data-k-toc-chapter="387">国际间的事要由大家商量解决</a></li>
+<li class="lvl-2"><a href="kindle_chapter_388.html" data-k-toc-chapter="388">改变国家体制，不设国家主席</a></li>
+<li class="lvl-2"><a href="kindle_chapter_389.html" data-k-toc-chapter="389">我的一点意见</a></li>
+<li class="lvl-2"><a href="kindle_chapter_390.html" data-k-toc-chapter="390">与斯诺的谈话——关于文化大革命</a></li>
+<li class="lvl-2"><a href="kindle_chapter_391.html" data-k-toc-chapter="391">对外宣传工作不可强加于人</a></li>
+<li class="lvl-2"><a href="kindle_chapter_392.html" data-k-toc-chapter="392">思想上政治上的路线正确与否是决定一切的</a></li>
+<li class="lvl-2"><a href="kindle_chapter_393.html" data-k-toc-chapter="393">恢复联合国席位后的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_394.html" data-k-toc-chapter="394">对反革命不要杀，保留活证据</a></li>
+<li class="lvl-2"><a href="kindle_chapter_395.html" data-k-toc-chapter="395">会见美国总统尼克松时的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_396.html" data-k-toc-chapter="396">中美联合公报（“上海公报”）中国方面的声明</a></li>
+<li class="lvl-2"><a href="kindle_chapter_397.html" data-k-toc-chapter="397">与日本首相田中角荣的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_398.html" data-k-toc-chapter="398">深挖洞，广积粮，不称霸</a></li>
+<li class="lvl-2"><a href="kindle_chapter_399.html" data-k-toc-chapter="399">祝贺越南人民取得的伟大胜利</a></li>
+<li class="lvl-2"><a href="kindle_chapter_400.html" data-k-toc-chapter="400">接见基辛格时的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_401.html" data-k-toc-chapter="401">启用邓小平</a></li>
+<li class="lvl-2"><a href="kindle_chapter_402.html" data-k-toc-chapter="402">在政治局会议上的讲话——八大军区司令员对调</a></li>
+<li class="lvl-2"><a href="kindle_chapter_403.html" data-k-toc-chapter="403">中国将修建青藏铁路</a></li>
+<li class="lvl-2"><a href="kindle_chapter_404.html" data-k-toc-chapter="404">关于划分三个世界的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_405.html" data-k-toc-chapter="405">同英国前首相希思的谈话</a></li>
+<li class="lvl-2"><a href="kindle_chapter_406.html" data-k-toc-chapter="406">关于理论问题的谈话要点</a></li>
+<li class="lvl-2"><a href="kindle_chapter_407.html" data-k-toc-chapter="407">对在押国民党战犯、党政军特人员一律释放</a></li>
+<li class="lvl-2"><a href="kindle_chapter_408.html" data-k-toc-chapter="408">要安定团结不要分裂，不要搞阴谋诡计</a></li>
+<li class="lvl-2"><a href="kindle_chapter_409.html" data-k-toc-chapter="409">关于《水浒》的评论</a></li>
+<li class="lvl-2"><a href="kindle_chapter_410.html" data-k-toc-chapter="410">中美关系会一点点好起来</a></li>
+<li class="lvl-2"><a href="kindle_chapter_411.html" data-k-toc-chapter="411">祝贺印度支那三国抗美救国战争取得胜利</a></li>
+<li class="lvl-2"><a href="kindle_chapter_412.html" data-k-toc-chapter="412">走资派还在走，“永不翻案”靠不住</a></li>
+<li class="lvl-2"><a href="kindle_chapter_413.html" data-k-toc-chapter="413">对天安门事件的指示</a></li>
+<li class="lvl-2"><a href="kindle_chapter_414.html" data-k-toc-chapter="414">后事交代</a></li>
+<li class="lvl-1"><a href="kindle_chapter_415.html" data-k-toc-chapter="415">版本信息</a></li></ul></div>
+</section>
+</main>
+<nav class="k-dock k-surface" id="kDock"><a href="/kindle-library.html" data-i18n="library" aria-current="location">Library</a><a href="/kindle-library.html#kHomeSettings" data-i18n="settings">Settings</a></nav>
+<script>
+
+function getCookie(key) {
+  var cookies = document.cookie.split('; ');
+  for (var i = 0; i < cookies.length; i++) {
+    var parts = cookies[i].split('=');
+    if (parts[0] === key) {
+      try { return decodeURIComponent(parts.slice(1).join('=')); } catch (error) { return null; }
+    }
+  }
+  return null;
+}
+function setCookie(key, value, days) {
+  var expires = '';
+  if (days) {
+    var date = new Date();
+    date.setTime(date.getTime() + days * 86400000);
+    expires = '; expires=' + date.toUTCString();
+  }
+  document.cookie = key + '=' + encodeURIComponent(value) + expires + '; path=/; SameSite=Lax';
+}
+function kHistoryKey() {
+  var root = window.location.pathname.replace(/(?:book\/[^/]+\/)?[^/]+$/, '');
+  return 'kindle_recent_' + encodeURIComponent(root);
+}
+function kRememberBook(book) {
+  var key = kHistoryKey();
+  var saved = (getCookie(key) || '').split(',');
+  var recent = [book];
+  for (var i = 0; i < saved.length && recent.length < 12; i++) {
+    if (saved[i] && recent.indexOf(saved[i]) < 0) recent.push(saved[i]);
+  }
+  setCookie(key, recent.join(','), 365);
+}
+var K_THEMES = ['light', 'sepia', 'dark'];
+var K_FONT_SIZES = [12, 14, 16, 18, 20, 22, 24, 28, 32, 36, 42, 48];
+function kMarkChoice(attribute, value) {
+  var choices = document.querySelectorAll('[' + attribute + ']');
+  for (var i = 0; i < choices.length; i++) {
+    choices[i].setAttribute('aria-pressed', choices[i].getAttribute(attribute) === value ? 'true' : 'false');
+  }
+}
+function applyTheme(theme) {
+  if (K_THEMES.indexOf(theme) === -1) theme = 'light';
+  document.body.className = theme;
+  kMarkChoice('data-k-theme', theme);
+}
+function kSelectTheme(theme) {
+  setCookie('kindle_theme', theme, 365);
+  applyTheme(theme);
+}
+function kApplyFontChoice(choice) {
+  if (choice !== 'serif' && choice !== 'sans') choice = 'book';
+  document.body.setAttribute('data-k-font', choice);
+  kMarkChoice('data-k-font-choice', choice);
+}
+function kSelectFont(choice) {
+  setCookie('kindle_font_family', choice, 365);
+  kApplyFontChoice(choice);
+  if (window.kReaderRelayout) window.kReaderRelayout();
+}
+function applyFont(size) {
+  var text = document.getElementById('kText');
+  if (!text) return;
+  var pixels = K_FONT_SIZES[size - 1] || K_FONT_SIZES[2];
+  text.style.setProperty('font-size', pixels + 'px', 'important');
+  var value = document.getElementById('kFontSizeValue');
+  if (value) value.textContent = pixels + ' px';
+}
+function kTheme() {
+  var current = getCookie('kindle_theme') || 'light';
+  var index = -1;
+  for (var i = 0; i < K_THEMES.length; i++) {
+    if (K_THEMES[i] === current) { index = i; break; }
+  }
+  if (index < 0) { index = 0; }
+  var next = K_THEMES[(index + 1) % K_THEMES.length];
+  kSelectTheme(next);
+}
+function kFont(delta) {
+  var size = parseInt(getCookie('kindle_font_size') || '3', 10);
+  if (isNaN(size)) { size = 3; }
+  size = Math.max(1, Math.min(K_FONT_SIZES.length, size + delta));
+  setCookie('kindle_font_size', String(size), 365);
+  applyFont(size);
+  if (window.kReaderRelayout) window.kReaderRelayout();
+}
+(function () {
+  applyTheme(getCookie('kindle_theme') || 'light');
+  kApplyFontChoice(getCookie('kindle_font_family'));
+  var size = parseInt(getCookie('kindle_font_size') || '3', 10);
+  if (isNaN(size)) { size = 3; }
+  applyFont(size);
+})();
+// Keep the reader layout and tap navigation as independent preferences.
+function kClickScrollOn() {
+  return getCookie('kindle_click_scroll') !== 'off';
+}
+function kPagedMode() {
+  var mode = getCookie('kindle_reading_mode');
+  return mode ? mode === 'pages' : kClickScrollOn();
+}
+function kToggleClickScroll() {
+  // Preserve the old layout when moving from the legacy combined setting.
+  if (!getCookie('kindle_reading_mode')) {
+    setCookie('kindle_reading_mode', kPagedMode() ? 'pages' : 'scroll', 365);
+  }
+  setCookie('kindle_click_scroll', kClickScrollOn() ? 'off' : 'on', 365);
+  kSyncReaderToggles();
+}
+function kToggleReadingMode() {
+  setCookie('kindle_reading_mode', kPagedMode() ? 'scroll' : 'pages', 365);
+  kSyncReaderToggles();
+  if (window.kReaderRelayout) window.kReaderRelayout();
+}
+function kSyncReaderToggles() {
+  var tap = document.getElementById('kClickScroll');
+  var mode = document.getElementById('kReadingMode');
+  if (tap) tap.setAttribute('aria-pressed', kClickScrollOn() ? 'true' : 'false');
+  if (mode) mode.setAttribute('aria-pressed', kPagedMode() ? 'true' : 'false');
+}
+function kSettingsOpen() {
+  var settings = document.getElementById('kSettings');
+  return settings && settings.style.display === 'block';
+}
+function kToggleSettings() {
+  var settings = document.getElementById('kSettings');
+  var backdrop = document.getElementById('kSettingsBackdrop');
+  var toggle = document.getElementById('kSettingsToggle');
+  if (!settings || !backdrop || !toggle) return;
+  var open = !kSettingsOpen();
+  settings.style.display = backdrop.style.display = open ? 'block' : 'none';
+  toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (open) settings.getElementsByTagName('button')[0].focus();
+  else toggle.focus();
+}
+function kIsTurnNode(node) {
+  while (node && node !== document.body) {
+    var tag = String(node.tagName || '').toUpperCase();
+    if (tag === 'A' || tag === 'BUTTON' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return true;
+    node = node.parentNode;
+  }
+  return false;
+}
+function kClickTurn(e) {
+  var ev = e || window.event;
+  if (!ev) return;
+  if (kSettingsOpen() || !kClickScrollOn() || !window.kTurnPage) return;
+  var viewport = document.getElementById('kViewport');
+  var target = ev.target || ev.srcElement;
+  if (!viewport || !target || !viewport.contains(target) || kIsTurnNode(target)) return;
+  if (window.getSelection && String(window.getSelection())) return;
+  var bounds = viewport.getBoundingClientRect();
+  var width = bounds.right - bounds.left;
+  if (width <= 0) return;
+  var x = ev.clientX - bounds.left;
+  if (x < width / 3) window.kTurnPage(-1);
+  else if (x > width * 2 / 3) window.kTurnPage(1);
+}
+(function () {
+  kSyncReaderToggles();
+  document.onclick = kClickTurn;
+})();
+
+
+(function () {
+  var dictionaries = {"en": {"continueReading": "Continue reading", "openFullReader": "Open full reader", "previous": "\u2039 Prev", "next": "Next \u203a", "theme": "Theme", "tapTurn": "Click to turn page", "library": "Library", "contents": "Table of contents", "settings": "Settings", "done": "Close settings", "pageMode": "Use page-turning mode", "startReading": "Start reading", "previousPage": "Previous page", "nextPage": "Next page", "pdfBadge": "PDF", "pdfUnsupported": "This PDF book can't be opened in Kindle mode yet.", "zoomIn": "Zoom in", "zoomOut": "Zoom out", "fitWidth": "Fit width", "fitPage": "Fit page", "goToPage": "Go to page", "jump": "Jump", "pageOf": "Page {number} of {total}", "page": "Page {number}", "noContents": "This PDF has no table of contents", "noContentsBook": "This book has no table of contents", "goToChapter": "Go to chapter", "pageLoadError": "This page could not be loaded. Please try again."}, "zh-CN": {"continueReading": "\u7ee7\u7eed\u9605\u8bfb", "openFullReader": "\u6253\u5f00\u5b8c\u6574\u9605\u8bfb\u5668", "previous": "\u2039 \u4e0a\u4e00\u7ae0", "next": "\u4e0b\u4e00\u7ae0 \u203a", "theme": "\u4e3b\u9898", "tapTurn": "\u70b9\u51fb\u7ffb\u9875", "library": "\u4e66\u5e93", "contents": "\u76ee\u5f55", "settings": "\u8bbe\u7f6e", "done": "\u5173\u95ed\u8bbe\u7f6e", "pageMode": "\u4f7f\u7528\u7ffb\u9875\u6a21\u5f0f", "startReading": "\u5f00\u59cb\u9605\u8bfb", "previousPage": "\u4e0a\u4e00\u9875", "nextPage": "\u4e0b\u4e00\u9875", "pdfBadge": "PDF", "pdfUnsupported": "\u8fd9\u672c\u4e66\u7684 PDF \u6682\u65f6\u65e0\u6cd5\u5728 Kindle \u6a21\u5f0f\u4e0b\u6253\u5f00\u3002", "zoomIn": "\u653e\u5927", "zoomOut": "\u7f29\u5c0f", "fitWidth": "\u9002\u5408\u5bbd\u5ea6", "fitPage": "\u9002\u5408\u9875\u9762", "goToPage": "\u8df3\u8f6c\u5230\u9875", "jump": "\u8df3\u8f6c", "pageOf": "\u7b2c {number} \u9875\uff0c\u5171 {total} \u9875", "page": "\u7b2c {number} \u9875", "noContents": "\u6b64 PDF \u6ca1\u6709\u76ee\u5f55", "noContentsBook": "\u6b64\u4e66\u7c4d\u6ca1\u6709\u76ee\u5f55", "goToChapter": "\u8df3\u8f6c\u5230\u7ae0\u8282", "pageLoadError": "\u9875\u9762\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u91cd\u8bd5\u3002"}, "zh-TW": {"continueReading": "\u7e7c\u7e8c\u95b1\u8b80", "openFullReader": "\u958b\u555f\u5b8c\u6574\u95b1\u8b80\u5668", "previous": "\u2039 \u4e0a\u4e00\u7ae0", "next": "\u4e0b\u4e00\u7ae0 \u203a", "theme": "\u4e3b\u984c", "tapTurn": "\u9ede\u9078\u7ffb\u9801", "library": "\u66f8\u5eab", "contents": "\u76ee\u9304", "settings": "\u8a2d\u5b9a", "done": "\u95dc\u9589\u8a2d\u5b9a", "pageMode": "\u4f7f\u7528\u7ffb\u9801\u6a21\u5f0f", "startReading": "\u958b\u59cb\u95b1\u8b80", "previousPage": "\u4e0a\u4e00\u9801", "nextPage": "\u4e0b\u4e00\u9801", "pdfBadge": "PDF", "pdfUnsupported": "\u9019\u672c\u66f8\u7684 PDF \u66ab\u6642\u7121\u6cd5\u5728 Kindle \u6a21\u5f0f\u4e0b\u958b\u555f\u3002", "zoomIn": "\u653e\u5927", "zoomOut": "\u7e2e\u5c0f", "fitWidth": "\u7b26\u5408\u5bec\u5ea6", "fitPage": "\u7b26\u5408\u9801\u9762", "goToPage": "\u8df3\u81f3\u9801\u9762", "jump": "\u8df3\u8e8d", "pageOf": "\u7b2c {number} \u9801\uff0c\u5171 {total} \u9801", "page": "\u7b2c {number} \u9801", "noContents": "\u6b64 PDF \u6c92\u6709\u76ee\u9304", "noContentsBook": "\u6b64\u66f8\u7c4d\u6c92\u6709\u76ee\u9304", "goToChapter": "\u8df3\u81f3\u7ae0\u7bc0", "pageLoadError": "\u9801\u9762\u8f09\u5165\u5931\u6557\uff0c\u8acb\u91cd\u8a66\u3002"}, "ko": {"continueReading": "\uacc4\uc18d \uc77d\uae30", "openFullReader": "\uc804\uccb4 \ub9ac\ub354 \uc5f4\uae30", "previous": "\u2039 \uc774\uc804", "next": "\ub2e4\uc74c \u203a", "theme": "\ud14c\ub9c8", "tapTurn": "\ud074\ub9ad\ud558\uc5ec \ud398\uc774\uc9c0\ub97c \ub118\uae30\uc138\uc694", "library": "\ub77c\uc774\ube0c\ub7ec\ub9ac", "contents": "\ubaa9\ucc28", "settings": "\uc124\uc815", "done": "\uc124\uc815 \ub2eb\uae30", "pageMode": "\ud398\uc774\uc9c0 \ub118\uae40 \ubaa8\ub4dc \uc0ac\uc6a9", "startReading": "\uc77d\uae30 \uc2dc\uc791", "previousPage": "\uc774\uc804 \ud398\uc774\uc9c0", "nextPage": "\ub2e4\uc74c \ud398\uc774\uc9c0", "pdfBadge": "PDF", "pdfUnsupported": "\uc774 PDF\ub294 \uc544\uc9c1 Kindle \ubaa8\ub4dc\uc5d0\uc11c \uc5f4 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.", "zoomIn": "\ud655\ub300", "zoomOut": "\ucd95\uc18c", "fitWidth": "\ub108\ube44\uc5d0 \ub9de\ucda4", "fitPage": "\ud398\uc774\uc9c0\uc5d0 \ub9de\ucda4", "goToPage": "\ud398\uc774\uc9c0\ub85c \uc774\ub3d9", "jump": "\uc774\ub3d9", "pageOf": "\uc804\uccb4 {total}\ud398\uc774\uc9c0 \uc911 {number}\ud398\uc774\uc9c0", "page": "{number}\ud398\uc774\uc9c0", "noContents": "\uc774 PDF\uc5d0\ub294 \ubaa9\ucc28\uac00 \uc5c6\uc2b5\ub2c8\ub2e4", "noContentsBook": "\uc774 \ucc45\uc5d0\ub294 \ubaa9\ucc28\uac00 \uc5c6\uc2b5\ub2c8\ub2e4", "goToChapter": "\uc7a5\uc73c\ub85c \uc774\ub3d9", "pageLoadError": "\ud398\uc774\uc9c0\ub97c \ubd88\ub7ec\uc624\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4. \ub2e4\uc2dc \uc2dc\ub3c4\ud574 \uc8fc\uc138\uc694."}, "ja": {"continueReading": "\u7d9a\u304d\u3092\u8aad\u3080", "openFullReader": "\u30d5\u30eb\u30ea\u30fc\u30c0\u30fc\u3092\u958b\u304f", "previous": "\u2039 \u524d\u3078", "next": "\u6b21\u3078 \u203a", "theme": "\u30c6\u30fc\u30de", "tapTurn": "\u30af\u30ea\u30c3\u30af\u3057\u3066\u30da\u30fc\u30b8\u3092\u3081\u304f\u308b", "library": "\u30e9\u30a4\u30d6\u30e9\u30ea", "contents": "\u76ee\u6b21", "settings": "\u8a2d\u5b9a", "done": "\u8a2d\u5b9a\u3092\u9589\u3058\u308b", "pageMode": "\u30da\u30fc\u30b8\u3081\u304f\u308a\u30e2\u30fc\u30c9\u3092\u4f7f\u7528\u3059\u308b", "startReading": "\u8aad\u307f\u59cb\u3081\u307e\u3059", "previousPage": "\u524d\u306e\u30da\u30fc\u30b8", "nextPage": "\u6b21\u306e\u30da\u30fc\u30b8", "pdfBadge": "PDF", "pdfUnsupported": "\u3053\u306e PDF \u306f\u307e\u3060 Kindle \u30e2\u30fc\u30c9\u3067\u958b\u3051\u307e\u305b\u3093\u3002", "zoomIn": "\u62e1\u5927", "zoomOut": "\u7e2e\u5c0f", "fitWidth": "\u5e45\u306b\u5408\u308f\u305b\u308b", "fitPage": "\u30da\u30fc\u30b8\u306b\u5408\u308f\u305b\u308b", "goToPage": "\u30da\u30fc\u30b8\u3078\u79fb\u52d5", "jump": "\u30b8\u30e3\u30f3\u30d7", "pageOf": "{total}\u30da\u30fc\u30b8\u4e2d{number}\u30da\u30fc\u30b8", "page": "{number}\u30da\u30fc\u30b8", "noContents": "\u3053\u306e PDF \u306b\u306f\u76ee\u6b21\u304c\u3042\u308a\u307e\u305b\u3093", "noContentsBook": "\u3053\u306e\u672c\u306b\u306f\u76ee\u6b21\u304c\u3042\u308a\u307e\u305b\u3093", "goToChapter": "\u7ae0\u3078\u79fb\u52d5", "pageLoadError": "\u30da\u30fc\u30b8\u3092\u8aad\u307f\u8fbc\u3081\u307e\u305b\u3093\u3067\u3057\u305f\u3002\u3082\u3046\u4e00\u5ea6\u304a\u8a66\u3057\u304f\u3060\u3055\u3044\u3002"}, "es": {"continueReading": "Continuar leyendo", "openFullReader": "Abrir el lector completo", "previous": "\u2039 Anterior", "next": "Siguiente \u203a", "theme": "Tema", "tapTurn": "Haz clic para pasar de p\u00e1gina", "library": "Biblioteca", "contents": "\u00cdndice", "settings": "Ajustes", "done": "Cerrar los ajustes", "pageMode": "Usar el modo de paginaci\u00f3n", "startReading": "Empezar a leer", "previousPage": "P\u00e1gina anterior", "nextPage": "P\u00e1gina siguiente", "pdfBadge": "PDF", "pdfUnsupported": "Este PDF a\u00fan no se puede abrir en modo Kindle.", "zoomIn": "Acercar", "zoomOut": "Alejar", "fitWidth": "Ajustar al ancho", "fitPage": "Ajustar a la p\u00e1gina", "goToPage": "Ir a la p\u00e1gina", "jump": "Ir", "pageOf": "P\u00e1gina {number} de {total}", "page": "P\u00e1gina {number}", "noContents": "Este PDF no tiene \u00edndice", "noContentsBook": "Este libro no tiene \u00edndice", "goToChapter": "Ir al cap\u00edtulo", "pageLoadError": "No se pudo cargar la p\u00e1gina. Int\u00e9ntalo de nuevo."}, "de": {"continueReading": "Weiterlesen", "openFullReader": "Vollst\u00e4ndigen Reader \u00f6ffnen", "previous": "\u2039 Zur\u00fcck", "next": "Weiter \u203a", "theme": "Design", "tapTurn": "Zum Umbl\u00e4ttern klicken", "library": "Bibliothek", "contents": "Inhaltsverzeichnis", "settings": "Einstellungen", "done": "Einstellungen schlie\u00dfen", "pageMode": "Seitenmodus verwenden", "startReading": "Lesen beginnen", "previousPage": "Vorherige Seite", "nextPage": "N\u00e4chste Seite", "pdfBadge": "PDF", "pdfUnsupported": "Dieses PDF kann im Kindle-Modus noch nicht ge\u00f6ffnet werden.", "zoomIn": "Vergr\u00f6\u00dfern", "zoomOut": "Verkleinern", "fitWidth": "An Breite anpassen", "fitPage": "An Seite anpassen", "goToPage": "Zu Seite springen", "jump": "Springen", "pageOf": "Seite {number} von {total}", "page": "Seite {number}", "noContents": "Dieses PDF hat kein Inhaltsverzeichnis", "noContentsBook": "Dieses Buch hat kein Inhaltsverzeichnis", "goToChapter": "Zu Kapitel springen", "pageLoadError": "Die Seite konnte nicht geladen werden. Bitte versuche es erneut."}, "fr": {"continueReading": "Reprendre la lecture", "openFullReader": "Ouvrir le lecteur complet", "previous": "\u2039 Pr\u00e9c\u00e9dent", "next": "Suivant \u203a", "theme": "Th\u00e8me", "tapTurn": "Cliquez pour tourner la page", "library": "Biblioth\u00e8que", "contents": "Table des mati\u00e8res", "settings": "R\u00e9glages", "done": "Fermer les r\u00e9glages", "pageMode": "Utiliser le mode pagination", "startReading": "Commencer la lecture", "previousPage": "Page pr\u00e9c\u00e9dente", "nextPage": "Page suivante", "pdfBadge": "PDF", "pdfUnsupported": "Ce PDF ne peut pas encore \u00eatre ouvert en mode Kindle.", "zoomIn": "Agrandir", "zoomOut": "R\u00e9duire", "fitWidth": "Ajuster \u00e0 la largeur", "fitPage": "Ajuster \u00e0 la page", "goToPage": "Aller \u00e0 la page", "jump": "Aller \u00e0", "pageOf": "Page {number} sur {total}", "page": "Page n\u00ba {number}", "noContents": "Ce PDF n'a pas de table des mati\u00e8res", "noContentsBook": "Ce livre n'a pas de table des mati\u00e8res", "goToChapter": "Aller au chapitre", "pageLoadError": "Impossible de charger la page. Veuillez r\u00e9essayer."}, "ru": {"continueReading": "\u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c \u0447\u0442\u0435\u043d\u0438\u0435", "openFullReader": "\u041e\u0442\u043a\u0440\u044b\u0442\u044c \u043f\u043e\u043b\u043d\u044b\u0439 \u0447\u0438\u0442\u0430\u0442\u0435\u043b\u044c", "previous": "\u2039 \u041d\u0430\u0437\u0430\u0434", "next": "\u0414\u0430\u043b\u0435\u0435 \u203a", "theme": "\u0422\u0435\u043c\u0430", "tapTurn": "\u0429\u0451\u043b\u043a\u043d\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u043f\u0435\u0440\u0435\u043b\u0438\u0441\u0442\u043d\u0443\u0442\u044c", "library": "\u0411\u0438\u0431\u043b\u0438\u043e\u0442\u0435\u043a\u0430", "contents": "\u041e\u0433\u043b\u0430\u0432\u043b\u0435\u043d\u0438\u0435", "settings": "\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438", "done": "\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438", "pageMode": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u043f\u043e\u0441\u0442\u0440\u0430\u043d\u0438\u0447\u043d\u044b\u0439 \u0440\u0435\u0436\u0438\u043c", "startReading": "\u041d\u0430\u0447\u0430\u0442\u044c \u0447\u0442\u0435\u043d\u0438\u0435", "previousPage": "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430", "nextPage": "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0430", "pdfBadge": "PDF", "pdfUnsupported": "\u042d\u0442\u043e\u0442 PDF \u043f\u043e\u043a\u0430 \u043d\u0435\u043b\u044c\u0437\u044f \u043e\u0442\u043a\u0440\u044b\u0442\u044c \u0432 \u0440\u0435\u0436\u0438\u043c\u0435 Kindle.", "zoomIn": "\u0423\u0432\u0435\u043b\u0438\u0447\u0438\u0442\u044c", "zoomOut": "\u0423\u043c\u0435\u043d\u044c\u0448\u0438\u0442\u044c", "fitWidth": "\u041f\u043e \u0448\u0438\u0440\u0438\u043d\u0435", "fitPage": "\u041f\u043e \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435", "goToPage": "\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435", "jump": "\u041f\u0435\u0440\u0435\u0439\u0442\u0438", "pageOf": "\u0421\u0442\u0440\u0430\u043d\u0438\u0446\u0430 {number} \u0438\u0437 {total}", "page": "\u0421\u0442\u0440\u0430\u043d\u0438\u0446\u0430 {number}", "noContents": "\u0412 \u044d\u0442\u043e\u043c PDF \u043d\u0435\u0442 \u043e\u0433\u043b\u0430\u0432\u043b\u0435\u043d\u0438\u044f", "noContentsBook": "\u0412 \u044d\u0442\u043e\u0439 \u043a\u043d\u0438\u0433\u0435 \u043d\u0435\u0442 \u043e\u0433\u043b\u0430\u0432\u043b\u0435\u043d\u0438\u044f", "goToChapter": "\u041f\u0435\u0440\u0435\u0439\u0442\u0438 \u043a \u0433\u043b\u0430\u0432\u0435", "pageLoadError": "\u041d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0443. \u041f\u043e\u043f\u0440\u043e\u0431\u0443\u0439\u0442\u0435 \u0435\u0449\u0451 \u0440\u0430\u0437."}, "it": {"continueReading": "Continua a leggere", "openFullReader": "Apri il lettore completo", "previous": "\u2039 Precedente", "next": "Successivo \u203a", "theme": "Tema", "tapTurn": "Fai clic per cambiare pagina", "library": "Biblioteca", "contents": "Indice", "settings": "Impostazioni", "done": "Chiudi le impostazioni", "pageMode": "Usa la modalit\u00e0 paginazione", "startReading": "Inizia a leggere", "previousPage": "Pagina precedente", "nextPage": "Pagina successiva", "pdfBadge": "PDF", "pdfUnsupported": "Questo PDF non pu\u00f2 ancora essere aperto in modalit\u00e0 Kindle.", "zoomIn": "Ingrandisci", "zoomOut": "Riduci", "fitWidth": "Adatta alla larghezza", "fitPage": "Adatta alla pagina", "goToPage": "Vai alla pagina", "jump": "Vai", "pageOf": "Pagina {number} di {total}", "page": "Pagina {number}", "noContents": "Questo PDF non ha un indice", "noContentsBook": "Questo libro non ha un indice", "goToChapter": "Vai al capitolo", "pageLoadError": "Impossibile caricare la pagina. Riprova."}, "pt-BR": {"continueReading": "Continuar lendo", "openFullReader": "Abrir o leitor completo", "previous": "\u2039 Anterior", "next": "Pr\u00f3ximo \u203a", "theme": "Tema", "tapTurn": "Clique para virar a p\u00e1gina", "library": "Biblioteca", "contents": "Sum\u00e1rio", "settings": "Configura\u00e7\u00f5es", "done": "Fechar configura\u00e7\u00f5es", "pageMode": "Usar modo de pagina\u00e7\u00e3o", "startReading": "Come\u00e7ar a ler", "previousPage": "P\u00e1gina anterior", "nextPage": "Pr\u00f3xima p\u00e1gina", "pdfBadge": "PDF", "pdfUnsupported": "Este PDF ainda n\u00e3o pode ser aberto no modo Kindle.", "zoomIn": "Ampliar", "zoomOut": "Reduzir", "fitWidth": "Ajustar \u00e0 largura", "fitPage": "Ajustar \u00e0 p\u00e1gina", "goToPage": "Ir para a p\u00e1gina", "jump": "Ir", "pageOf": "P\u00e1gina {number} de {total}", "page": "P\u00e1gina {number}", "noContents": "Este PDF n\u00e3o tem sum\u00e1rio", "noContentsBook": "Este livro n\u00e3o tem sum\u00e1rio", "goToChapter": "Ir para o cap\u00edtulo", "pageLoadError": "N\u00e3o foi poss\u00edvel carregar a p\u00e1gina. Tente novamente."}, "ar": {"continueReading": "\u0645\u062a\u0627\u0628\u0639\u0629 \u0627\u0644\u0642\u0631\u0627\u0621\u0629", "openFullReader": "\u0641\u062a\u062d \u0627\u0644\u0642\u0627\u0631\u0626 \u0627\u0644\u0643\u0627\u0645\u0644", "previous": "\u2039 \u0627\u0644\u0633\u0627\u0628\u0642", "next": "\u0627\u0644\u062a\u0627\u0644\u064a \u203a", "theme": "\u0627\u0644\u0633\u0645\u0629", "tapTurn": "\u0627\u0646\u0642\u0631 \u0644\u062a\u0642\u0644\u064a\u0628 \u0627\u0644\u0635\u0641\u062d\u0629", "library": "\u0627\u0644\u0645\u0643\u062a\u0628\u0629", "contents": "\u062c\u062f\u0648\u0644 \u0627\u0644\u0645\u062d\u062a\u0648\u064a\u0627\u062a", "settings": "\u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a", "done": "\u0625\u063a\u0644\u0627\u0642 \u0627\u0644\u0625\u0639\u062f\u0627\u062f\u0627\u062a", "pageMode": "\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0648\u0636\u0639 \u062a\u0642\u0644\u064a\u0628 \u0627\u0644\u0635\u0641\u062d\u0627\u062a", "startReading": "\u0627\u0628\u062f\u0623 \u0627\u0644\u0642\u0631\u0627\u0621\u0629", "previousPage": "\u0627\u0644\u0635\u0641\u062d\u0629 \u0627\u0644\u0633\u0627\u0628\u0642\u0629", "nextPage": "\u0627\u0644\u0635\u0641\u062d\u0629 \u0627\u0644\u062a\u0627\u0644\u064a\u0629", "pdfBadge": "PDF", "pdfUnsupported": "\u0644\u0627 \u064a\u0645\u0643\u0646 \u0641\u062a\u062d \u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 PDF \u0641\u064a \u0648\u0636\u0639 Kindle \u0628\u0639\u062f.", "zoomIn": "\u062a\u0643\u0628\u064a\u0631", "zoomOut": "\u062a\u0635\u063a\u064a\u0631", "fitWidth": "\u0645\u0644\u0627\u0621\u0645\u0629 \u0627\u0644\u0639\u0631\u0636", "fitPage": "\u0645\u0644\u0627\u0621\u0645\u0629 \u0627\u0644\u0635\u0641\u062d\u0629", "goToPage": "\u0627\u0644\u0627\u0646\u062a\u0642\u0627\u0644 \u0625\u0644\u0649 \u0627\u0644\u0635\u0641\u062d\u0629", "jump": "\u0627\u0646\u062a\u0642\u0627\u0644", "pageOf": "\u0627\u0644\u0635\u0641\u062d\u0629 {number} \u0645\u0646 {total}", "page": "\u0627\u0644\u0635\u0641\u062d\u0629 {number}", "noContents": "\u0644\u0627 \u064a\u062d\u062a\u0648\u064a \u0645\u0644\u0641 PDF \u0647\u0630\u0627 \u0639\u0644\u0649 \u062c\u062f\u0648\u0644 \u0645\u062d\u062a\u0648\u064a\u0627\u062a", "noContentsBook": "\u0644\u0627 \u064a\u062d\u062a\u0648\u064a \u0647\u0630\u0627 \u0627\u0644\u0643\u062a\u0627\u0628 \u0639\u0644\u0649 \u062c\u062f\u0648\u0644 \u0645\u062d\u062a\u0648\u064a\u0627\u062a", "goToChapter": "\u0627\u0644\u0627\u0646\u062a\u0642\u0627\u0644 \u0625\u0644\u0649 \u0627\u0644\u0641\u0635\u0644", "pageLoadError": "\u062a\u0639\u0630\u0651\u0631 \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0635\u0641\u062d\u0629. \u064a\u0631\u062c\u0649 \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649."}, "id": {"continueReading": "Lanjutkan membaca", "openFullReader": "Buka pembaca lengkap", "previous": "\u2039 Sebelumnya", "next": "Berikutnya \u203a", "theme": "Tema", "tapTurn": "Klik untuk membalik halaman", "library": "Perpustakaan", "contents": "Daftar isi", "settings": "Pengaturan", "done": "Tutup pengaturan", "pageMode": "Gunakan mode halaman", "startReading": "Mulai membaca", "previousPage": "Halaman sebelumnya", "nextPage": "Halaman berikutnya", "pdfBadge": "PDF", "pdfUnsupported": "PDF ini belum dapat dibuka dalam mode Kindle.", "zoomIn": "Perbesar", "zoomOut": "Perkecil", "fitWidth": "Sesuaikan lebar", "fitPage": "Sesuaikan halaman", "goToPage": "Buka halaman", "jump": "Lompat", "pageOf": "Halaman {number} dari {total}", "page": "Halaman {number}", "noContents": "PDF ini tidak memiliki daftar isi", "noContentsBook": "Buku ini tidak memiliki daftar isi", "goToChapter": "Buka bab", "pageLoadError": "Halaman tidak dapat dimuat. Silakan coba lagi."}, "hi": {"continueReading": "\u092a\u0922\u093c\u0928\u093e \u091c\u093e\u0930\u0940 \u0930\u0916\u0947\u0902", "openFullReader": "\u092a\u0942\u0930\u094d\u0923 \u0930\u0940\u0921\u0930 \u0916\u094b\u0932\u0947\u0902", "previous": "\u2039 \u092a\u093f\u091b\u0932\u093e", "next": "\u0905\u0917\u0932\u093e \u203a", "theme": "\u0925\u0940\u092e", "tapTurn": "\u092a\u0943\u0937\u094d\u0920 \u092a\u0932\u091f\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0915\u094d\u0932\u093f\u0915 \u0915\u0930\u0947\u0902", "library": "\u092a\u0941\u0938\u094d\u0924\u0915\u093e\u0932\u092f", "contents": "\u0935\u093f\u0937\u092f-\u0938\u0942\u091a\u0940", "settings": "\u0938\u0947\u091f\u093f\u0902\u0917\u094d\u0938", "done": "\u0938\u0947\u091f\u093f\u0902\u0917 \u092c\u0902\u0926 \u0915\u0930\u0947\u0902", "pageMode": "\u092a\u0943\u0937\u094d\u0920 \u092a\u0932\u091f\u0928\u0947 \u0915\u093e \u092e\u094b\u0921 \u0907\u0938\u094d\u0924\u0947\u092e\u093e\u0932 \u0915\u0930\u0947\u0902", "startReading": "\u092a\u0922\u093c\u0928\u093e \u0936\u0941\u0930\u0942 \u0915\u0930\u0947\u0902", "previousPage": "\u092a\u093f\u091b\u0932\u093e \u092a\u0943\u0937\u094d\u0920", "nextPage": "\u0905\u0917\u0932\u093e \u092a\u0943\u0937\u094d\u0920", "pdfBadge": "PDF", "pdfUnsupported": "\u092f\u0939 PDF \u0905\u092d\u0940 Kindle \u092e\u094b\u0921 \u092e\u0947\u0902 \u0928\u0939\u0940\u0902 \u0916\u094b\u0932\u093e \u091c\u093e \u0938\u0915\u0924\u093e\u0964", "zoomIn": "\u091c\u093c\u0942\u092e \u0907\u0928", "zoomOut": "\u091c\u093c\u0942\u092e \u0906\u0909\u091f", "fitWidth": "\u091a\u094c\u0921\u093c\u093e\u0908 \u092e\u0947\u0902 \u092b\u093f\u091f \u0915\u0930\u0947\u0902", "fitPage": "\u092a\u0943\u0937\u094d\u0920 \u092e\u0947\u0902 \u092b\u093f\u091f \u0915\u0930\u0947\u0902", "goToPage": "\u092a\u0943\u0937\u094d\u0920 \u092a\u0930 \u091c\u093e\u090f\u0901", "jump": "\u091c\u093e\u090f\u0901", "pageOf": "{total} \u092e\u0947\u0902 \u0938\u0947 \u092a\u0943\u0937\u094d\u0920 {number}", "page": "\u092a\u0943\u0937\u094d\u0920 {number}", "noContents": "\u0907\u0938 PDF \u092e\u0947\u0902 \u0915\u094b\u0908 \u0935\u093f\u0937\u092f-\u0938\u0942\u091a\u0940 \u0928\u0939\u0940\u0902 \u0939\u0948", "noContentsBook": "\u0907\u0938 \u092a\u0941\u0938\u094d\u0924\u0915 \u092e\u0947\u0902 \u0915\u094b\u0908 \u0935\u093f\u0937\u092f-\u0938\u0942\u091a\u0940 \u0928\u0939\u0940\u0902 \u0939\u0948", "goToChapter": "\u0905\u0927\u094d\u092f\u093e\u092f \u092a\u0930 \u091c\u093e\u090f\u0902", "pageLoadError": "\u092a\u0943\u0937\u094d\u0920 \u0932\u094b\u0921 \u0928\u0939\u0940\u0902 \u0939\u094b \u0938\u0915\u093e\u0964 \u0915\u0943\u092a\u092f\u093e \u092a\u0941\u0928\u0903 \u092a\u094d\u0930\u092f\u093e\u0938 \u0915\u0930\u0947\u0902\u0964"}, "vi": {"continueReading": "\u0110\u1ecdc ti\u1ebfp", "openFullReader": "M\u1edf tr\u00ecnh \u0111\u1ecdc \u0111\u1ea7y \u0111\u1ee7", "previous": "\u2039 Tr\u01b0\u1edbc", "next": "Ti\u1ebfp \u203a", "theme": "Ch\u1ee7 \u0111\u1ec1", "tapTurn": "Nh\u1ea5p \u0111\u1ec3 l\u1eadt trang", "library": "Th\u01b0 vi\u1ec7n", "contents": "M\u1ee5c l\u1ee5c", "settings": "C\u00e0i \u0111\u1eb7t", "done": "\u0110\u00f3ng c\u00e0i \u0111\u1eb7t", "pageMode": "D\u00f9ng ch\u1ebf \u0111\u1ed9 l\u1eadt trang", "startReading": "B\u1eaft \u0111\u1ea7u \u0111\u1ecdc", "previousPage": "Trang tr\u01b0\u1edbc", "nextPage": "Trang sau", "pdfBadge": "PDF", "pdfUnsupported": "Ch\u01b0a th\u1ec3 m\u1edf PDF n\u00e0y trong ch\u1ebf \u0111\u1ed9 Kindle.", "zoomIn": "Ph\u00f3ng to", "zoomOut": "Thu nh\u1ecf", "fitWidth": "V\u1eeba chi\u1ec1u r\u1ed9ng", "fitPage": "V\u1eeba trang", "goToPage": "\u0110i \u0111\u1ebfn trang", "jump": "Chuy\u1ec3n \u0111\u1ebfn", "pageOf": "Trang {number} / {total}", "page": "Trang {number}", "noContents": "PDF n\u00e0y kh\u00f4ng c\u00f3 m\u1ee5c l\u1ee5c", "noContentsBook": "S\u00e1ch n\u00e0y kh\u00f4ng c\u00f3 m\u1ee5c l\u1ee5c", "goToChapter": "\u0110\u1ebfn ch\u01b0\u01a1ng", "pageLoadError": "Kh\u00f4ng th\u1ec3 t\u1ea3i trang. Vui l\u00f2ng th\u1eed l\u1ea1i."}, "th": {"continueReading": "\u0e2d\u0e48\u0e32\u0e19\u0e15\u0e48\u0e2d", "openFullReader": "\u0e40\u0e1b\u0e34\u0e14\u0e42\u0e1b\u0e23\u0e41\u0e01\u0e23\u0e21\u0e2d\u0e48\u0e32\u0e19\u0e41\u0e1a\u0e1a\u0e40\u0e15\u0e47\u0e21", "previous": "\u2039 \u0e01\u0e48\u0e2d\u0e19\u0e2b\u0e19\u0e49\u0e32", "next": "\u0e16\u0e31\u0e14\u0e44\u0e1b \u203a", "theme": "\u0e18\u0e35\u0e21", "tapTurn": "\u0e04\u0e25\u0e34\u0e01\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e1e\u0e25\u0e34\u0e01\u0e2b\u0e19\u0e49\u0e32", "library": "\u0e2b\u0e49\u0e2d\u0e07\u0e2a\u0e21\u0e38\u0e14", "contents": "\u0e2a\u0e32\u0e23\u0e1a\u0e31\u0e0d", "settings": "\u0e01\u0e32\u0e23\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32", "done": "\u0e1b\u0e34\u0e14\u0e01\u0e32\u0e23\u0e15\u0e31\u0e49\u0e07\u0e04\u0e48\u0e32", "pageMode": "\u0e43\u0e0a\u0e49\u0e42\u0e2b\u0e21\u0e14\u0e1e\u0e25\u0e34\u0e01\u0e2b\u0e19\u0e49\u0e32", "startReading": "\u0e40\u0e23\u0e34\u0e48\u0e21\u0e2d\u0e48\u0e32\u0e19", "previousPage": "\u0e2b\u0e19\u0e49\u0e32\u0e01\u0e48\u0e2d\u0e19", "nextPage": "\u0e2b\u0e19\u0e49\u0e32\u0e16\u0e31\u0e14\u0e44\u0e1b", "pdfBadge": "PDF", "pdfUnsupported": "\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e40\u0e1b\u0e34\u0e14 PDF \u0e40\u0e25\u0e48\u0e21\u0e19\u0e35\u0e49\u0e43\u0e19\u0e42\u0e2b\u0e21\u0e14 Kindle \u0e44\u0e14\u0e49", "zoomIn": "\u0e02\u0e22\u0e32\u0e22", "zoomOut": "\u0e22\u0e48\u0e2d", "fitWidth": "\u0e1e\u0e2d\u0e14\u0e35\u0e04\u0e27\u0e32\u0e21\u0e01\u0e27\u0e49\u0e32\u0e07", "fitPage": "\u0e1e\u0e2d\u0e14\u0e35\u0e2b\u0e19\u0e49\u0e32", "goToPage": "\u0e44\u0e1b\u0e17\u0e35\u0e48\u0e2b\u0e19\u0e49\u0e32", "jump": "\u0e44\u0e1b\u0e17\u0e35\u0e48", "pageOf": "\u0e2b\u0e19\u0e49\u0e32 {number} \u0e08\u0e32\u0e01 {total}", "page": "\u0e2b\u0e19\u0e49\u0e32 {number}", "noContents": "PDF \u0e19\u0e35\u0e49\u0e44\u0e21\u0e48\u0e21\u0e35\u0e2a\u0e32\u0e23\u0e1a\u0e31\u0e0d", "noContentsBook": "\u0e2b\u0e19\u0e31\u0e07\u0e2a\u0e37\u0e2d\u0e40\u0e25\u0e48\u0e21\u0e19\u0e35\u0e49\u0e44\u0e21\u0e48\u0e21\u0e35\u0e2a\u0e32\u0e23\u0e1a\u0e31\u0e0d", "goToChapter": "\u0e44\u0e1b\u0e17\u0e35\u0e48\u0e1a\u0e17", "pageLoadError": "\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e42\u0e2b\u0e25\u0e14\u0e2b\u0e19\u0e49\u0e32\u0e19\u0e35\u0e49\u0e44\u0e14\u0e49 \u0e42\u0e1b\u0e23\u0e14\u0e25\u0e2d\u0e07\u0e2d\u0e35\u0e01\u0e04\u0e23\u0e31\u0e49\u0e07"}, "ms": {"continueReading": "Teruskan membaca", "openFullReader": "Buka pembaca penuh", "previous": "\u2039 Sebelum", "next": "Seterusnya \u203a", "theme": "Tema", "tapTurn": "Klik untuk menyelak halaman", "library": "Perpustakaan", "contents": "Isi kandungan", "settings": "Tetapan", "done": "Tutup tetapan", "pageMode": "Gunakan mod selak halaman", "startReading": "Mula membaca", "previousPage": "Halaman sebelumnya", "nextPage": "Halaman seterusnya", "pdfBadge": "PDF", "pdfUnsupported": "PDF ini belum boleh dibuka dalam mod Kindle.", "zoomIn": "Zum masuk", "zoomOut": "Zum keluar", "fitWidth": "Muat lebar", "fitPage": "Muat halaman", "goToPage": "Pergi ke halaman", "jump": "Pergi", "pageOf": "Halaman {number} daripada {total}", "page": "Halaman {number}", "noContents": "PDF ini tiada jadual kandungan", "noContentsBook": "Buku ini tiada jadual kandungan", "goToChapter": "Pergi ke bab", "pageLoadError": "Halaman tidak dapat dimuatkan. Sila cuba lagi."}};
+  var keys = Object.keys(dictionaries);
+  var listeners = [];
+  var active;
+  function normalize(value) {
+    var code = (value || '').toLowerCase().replace(/_/g, '-');
+    var base = code.split('-')[0];
+    if (base === 'zh') return /^zh-(tw|hk|mo|hant)/.test(code) ? 'zh-TW' : 'zh-CN';
+    if (base === 'pt') return 'pt-BR';
+    for (var i = 0; i < keys.length; i++) if (keys[i] === base) return base;
+    return '';
+  }
+  window.kTranslate = function (key) { return dictionaries[active][key]; };
+  window.kOnLocaleChange = function (callback) { listeners.push(callback); };
+  window.kLocalize = function (root) {
+    var elements = (root || document).querySelectorAll('[data-i18n],[data-i18n-aria-label],[data-i18n-placeholder]');
+    for (var i = 0; i < elements.length; i++) {
+      var element = elements[i];
+      var message = kTranslate(element.getAttribute('data-i18n'));
+      if (typeof message === 'string') element.textContent = message;
+      var attributes = ['aria-label', 'placeholder'];
+      for (var j = 0; j < attributes.length; j++) {
+        var text = kTranslate(element.getAttribute('data-i18n-' + attributes[j]));
+        if (typeof text === 'string') {
+          text = text.replace('{number}', element.getAttribute('data-page') || '')
+                     .replace('{total}', element.getAttribute('data-total') || '');
+          element.setAttribute(attributes[j], text);
+        }
+      }
+    }
+  };
+  function apply(locale) {
+    active = locale;
+    document.documentElement.lang = locale;
+    var select = document.getElementById('kLanguage');
+    if (select) select.value = locale;
+    var chrome = document.querySelectorAll('[data-k-ui-language]');
+    for (var i = 0; i < chrome.length; i++) chrome[i].lang = locale;
+    kLocalize(document);
+    for (var j = 0; j < listeners.length; j++) listeners[j]();
+  }
+  window.kSetLocale = function (locale) {
+    locale = normalize(locale);
+    if (!locale) return;
+    setCookie('epub_browser_locale', locale, 365);
+    apply(locale);
+  };
+  function sync() {
+    var fallback = false ? initial : (navigator.language || navigator.userLanguage);
+    apply(normalize(getCookie('epub_browser_locale')) || normalize(fallback) || 'en');
+  }
+  var initial = document.documentElement.lang;
+  var previousPageShow = window.onpageshow;
+  sync();
+  window.onpageshow = function (event) {
+    if (event && event.persisted) sync();
+    if (previousPageShow) previousPageShow(event);
+  };
+})();
+
+
+function kSetResume(chapter) {
+  if (typeof chapter !== 'number' || chapter < 0 || chapter >= 416
+      || chapter !== Math.floor(chapter)) return;
+  var resume = document.getElementById('kResume');
+  if (!resume) return;
+  resume.href = 'kindle_chapter_' + chapter + '.html#resume';
+  document.getElementById('kStartLabel').style.display = 'none';
+  document.getElementById('kResumeLabel').style.display = 'inline';
+  var entries = document.querySelectorAll('[data-k-toc-chapter]');
+  var current;
+  for (var i = 0; i < entries.length; i++) {
+    var index = Number(entries[i].getAttribute('data-k-toc-chapter'));
+    if (index === chapter && !current) {
+      current = entries[i];
+      current.setAttribute('aria-current', 'location');
+    } else entries[i].removeAttribute('aria-current');
+  }
+}
+function kChapterJump() {
+  var input = document.getElementById('kChapterJump');
+  var chapter = parseInt(input ? input.value : '', 10);
+  if (chapter >= 1 && chapter <= 416) {
+    window.location.href = 'kindle_chapter_' + (chapter - 1) + '.html';
+  }
+  return false;
+}
+var kindleRequestedChapter = location.hash.match(/^#chapter-([0-9]+)$/);
+if (kindleRequestedChapter) {
+  kSetResume(Number(kindleRequestedChapter[1]));
+  var kindleCurrent = document.querySelector('.k-toc [aria-current]');
+  if (kindleCurrent && kindleCurrent.getBoundingClientRect().bottom > window.innerHeight - 58) {
+    kindleCurrent.scrollIntoView();
+  }
+}
+
+var kindleSavedChapter = (getCookie("6QrgU-nfQSm_M6lmKAuBRg") || '').match(/^chapter_([0-9]+)[.]html$/);
+if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSavedChapter[1]));
+
+</script>
+</body>
+</html>

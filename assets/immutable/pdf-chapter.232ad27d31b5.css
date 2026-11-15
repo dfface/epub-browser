@@ -1,0 +1,297 @@
+.pdf-page-content {
+    position: relative;
+    width: 100%;
+    max-width: 100%;
+    min-height: 12rem;
+    margin-inline: auto;
+    overflow: auto;
+    color: var(--reader-ink, var(--text));
+    background: #fff;
+    border: 1px solid var(--reader-border, var(--border));
+    border-radius: var(--border-radius-lg);
+    box-shadow: var(--shadow-sm);
+    contain: layout paint;
+}
+
+/* PDF keeps the shared reader chrome, but turns the nested EPUB card into a
+   theme-aware viewer stage. The rendered canvas itself is the paper. */
+body.pdf-source {
+    padding-inline: 0;
+}
+
+body.pdf-source .eb-content-container {
+    min-height: calc(100vh - var(--reader-header-offset, 64px));
+    margin-top: 0;
+    padding: clamp(12px, 2.5vw, 40px);
+    background: color-mix(in srgb, var(--background) 92%, var(--text));
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-inline: contain;
+}
+
+.dark-mode body.pdf-source .eb-content-container {
+    background: var(--reader-canvas, var(--background));
+}
+
+body.pdf-source #eb-content {
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
+    padding: 0;
+    overflow: visible;
+}
+
+body.pdf-source:not(.continuous-scroll-mode) .eb-content-container {
+    display: grid;
+}
+
+body.pdf-source:not(.continuous-scroll-mode) #eb-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+body.pdf-source > .container,
+body.pdf-source .container:has(> .eb-content-container) {
+    width: 100%;
+    max-width: none;
+    padding-inline: 0;
+}
+
+body.pdf-source .pdf-page-content {
+    width: 100%;
+    max-width: none;
+    overflow: visible;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    contain: layout;
+}
+
+body.pdf-source .pdf-page-content[data-pdf-rendered="placeholder"] {
+    background: color-mix(in srgb, var(--card-bg, var(--background)) 88%, var(--text));
+    outline: 1px solid color-mix(in srgb, var(--reader-border, var(--border)) 68%, transparent);
+    box-shadow: 0 6px 22px color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+body.pdf-source .pdf-page-canvas {
+    background: #fff;
+    outline: 1px solid color-mix(in srgb, var(--reader-border, var(--border)) 72%, transparent);
+    box-shadow: 0 8px 28px color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+body.pdf-source .continuous-chapter {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: center;
+}
+
+body.pdf-source .continuous-chapter .chapter-separator {
+    display: none;
+}
+
+body.pdf-source .continuous-chapter + .continuous-chapter {
+    margin-top: var(--pdf-page-gap, 12px);
+}
+
+.pdf-page-content[aria-busy="true"] {
+    background: color-mix(in srgb, var(--background) 94%, var(--primary));
+}
+
+.pdf-page-content .pdf-page-canvas {
+    display: block;
+    margin: 0;
+}
+
+.pdf-page-content .pdf-page-text-layer {
+    --scale-factor: calc(var(--total-scale-factor) / var(--min-font-size, 1));
+    position: absolute;
+    inset: 0 auto auto 0;
+    overflow: hidden;
+    line-height: 1;
+    text-align: initial;
+    text-size-adjust: none;
+    forced-color-adjust: none;
+    transform-origin: 0 0;
+}
+
+.pdf-page-content .pdf-page-text-layer span,
+.pdf-page-content .pdf-page-text-layer br {
+    position: absolute;
+    color: transparent;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0 0;
+}
+
+.dark-mode body.pdf-source #eb-content .pdf-page-text-layer span,
+.dark-mode body.pdf-source #eb-content .pdf-page-text-layer br {
+    color: transparent !important;
+}
+
+.pdf-page-content .pdf-page-text-layer span {
+    font-size: calc(var(--font-height) * var(--scale-factor));
+    transform: rotate(var(--rotate, 0deg)) scaleX(var(--scale-x, 1));
+}
+
+.pdf-page-content .pdf-page-text-layer ::selection {
+    color: transparent;
+    background: color-mix(in srgb, var(--primary) 34%, transparent);
+}
+
+.pdf-page-content .pdf-page-status {
+    position: absolute;
+    inset: 50% auto auto 50%;
+    z-index: 3;
+    display: grid;
+    width: max-content;
+    max-width: calc(100% - 2rem);
+    justify-items: center;
+    gap: 10px;
+    margin: 0;
+    padding: 12px 16px;
+    color: var(--text-secondary);
+    background: color-mix(in srgb, var(--card-bg, var(--background)) 90%, transparent);
+    border: 1px solid color-mix(in srgb, var(--reader-border, var(--border)) 75%, transparent);
+    border-radius: 12px;
+    box-shadow: var(--shadow-sm);
+    text-align: center;
+    transform: translate(-50%, -50%);
+    backdrop-filter: blur(8px);
+}
+
+.pdf-page-content .pdf-page-status[data-pdf-status="loading"]::before {
+    width: 24px;
+    height: 24px;
+    border: 3px solid color-mix(in srgb, var(--primary) 22%, transparent);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    content: "";
+    animation: pdf-loading-spin 0.8s linear infinite;
+}
+
+@keyframes pdf-loading-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pdf-page-content .pdf-page-status[data-pdf-status="loading"]::before {
+        animation-duration: 1.8s;
+    }
+}
+
+.continuous-chapter .pdf-page-content {
+    margin-block: 0;
+}
+
+/* The optional PDF actions deliberately inherit the shared reader rail. */
+.pdf-chapter-actions {
+    display: contents;
+}
+
+.pdf-chapter-actions .control-btn[aria-pressed="true"],
+.mobile-controls .control-btn[aria-pressed="true"] {
+    background: var(--hover);
+    color: var(--reader-action, var(--button-bg));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 28%, transparent);
+}
+
+.pdf-search-form {
+    display: flex;
+    gap: 8px;
+    padding: 12px 14px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 82%, transparent);
+}
+
+.pdf-search-form input {
+    min-width: 0;
+    min-height: 44px;
+    flex: 1;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--input-bg, var(--card-bg));
+    color: var(--text);
+    font: inherit;
+}
+
+.pdf-search-form input:focus-visible {
+    outline: 3px solid var(--reader-action, var(--button-bg));
+    outline-offset: 2px;
+}
+
+.pdf-search-form .control-btn {
+    display: inline-grid;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    place-items: center;
+    padding: 0;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--reader-action, var(--button-bg));
+    cursor: pointer;
+    font: inherit;
+}
+
+.pdf-search-form .control-btn:hover {
+    background: var(--hover);
+}
+
+.pdf-search-form .control-btn:focus-visible {
+    outline: 3px solid var(--reader-action, var(--button-bg));
+    outline-offset: 2px;
+}
+
+.pdf-search-results li {
+    margin: 2px 0;
+    color: var(--text-secondary);
+}
+
+.pdf-search-results a {
+    display: block;
+    padding: 11px 12px;
+    border-radius: 10px;
+    color: var(--text-secondary);
+    line-height: 1.45;
+    text-decoration: none;
+}
+
+.pdf-search-results a:hover,
+.pdf-search-results a:focus-visible {
+    background: var(--hover);
+    color: var(--text);
+}
+
+.pdf-search-results a:focus-visible {
+    outline: 3px solid var(--reader-action, var(--button-bg));
+    outline-offset: 2px;
+}
+
+.pdf-search-form .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+}
+
+@media (forced-colors: active) {
+    .pdf-page-content .pdf-page-text-layer ::selection {
+        background: Highlight;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .pdf-search-drawer,
+    .pdf-search-form .control-btn {
+        transition: none;
+    }
+}
