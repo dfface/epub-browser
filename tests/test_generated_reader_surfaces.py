@@ -3927,7 +3927,7 @@ assert.deepEqual(
             'epub_browser/assets/chapter.js'
         ).read_text(encoding='utf-8'))
 
-    def test_desktop_chapter_sidebar_overlays_without_repositioning_the_reader(self):
+    def test_desktop_chapter_sidebar_shares_width_and_balances_the_reader(self):
         chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
         ai_chat_css = Path('epub_browser/assets/ai-chat.css').read_text(encoding='utf-8')
 
@@ -3942,9 +3942,18 @@ assert.deepEqual(
         ]
         self.assertIn('box-shadow: var(--shadow-md);', persistent_sidebar)
         self.assertNotIn('var(--text)', persistent_sidebar)
-        self.assertNotRegex(
+        # The sidebar takes whatever the reading column leaves after both
+        # gutters and the outer offset, clamped between 220px and 320px.
+        self.assertIn(
+            'calc(100vw - var(--reader-page-width, 1000px) - '
+            '2 * var(--chapter-sidebar-gap) - var(--chapter-sidebar-offset))',
             chapter_css,
-            r'body\.desktop-chapter-sidebar[^\{]*\.container\s*\{',
+        )
+        self.assertRegex(
+            chapter_css,
+            r'body\.desktop-chapter-sidebar:not\(\.ai-chat-open\)\s+\.container\s*\{[^}]*'
+            r'left:\s*calc\(\(var\(--chapter-sidebar-offset\)\s*\+\s*'
+            r'var\(--chapter-sidebar-width\)\)\s*/\s*2\)',
         )
         self.assertNotRegex(
             ai_chat_css,
@@ -3987,7 +3996,10 @@ assert.deepEqual(
         self.assertIn('@media (prefers-reduced-motion: reduce)', chapter_css)
 
         sidebar_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
-        self.assertIn('body.desktop-chapter-sidebar-auto-hide #bookHomeFloating', sidebar_css)
+        self.assertIn(
+            'body.desktop-chapter-sidebar.desktop-chapter-sidebar-auto-hide #bookHomeFloating',
+            sidebar_css,
+        )
         self.assertIn(
             'transform: translateX(calc(-100% + var(--reader-edge-peek)));',
             sidebar_css,
@@ -4012,7 +4024,7 @@ assert.deepEqual(
         chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
         ai_chat_css = Path('epub_browser/assets/ai-chat.css').read_text(encoding='utf-8')
         shared_rule = re.search(
-            r'body\.desktop-chapter-sidebar-auto-hide #bookHomeFloating,\s*'
+            r'body\.desktop-chapter-sidebar\.desktop-chapter-sidebar-auto-hide #bookHomeFloating,\s*'
             r'body\.ai-chat-open\.desktop-chapter-sidebar #bookHomeFloating\s*'
             r'\{([^}]*)\}',
             chapter_css,

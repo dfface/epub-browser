@@ -362,89 +362,97 @@ body.reader-drawer-open {
 .toc-level-2 { margin-left: 15px; font-size: 0.85em; }
 .toc-level-3 { margin-left: 30px; font-size: 0.8em; }
 
-/* Keep the book-level chapter list as an overlay so opening it never moves the reading stage. */
-@media (min-width: 1360px) {
-    body.desktop-chapter-sidebar {
-        /* Fluid overlay: grows with the window so long chapter titles wrap
-           less, but keeps the current 220px floor on small desktops and stops
-           at a comfortable 320px reading-list width. */
-        --chapter-sidebar-offset: 20px;
-        --chapter-sidebar-width: clamp(220px, 16vw, 320px);
-    }
-
-    body.desktop-chapter-sidebar #bookHomeFloating {
-        left: var(--chapter-sidebar-offset);
-        right: auto;
-        top: 84px;
-        bottom: 24px;
-        width: var(--chapter-sidebar-width);
-        height: auto;
-        max-height: calc(100vh - 108px);
-        z-index: 40;
-        opacity: 1;
-        visibility: visible;
-        pointer-events: auto;
-        transform: none;
-        border-color: var(--border);
-        background: color-mix(in srgb, var(--card-bg) 88%, transparent);
-        box-shadow: var(--shadow-md);
-        backdrop-filter: blur(16px) saturate(140%);
-        -webkit-backdrop-filter: blur(16px) saturate(140%);
-    }
-
-    body.desktop-chapter-sidebar #bookHomeFloating .toc-header {
-        padding: 12px 14px;
-    }
-
-    body.desktop-chapter-sidebar #bookHomeFloating .toc-book-home span,
-    body.desktop-chapter-sidebar #bookHomeFloating .toc-close,
-    body.desktop-chapter-sidebar #bookHomeToggle {
-        display: none;
-    }
-
-    body.desktop-chapter-sidebar #bookHomeFloating .toc-item a {
-        padding-left: 12px;
-        padding-right: 12px;
-    }
-
-    body.desktop-chapter-sidebar #bookHomeFloating .toc-item.active {
-        background: var(--hover);
-        box-shadow: none;
-    }
-
-    /* The sidebar is an overlay and never narrows the reading stage, so the
-       page stays centred on the full viewport and the sidebar covers the left
-       margin while the right margin stays empty.  Shift the page by half of
-       the sidebar footprint so both sides balance, and derive the shift from
-       the same fluid width so the two never drift apart. */
-    body.desktop-chapter-sidebar:not(.ai-chat-open) .container {
-        position: relative;
-        left: calc((var(--chapter-sidebar-offset) + var(--chapter-sidebar-width)) / 2);
-    }
-
-    body.desktop-chapter-sidebar-auto-hide #bookHomeFloating,
-    body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating {
-        left: 0;
-        border-radius: 0 14px 14px 0;
-        opacity: .58;
-        transform: translateX(calc(-100% + var(--reader-edge-peek)));
-        transition: transform 180ms ease-out, opacity 160ms ease;
-        transition-delay: 320ms;
-        will-change: transform, opacity;
-    }
-
-    body.desktop-chapter-sidebar-auto-hide #bookHomeFloating:hover,
-    body.desktop-chapter-sidebar-auto-hide #bookHomeFloating:focus-within,
-    body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating:hover,
-    body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating:focus-within {
-        opacity: 1;
-        transform: translateX(0);
-        box-shadow: var(--shadow-md);
-        transition-delay: 0ms;
-    }
+/* Keep the book-level chapter list as an overlay so opening it never narrows
+   the reading stage. chapter.js only enables it when the same horizontal
+   budget fits: sidebar + page width + two gutters + the outer offset. */
+body.desktop-chapter-sidebar {
+    /* Everything the reading column leaves over after a gutter on each side
+       and the outer offset. The clamp keeps the list usable at its minimum
+       and lets surplus space widen it up to a comfortable maximum. */
+    --chapter-sidebar-offset: 20px;
+    --chapter-sidebar-gap: 24px;
+    --chapter-sidebar-min: 220px;
+    --chapter-sidebar-max: 320px;
+    --chapter-sidebar-width: clamp(
+        var(--chapter-sidebar-min),
+        calc(100vw - var(--reader-page-width, 1000px) - 2 * var(--chapter-sidebar-gap) - var(--chapter-sidebar-offset)),
+        var(--chapter-sidebar-max)
+    );
 }
 
-@media (max-width: 1359px) {
+body.desktop-chapter-sidebar #bookHomeFloating {
+    left: var(--chapter-sidebar-offset);
+    right: auto;
+    top: 84px;
+    bottom: 24px;
+    width: var(--chapter-sidebar-width);
+    height: auto;
+    max-height: calc(100vh - 108px);
+    z-index: 40;
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+    border-color: var(--border);
+    background: color-mix(in srgb, var(--card-bg) 88%, transparent);
+    box-shadow: var(--shadow-md);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+body.desktop-chapter-sidebar #bookHomeFloating .toc-header {
+    padding: 12px 14px;
+}
+
+body.desktop-chapter-sidebar #bookHomeFloating .toc-book-home span,
+body.desktop-chapter-sidebar #bookHomeFloating .toc-close,
+body.desktop-chapter-sidebar #bookHomeToggle {
+    display: none;
+}
+
+body.desktop-chapter-sidebar #bookHomeFloating .toc-item a {
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+body.desktop-chapter-sidebar #bookHomeFloating .toc-item.active {
+    background: var(--hover);
+    box-shadow: none;
+}
+
+/* The sidebar is an overlay and never narrows the reading stage, so the page
+   stays centred on the viewport and the sidebar covers the left margin.
+   Shifting it by half the sidebar footprint makes the gap on both sides
+   (100vw - page - offset - sidebar) / 2, using the very same width variable. */
+body.desktop-chapter-sidebar:not(.ai-chat-open) .container {
+    position: relative;
+    left: calc((var(--chapter-sidebar-offset) + var(--chapter-sidebar-width)) / 2);
+}
+
+body.desktop-chapter-sidebar.desktop-chapter-sidebar-auto-hide #bookHomeFloating,
+body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating {
+    left: 0;
+    border-radius: 0 14px 14px 0;
+    opacity: .58;
+    transform: translateX(calc(-100% + var(--reader-edge-peek)));
+    transition: transform 180ms ease-out, opacity 160ms ease;
+    transition-delay: 320ms;
+    will-change: transform, opacity;
+}
+
+body.desktop-chapter-sidebar.desktop-chapter-sidebar-auto-hide #bookHomeFloating:hover,
+body.desktop-chapter-sidebar.desktop-chapter-sidebar-auto-hide #bookHomeFloating:focus-within,
+body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating:hover,
+body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating:focus-within {
+    opacity: 1;
+    transform: translateX(0);
+    box-shadow: var(--shadow-md);
+    transition-delay: 0ms;
+}
+
+/* The sidebar can fit from 968px up (narrowest page preset), so keep its
+   settings reachable from there instead of the old fixed 1360px cutoff. */
+@media (max-width: 967px) {
     .desktop-setting-only {
         display: none;
     }
