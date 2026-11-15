@@ -15,6 +15,7 @@ BOOK_SORT_OPTIONS = {
 LIBRARY_SORT_OPTIONS = {
     "manual": "library.sort.manual",
     "shelf_first": "library.sort.shelfFirst",
+    "pdf_first": "library.sort.pdfFirst",
     **BOOK_SORT_OPTIONS,
 }
 
@@ -40,6 +41,17 @@ def sort_catalog(books, sort, manual_order=(), shelf_added=None):
         if manual_order:
             ranks = {book_id: index for index, book_id in enumerate(manual_order)}
             ordered.sort(key=lambda book: ranks.get(book.book_id, -1))
+        return ordered
+    if sort == "pdf_first":
+        # Group PDFs ahead of EPUBs, newest first inside each group. Three
+        # stable passes keep the title collation as the final tie-break.
+        ordered.sort(key=lambda book: book.title.casefold())
+        ordered.sort(key=lambda book: book.created_at, reverse=True)
+        ordered.sort(
+            key=lambda book: 0
+            if getattr(book, "source_format", "epub") == "pdf"
+            else 1
+        )
         return ordered
     if sort == "shelf_first":
         added = shelf_added or {}

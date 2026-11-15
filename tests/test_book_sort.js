@@ -27,6 +27,30 @@ function ids(books) {
     return books.map((item) => item.hash);
 }
 
+test('pdf_first puts PDFs first and orders each group newest first', () => {
+    const sort = loadBookSort({});
+    const books = [
+        { hash: 'e-new', title: 'E new', created_at: '2024-05-01', format: 'epub' },
+        { hash: 'p-old', title: 'P old', created_at: '2024-01-01', format: 'pdf' },
+        { hash: 'e-old', title: 'E old', created_at: '2024-02-01', format: 'epub' },
+        { hash: 'p-new', title: 'P new', created_at: '2024-04-01', format: 'pdf' },
+    ];
+    assert.deepEqual(
+        ids(sort.sortBooks(books, 'pdf_first', 'en')),
+        ['p-new', 'p-old', 'e-new', 'e-old'],
+    );
+});
+
+test('pdf_first falls back to title order for equal timestamps', () => {
+    const sort = loadBookSort({});
+    const books = [
+        { hash: 'z', title: 'Z', created_at: '2024-01-01', format: 'epub' },
+        { hash: 'p-b', title: 'P b', created_at: '2024-01-01', format: 'pdf' },
+        { hash: 'p-a', title: 'P a', created_at: '2024-01-01', format: 'pdf' },
+    ];
+    assert.deepEqual(ids(sort.sortBooks(books, 'pdf_first', 'en')), ['p-a', 'p-b', 'z']);
+});
+
 test('shelf_first sorts shelf books by added time descending', () => {
     const sort = loadBookSort({
         bookshelf: JSON.stringify({

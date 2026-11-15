@@ -145,6 +145,7 @@
   "library.sort.apply": "적용",
   "library.sort.manual": "수동 순서",
   "library.sort.shelfFirst": "책장 우선",
+  "library.sort.pdfFirst": "PDF 우선",
   "library.sort.label": "정렬 기준",
   "library.sort.titleAsc": "제목(A~Z)",
   "library.sort.titleDesc": "제목(Z–A)",

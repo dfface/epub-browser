@@ -145,6 +145,7 @@
   "library.sort.apply": "Áp dụng",
   "library.sort.manual": "Thứ tự thủ công",
   "library.sort.shelfFirst": "Kệ sách trước",
+  "library.sort.pdfFirst": "PDF trước",
   "library.sort.label": "Sắp xếp theo",
   "library.sort.titleAsc": "Tên sách (A–Z)",
   "library.sort.titleDesc": "Tên sách (Z–A)",

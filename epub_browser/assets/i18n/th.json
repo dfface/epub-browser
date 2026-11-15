@@ -145,6 +145,7 @@
   "library.sort.apply": "ใช้",
   "library.sort.manual": "ลำดับที่กำหนดเอง",
   "library.sort.shelfFirst": "ชั้นหนังสือก่อน",
+  "library.sort.pdfFirst": "PDF ก่อน",
   "library.sort.label": "เรียงตาม",
   "library.sort.titleAsc": "ชื่อเรื่อง (A–Z)",
   "library.sort.titleDesc": "ชื่อเรื่อง (Z–A)",
