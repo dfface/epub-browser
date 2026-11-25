@@ -1,0 +1,90 @@
+"""Regression EPUB: duplicate basenames, encoded paths and footnote returns."""
+import json
+import shutil
+import tempfile
+import unittest
+import zipfile
+from pathlib import Path
+from lxml import html
+from epub_browser.asset_publisher import AssetPublisher
+from epub_browser.processor import EPUBProcessor
+from epub_browser.server_pages import ServerPageRenderer
+
+
+def write_link_epub(path, website=False, ambiguous=False):
+    paths = ['Text/one.xhtml', 'Notes/one.xhtml', 'Text/space name.xhtml']
+    bodies = [
+        '<h1 id="start">Start</h1><a href="#local">Local</a><p id="local">Local target</p>'
+        '<a href="../Notes/one.xhtml#note">Note</a>'
+        '<a href="space%20name.xhtml#%E6%B3%A8">Encoded</a>'
+        '<a href="https://example.org/one.xhtml#external">External</a>',
+        '<p id="note">Note</p><a href="../Text/one.xhtml#start">Return</a>',
+        '<p id="注">Encoded target</p>',
+    ]
+    if website:
+        bodies[0] += '<a href="/guide/notes/#note">Website note</a><a href="/unrelated/">Unrelated</a>'
+        bodies[0] += '<a href="https://docs.example/guide/notes/">Original external</a>'
+        sources = ['/guide/start/', '/guide/notes/', '/guide/notes/' if ambiguous else '/guide/encoded/']
+        bodies = ['<blockquote>原文：<a href="https://docs.example' + source + '">https://docs.example' + source + '</a></blockquote>' + body for source, body in zip(sources, bodies)]
+    with zipfile.ZipFile(path, 'w') as z:
+        z.writestr('META-INF/container.xml', '<container xmlns="urn:oasis:names:tc:opendocument:xmlns:container" version="1.0"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>')
+        manifest = '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>' + ''.join(f'<item id="c{i}" href="{p}" media-type="application/xhtml+xml"/>' for i,p in enumerate(paths))
+        spine = ''.join(f'<itemref idref="c{i}"/>' for i in range(3))
+        z.writestr('OEBPS/content.opf', f'<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Link regression</dc:title><dc:identifier id="uid">urn:issue80:links</dc:identifier><dc:language>en</dc:language></metadata><manifest>{manifest}</manifest><spine>{spine}</spine></package>')
+        z.writestr('OEBPS/nav.xhtml', '<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="Text/one.xhtml#start">Start</a></li><li><a href="Text/space%20name.xhtml#%E6%B3%A8">Encoded</a></li></ol></nav></body></html>')
+        for p, body in zip(paths, bodies):
+            z.writestr('OEBPS/'+p, '<html><head><title>Links</title></head><body id="body-target">'+body+'</body></html>')
+
+
+class EPUBLinkTests(unittest.TestCase):
+    def test_spine_links_and_ids_survive_ssg_and_server_conversion(self):
+        for mode in ('ssg', 'server'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                source = Path(tmp, 'links.epub')
+                write_link_epub(source)
+                p = EPUBProcessor(source, tmp, deployment_mode=mode)
+                result = p.convert()
+                renderer = None
+                if mode == 'server':
+                    public = Path(tmp, 'public')
+                    target = public / 'book' / result.book_id
+                    target.parent.mkdir(parents=True)
+                    shutil.copytree(result.output_dir, target)
+                    AssetPublisher(Path('epub_browser/assets'), public).publish()
+                    renderer = ServerPageRenderer(public, result.book_id)
+                    self.assertIn('chapter_0.html', renderer.render_index())
+                    self.assertFalse((target / 'chapter_0.html').exists())
+                toc = json.loads((result.output_dir / ('toc.json' if mode == 'ssg' else 'content/toc.json')).read_text())
+                self.assertTrue(any(item.get('anchor') == '%E6%B3%A8' and item.get('chapter_index') == 2 for item in toc))
+                pages = []
+                for i in range(3):
+                    file = result.output_dir / (f'chapter_{i}.html' if mode == 'ssg' else f'content/chapter_{i}.json')
+                    text = file.read_text()
+                    if mode == 'server':
+                        text = renderer.render_chapter(i)
+                    pages.append(html.fromstring(text))
+                links = pages[0].xpath('//a/@href')
+                self.assertIn('#local', links)
+                self.assertTrue(pages[0].xpath('//*[@id="body-target"]'))
+                self.assertIn('chapter_1.html#note', links)
+                self.assertIn('chapter_2.html#%E6%B3%A8', links)
+                self.assertIn('https://example.org/one.xhtml#external', links)
+                self.assertIn('chapter_0.html#start', pages[1].xpath('//a/@href'))
+                for page, target in zip(pages, ['local', 'note', '注']):
+                    self.assertTrue(page.xpath('//*[@id=$target]', target=target))
+
+    def test_imported_website_links_resolve_only_unique_declared_sources(self):
+        for mode in ('ssg', 'server'):
+            for ambiguous in (False, True):
+                with self.subTest(mode=mode, ambiguous=ambiguous), tempfile.TemporaryDirectory() as tmp:
+                    source = Path(tmp, 'website.epub')
+                    write_link_epub(source, website=True, ambiguous=ambiguous)
+                    result = EPUBProcessor(source, tmp, deployment_mode=mode).convert()
+                    if mode == 'server':
+                        markup = json.loads((result.output_dir / 'content/chapter_0.json').read_text())['content']
+                    else:
+                        markup = (result.output_dir / 'chapter_0.html').read_text()
+                    links = html.fromstring(markup).xpath('//a/@href')
+                    self.assertEqual(html.fromstring(markup).xpath('//a[text()="Website note"]/@href'), ['/guide/notes/#note' if ambiguous else 'chapter_1.html#note'])
+                    self.assertIn('/unrelated/', links)
+                    self.assertIn('https://docs.example/guide/notes/', links)

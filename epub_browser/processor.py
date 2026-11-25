@@ -27,6 +27,7 @@ from .epub_parsing import (
     iter_local,
     local_name,
     parse_xhtml_document,
+    parse_xhtml_bytes,
     parse_xml_document,
     require_single_rootfile,
     validate_manifest_ids,
@@ -63,7 +64,8 @@ SERVER_OUTPUT_REVISION_FILE = ".server-content-revision"
 # v11: book CSS font/length fixed units (px/pt) in font-size-relevant
 # properties are converted to `em` so the reader font-size control affects every
 # EPUB; stored chapter CSS therefore differs and must be regenerated.
-SERVER_OUTPUT_REVISION = "server-content-v11"
+# v12: spine-resolved internal links and body anchor IDs replace broken targets.
+SERVER_OUTPUT_REVISION = "server-content-v12"
 
 
 class EPUBProcessor(ReaderPageRenderer):
@@ -319,6 +321,7 @@ class EPUBProcessor(ReaderPageRenderer):
         """Convert one EPUB into its caller-owned staging directory."""
         self.prepare()
         self.generate_hash()
+        self._index_chapter_source_urls()
         self.create_web_interface()
         if self.deployment_mode == "server":
             Path(self.web_dir, SERVER_OUTPUT_REVISION_FILE).write_text(
@@ -1212,9 +1215,14 @@ class EPUBProcessor(ReaderPageRenderer):
             try:
                 # 提取body内容
                 start = content.lower().find('<body')
-                start = content.find('>', start) + 1
+                body_tag_end = content.find('>', start) + 1
+                body_node = find_descendant_local(parse_xhtml_bytes(content.encode('utf-8')), 'body')
+                body_id = body_node.get('id') if body_node is not None else None
+                start = body_tag_end
                 end = content.lower().find('</body>')
                 content = content[start:end]
+                if body_id:
+                    content = '<div id="' + html.escape(body_id, quote=True) + '">' + content + '</div>'
             except:
                 pass
 
@@ -1296,61 +1304,84 @@ class EPUBProcessor(ReaderPageRenderer):
         replaced_content = re.sub(img_pattern2, replace_img_link, replaced_content)
         return replaced_content
 
+    @staticmethod
+    def _source_url_key(url):
+        parsed = urllib.parse.urlsplit(url)
+        if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+            return None
+        return (parsed.scheme.lower(), parsed.netloc.lower(),
+                posixpath.normpath(urllib.parse.unquote(parsed.path)))
+
+    def _index_chapter_source_urls(self):
+        """Index explicit import provenance, never infer it from ordinary links.
+
+        Website-derived EPUBs can retain origin-relative links after renaming
+        their chapter files. Canonical metadata or a source attribution supplies
+        the missing identity. Duplicate identities are deliberately unresolved.
+        """
+        self._chapter_source_urls = {}
+        candidates = {}
+        for index, chapter in enumerate(self.chapters):
+            try:
+                root = parse_xhtml_document(self._internal_file(chapter['path']))
+            except (EPUBParseError, OSError):
+                continue
+            declared = {
+                node.get('href') for node in iter_local(root, 'link')
+                if 'canonical' in node.get('rel', '').lower().split()
+            }
+            for block in iter_local(root, 'blockquote'):
+                label = (block.text or '').strip().casefold()
+                if label not in {'原文：', '原文:', 'source:', 'original:'}:
+                    continue
+                links = list(iter_local(block, 'a'))
+                if len(links) == 1:
+                    link = links[0]
+                    if ''.join(link.itertext()).strip() == link.get('href'):
+                        declared.add(link.get('href'))
+            sources = {url for url in declared if url and self._source_url_key(url)}
+            if len(sources) != 1:
+                continue
+            url = sources.pop()
+            self._chapter_source_urls[chapter['path']] = url
+            candidates.setdefault(self._source_url_key(url), set()).add(index)
+        self._source_url_chapters = {
+            key: f"chapter_{next(iter(indexes))}.html"
+            for key, indexes in candidates.items() if len(indexes) == 1
+        }
+
     def fix_html_file_links(self, content, chapter_path):
         """修复html/xhtml文件链接"""
-        # 根据目录中的文件名做新旧的映射
-        old_file2new_file = {}
-        for toc_item in self.toc:
-            if 'old_file_name' in toc_item and 'new_file_name' in toc_item:
-                old_file2new_file[toc_item['old_file_name']] = toc_item['new_file_name']
+        # The spine owns public chapter indexes, including chapters absent
+        # from the TOC. Resolve full archive paths to avoid basename collisions.
+        destinations = {
+            chapter['path']: f"chapter_{index}.html"
+            for index, chapter in enumerate(self.chapters) if chapter.get('path')
+        }
+        pattern = r"(<a\b[^>]*?(?<![\w:-])href\s*=\s*)([\"'])(.*?)(\2)"
 
-        # 匹配a标签的href属性
-        a_pattern = r'<a[^>]+href="([^"]+)"[^>]*>'
-
-        def replace_a_link(match):
-            src = match.group(1)
-            parsed_src = urllib.parse.urlsplit(html.unescape(src).strip())
-
-            # Root-relative anchors navigate the web origin rather than the
-            # extracted EPUB archive, so they must not enter path resolution.
-            if (
-                not parsed_src.scheme
-                and not parsed_src.netloc
-                and parsed_src.path.startswith("/")
-            ):
+        def replace_link(match):
+            reference = html.unescape(match.group(3)).strip()
+            parsed = urllib.parse.urlsplit(reference)
+            if parsed.scheme or parsed.netloc or not parsed.path:
                 return match.group(0)
-
-            # 如果已经是绝对路径或数据URI，则不处理
-            if self._is_external_reference(src):
+            if parsed.path.startswith('/'):
+                source = getattr(self, '_chapter_source_urls', {}).get(chapter_path)
+                key = self._source_url_key(urllib.parse.urljoin(source, reference)) if source else None
+                destination = getattr(self, '_source_url_chapters', {}).get(key)
+            else:
+                resolved = self._resolve_internal_path(reference, posixpath.dirname(chapter_path))
+                destination = destinations.get(resolved)
+            if destination is None:
                 return match.group(0)
-            if self.deployment_mode == "server" and parsed_src.scheme:
-                # The final allowlist removes active schemes. Avoid resolving
-                # them as EPUB-internal paths before that pass.
-                return match.group(0)
+            if parsed.query:
+                destination += '?' + parsed.query
+            if parsed.fragment:
+                destination += '#' + parsed.fragment
+            quote = match.group(2)
+            return match.group(1) + quote + html.escape(destination, quote=True) + quote
 
-            chapter_dir = posixpath.dirname(chapter_path)
-            self._resolve_internal_path(src, chapter_dir)
-
-            # 如果有 old_file_name 则替换
-            new_src = None
-            for key, value in old_file2new_file.items():
-                if key in src and value is not None:
-                    # 直接新文件+旧 Hash，因为原来的地址可能类似 ../contents/chapterchapter_15.html#annot5
-                    new_src = value
-                    if '#' in src:
-                        anchor = src.split('#')[1]
-                        new_src += f'#{anchor}'
-                    break
-
-            if not new_src:
-                return match.group(0)
-
-            # 转换为web资源路径，这里的 html 资源不会在 resources 下，直接就在当前电子书下
-            web_src = f"{new_src}"
-            return match.group(0).replace(f'"{src}"', f'"{web_src}"')
-
-        replaced_content = re.sub(a_pattern, replace_a_link, content)
-        return replaced_content
+        return re.sub(pattern, replace_link, content, flags=re.IGNORECASE)
 
     def fix_other_links(self, content, chapter_path):
         """修复其他资源链接"""
