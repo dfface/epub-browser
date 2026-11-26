@@ -558,6 +558,12 @@ body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating:focus-within {
     width: 100%;
 }
 
+/* Chapter navigation moves focus here for keyboard and screen-reader continuity.
+   The article is a reading surface; interactive descendants retain focus rings. */
+#eb-content[tabindex="-1"]:focus {
+    outline: none;
+}
+
 /* EPUBs often bring a large first-heading margin.  The page shell already
    establishes the opening rhythm, so avoid spending the first viewport on it. */
 #eb-content > :first-child {
