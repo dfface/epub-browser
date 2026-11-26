@@ -1063,3 +1063,9 @@
         gap: 6px;
     }
 }
+
+/* Hide only creation entrances; existing image notes remain discoverable.
+   display:none also removes hidden entrances from the keyboard tab order. */
+html:not([data-image-note-entrances="true"]) .image-annotation-anchor:not(.has-image-note) .image-annotation-button {
+    display: none;
+}

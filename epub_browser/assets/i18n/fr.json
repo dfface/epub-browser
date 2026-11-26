@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "La recherche est temporairement indisponible. Réessayez plus tard.",
   "book.closeSearch": "Fermer la recherche",
   "admin.general.searchIndexCacheLimit": "Index de recherche mis en cache sur le disque",
-  "admin.general.searchIndexCacheLimitHelp": "Le serveur conserve ce nombre d’index de recherche récemment utilisés. Un index supprimé est reconstruit lors de la prochaine recherche dans ce livre."
+  "admin.general.searchIndexCacheLimitHelp": "Le serveur conserve ce nombre d’index de recherche récemment utilisés. Un index supprimé est reconstruit lors de la prochaine recherche dans ce livre.",
+  "settings.textAlignment": "Alignement du texte",
+  "settings.alignLeft": "À gauche",
+  "settings.alignRight": "À droite",
+  "settings.alignCenter": "Centré",
+  "settings.alignJustify": "Justifié",
+  "settings.imageNoteEntrances": "Afficher les boutons de note sur les images",
+  "settings.imageNoteEntrancesHelp": "Activez pour annoter les images. Les repères des notes existantes restent visibles."
 }

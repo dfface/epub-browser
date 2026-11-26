@@ -3,27 +3,28 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
-function loadBookClient() {
+function loadBookClient(mode = 'server') {
   const listeners = {};
   const notifications = [];
   const saved = [];
   let shelf = { items: ['book-id'], groups: {}, order: ['book-id'] };
   const button = {
+    attributes: {},
     dataset: {},
     classList: { add() {}, remove() {} },
-    setAttribute() {},
+    setAttribute(key, value) { this.attributes[key] = value; },
     addEventListener(type, listener) { listeners[type] = listener; },
   };
-  const text = { textContent: '' };
+  const text = { textContent: '', attributes: {}, setAttribute(key, value) { this.attributes[key] = value; } };
   const window = {
-    EpubBrowserMode: 'server',
+    EpubBrowserMode: mode,
     epubBrowserCache: {},
     EpubBrowserI18n: { t(key) { return key; } },
     EpubBrowserNotification: {
       show(message, level) { notifications.push({ message, level }); },
     },
     EpubBookshelfStore: {
-      isServerMode() { return true; },
+      isServerMode() { return mode === 'server'; },
       data() { return shelf; },
       load() {
         return Promise.resolve({ data: shelf, version: 1 });
@@ -38,7 +39,7 @@ function loadBookClient() {
   const context = {
     window,
     navigator: { userAgent: '' },
-    localStorage: { getItem() { return null; }, setItem() {} },
+    localStorage: { getItem(key) { return key === 'bookshelf' ? JSON.stringify(shelf) : null; }, setItem(key, value) { if (key === 'bookshelf') { shelf = JSON.parse(value); saved.push(shelf); } } },
     document: {
       cookie: '',
       getElementById(id) {
@@ -52,7 +53,7 @@ function loadBookClient() {
     Promise,
   };
   vm.runInNewContext(fs.readFileSync('epub_browser/assets/book.js', 'utf8'), context);
-  return { context, listeners, notifications, saved };
+  return { context, listeners, notifications, saved, button, text };
 }
 
 test('logged-in Server reader changes its shelf without a legacy username marker', async () => {
@@ -125,7 +126,7 @@ test('Server reader defers its shelf button until the Server store has loaded', 
     createElement() { return { style: {} }; },
     getElementById(id) {
       if (id === 'toggleShelfBtn') return button;
-      if (id === 'toggleShelfBtnText') return { textContent: '' };
+      if (id === 'toggleShelfBtnText') return { textContent: '', setAttribute() {} };
       if (id === 'scrollToTopBtn') return passiveButton;
       return null;
     },
@@ -176,7 +177,7 @@ test('Server book detail resolves its shelf label through the lightweight member
     setAttribute(name, value) { this.attributes[name] = value; },
     removeAttribute(name) { delete this.attributes[name]; },
   };
-  const text = { textContent: '' };
+  const text = { textContent: '', setAttribute() {} };
   const window = {
     EpubBrowserMode: 'server',
     EpubBrowserBasePath: '/reader/',
@@ -218,3 +219,17 @@ test('Server progress labels never invent a shared account identity', () => {
 
   assert.equal(client.context.getProgressIdentity(), '');
 });
+
+for (const mode of ['ssg', 'server']) {
+  test(`${mode} shelf removal updates accessible state and the live translation key`, async () => {
+    const client = loadBookClient(mode);
+    client.context.initBookShelfButton('book-id');
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(client.button.attributes['aria-pressed'], 'true');
+    assert.equal(client.text.attributes['data-i18n'], 'book.removeFromShelf');
+    await client.listeners.click();
+    assert.equal(client.saved.length, 1);
+    assert.equal(client.button.attributes['aria-pressed'], 'false');
+    assert.equal(client.text.attributes['data-i18n'], 'book.addToShelf');
+  });
+}

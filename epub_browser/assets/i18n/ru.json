@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "Поиск временно недоступен. Повторите попытку позже.",
   "book.closeSearch": "Закрыть поиск",
   "admin.general.searchIndexCacheLimit": "Кэшированные на диске индексы поиска по книгам",
-  "admin.general.searchIndexCacheLimitHelp": "Сервер хранит столько недавно использованных индексов поиска. Удалённый индекс будет пересоздан при следующем поиске по этой книге."
+  "admin.general.searchIndexCacheLimitHelp": "Сервер хранит столько недавно использованных индексов поиска. Удалённый индекс будет пересоздан при следующем поиске по этой книге.",
+  "settings.textAlignment": "Выравнивание текста",
+  "settings.alignLeft": "По левому краю",
+  "settings.alignRight": "По правому краю",
+  "settings.alignCenter": "По центру",
+  "settings.alignJustify": "По ширине",
+  "settings.imageNoteEntrances": "Показывать кнопки заметок к изображениям",
+  "settings.imageNoteEntrancesHelp": "Включите, чтобы добавлять заметки к изображениям. Метки существующих заметок остаются видимыми."
 }

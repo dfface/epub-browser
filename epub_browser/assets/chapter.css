@@ -538,6 +538,10 @@ body.ai-chat-open.desktop-chapter-sidebar #bookHomeFloating:focus-within {
 }
 
 #eb-content {
+    /* Publisher body margins are scoped onto this article. Combining those
+       margins with the reader's full-width canvas clips text at the card edge.
+       Only the outer canvas belongs to the reader; paragraph indents stay intact. */
+    margin-inline: 0 !important;
     padding: clamp(40px, 5vw, 72px) clamp(28px, 6vw, 80px);
     color: var(--reader-ink, var(--text));
     transition: var(--transition);
@@ -1954,7 +1958,9 @@ body.pagination-mode {
     color: var(--primary) !important;
 } */
 
-.font-family-selector select {
+.font-family-selector select,
+.settings-select {
+    min-height: 44px;
     width: 100%;
     padding: 10px 15px;
     border: 1px solid var(--border);
@@ -1965,7 +1971,8 @@ body.pagination-mode {
     transition: var(--transition);
 }
 
-.font-family-selector select:focus {
+.font-family-selector select:focus,
+.settings-select:focus {
     outline: none;
     border-color: var(--button-bg);
     box-shadow: 0 0 0 2px rgba(67, 97, 238, 0.2);
@@ -2348,4 +2355,22 @@ body.continuous-scroll-mode #mobileBookHomeShortcut {
 @keyframes dotPulse {
     0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
     40% { transform: scale(1); opacity: 1; }
+}
+
+/* Explicit reader overrides; default leaves publisher alignment untouched. */
+html[data-reader-text-alignment="left"] :is(#eb-content, .eb-content),
+html[data-reader-text-alignment="left"] :is(#eb-content, .eb-content) :is(p, div, li, blockquote, h1, h2, h3, h4, h5, h6, td, th) {
+    text-align: left !important;
+}
+html[data-reader-text-alignment="right"] :is(#eb-content, .eb-content),
+html[data-reader-text-alignment="right"] :is(#eb-content, .eb-content) :is(p, div, li, blockquote, h1, h2, h3, h4, h5, h6, td, th) {
+    text-align: right !important;
+}
+html[data-reader-text-alignment="center"] :is(#eb-content, .eb-content),
+html[data-reader-text-alignment="center"] :is(#eb-content, .eb-content) :is(p, div, li, blockquote, h1, h2, h3, h4, h5, h6, td, th) {
+    text-align: center !important;
+}
+html[data-reader-text-alignment="justify"] :is(#eb-content, .eb-content),
+html[data-reader-text-alignment="justify"] :is(#eb-content, .eb-content) :is(p, div, li, blockquote, h1, h2, h3, h4, h5, h6, td, th) {
+    text-align: justify !important;
 }

@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "搜索暂时不可用，请稍后再试。",
   "book.closeSearch": "关闭搜索",
   "admin.general.searchIndexCacheLimit": "缓存的书籍搜索索引",
-  "admin.general.searchIndexCacheLimitHelp": "服务器保留最近使用过的搜索索引数量。删除后仅需在下次搜索该书时重新构建。"
+  "admin.general.searchIndexCacheLimitHelp": "服务器保留最近使用过的搜索索引数量。删除后仅需在下次搜索该书时重新构建。",
+  "settings.textAlignment": "正文对齐",
+  "settings.alignLeft": "左对齐",
+  "settings.alignRight": "右对齐",
+  "settings.alignCenter": "居中",
+  "settings.alignJustify": "两端对齐",
+  "settings.imageNoteEntrances": "显示图片笔记按钮",
+  "settings.imageNoteEntrancesHelp": "开启后可为图片添加笔记；已有笔记标记始终显示。"
 }

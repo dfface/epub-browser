@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "การค้นหาไม่พร้อมใช้งานชั่วคราว โปรดลองใหม่ภายหลัง",
   "book.closeSearch": "ปิดการค้นหา",
   "admin.general.searchIndexCacheLimit": "ดัชนีค้นหาหนังสือที่แคชบนดิสก์",
-  "admin.general.searchIndexCacheLimitHelp": "เซิร์ฟเวอร์เก็บดัชนีค้นหาที่ใช้ล่าสุดตามจำนวนนี้ หากถูกลบจะสร้างใหม่เมื่อค้นหาหนังสือเล่มนั้นครั้งถัดไป"
+  "admin.general.searchIndexCacheLimitHelp": "เซิร์ฟเวอร์เก็บดัชนีค้นหาที่ใช้ล่าสุดตามจำนวนนี้ หากถูกลบจะสร้างใหม่เมื่อค้นหาหนังสือเล่มนั้นครั้งถัดไป",
+  "settings.textAlignment": "การจัดแนวข้อความ",
+  "settings.alignLeft": "ชิดซ้าย",
+  "settings.alignRight": "ชิดขวา",
+  "settings.alignCenter": "กึ่งกลาง",
+  "settings.alignJustify": "ชิดขอบทั้งสอง",
+  "settings.imageNoteEntrances": "แสดงปุ่มบันทึกบนรูปภาพ",
+  "settings.imageNoteEntrancesHelp": "เปิดเพื่อเพิ่มบันทึกบนรูปภาพ เครื่องหมายบันทึกที่มีอยู่ยังคงแสดงอยู่"
 }

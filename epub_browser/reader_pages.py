@@ -1545,7 +1545,7 @@ class ReaderPageRenderer:
                         </div>
                     </div>
                     {ai_book_chat_button}
-                    <button class="css-btn secondary" id="toggleShelfBtn"><i class="fas fa-bookmark"></i><span id="toggleShelfBtnText" data-i18n="book.addToShelf">Add to Shelf</span></button>
+                    <button type="button" class="css-btn secondary" id="toggleShelfBtn" aria-pressed="false"><i class="fas fa-bookmark" aria-hidden="true"></i><span id="toggleShelfBtnText" aria-live="polite" data-i18n="book.addToShelf">Add to Shelf</span></button>
                     {book_search_trigger}
                     {book_review_trigger}
                 </div>
@@ -2681,6 +2681,17 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                             <span>100%</span>
                             <span>200%</span>
                             <span>400%</span>'''
+        text_alignment_control = "" if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT else """
+                <div class="settings-group">
+                    <label class="settings-label" for="textAlignmentSelect" data-i18n="settings.textAlignment">Text alignment</label>
+                    <select id="textAlignmentSelect" class="settings-select">
+                        <option value="default" data-i18n="settings.bookDefault">Book default</option>
+                        <option value="left" data-i18n="settings.alignLeft">Left</option>
+                        <option value="right" data-i18n="settings.alignRight">Right</option>
+                        <option value="center" data-i18n="settings.alignCenter">Center</option>
+                        <option value="justify" data-i18n="settings.alignJustify">Justify</option>
+                    </select>
+                </div>"""
         font_size_control = ""
         if pdf_page is None:
             sizes = len(_READER_FONT_SIZES_REM)
@@ -3016,6 +3027,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
         </div>
                 </div>
                 {font_size_control}
+                {text_alignment_control}
+
                 <div class="settings-group">
                     <div class="settings-label-row">
                         <label class="settings-label" for="pageWidthSlider" data-i18n="settings.pageWidth">Page width</label>
@@ -3090,6 +3103,16 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                             <i class="fas fa-info-circle" aria-hidden="true"></i>
                         </span>
                     </label>
+                    <div class="settings-option-with-tip">
+                        <label class="settings-switch">
+                            <input type="checkbox" id="imageNoteEntrancesToggle" aria-describedby="imageNoteEntrancesHelp">
+                            <span class="switch-slider"></span>
+                            <span class="switch-text" data-i18n="settings.imageNoteEntrances">Show image note buttons</span>
+                        </label>
+                        <button type="button" id="imageNoteEntrancesHelp" class="settings-info-tip" data-settings-tip data-tip="Enable to add notes to images. Existing note markers remain visible." data-i18n-data-tip="settings.imageNoteEntrancesHelp" aria-label="Enable to add notes to images. Existing note markers remain visible." data-i18n-aria-label="settings.imageNoteEntrancesHelp">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i>
+                        </button>
+                    </div>
                 </div>
                 <fieldset class="settings-group desktop-layout-settings">
                     <legend class="settings-section-title" data-i18n="settings.desktopLayout">Desktop layout</legend>
