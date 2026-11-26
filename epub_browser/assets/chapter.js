@@ -544,13 +544,6 @@ function initScript() {
 
     if (isPaginationMode) {
         enablePaginationMode();
-        document.querySelectorAll('.eb-content a').forEach(function(item) {
-            var href = item.getAttribute('href');
-            if (href) {
-                item.setAttribute('data-original-href', href);
-                item.removeAttribute('href');
-            }
-        });
         content.addEventListener('scroll', function() {
             var sl = content.scrollLeft;
             var np = Math.round(sl / pageWidth);
@@ -570,6 +563,10 @@ function initScript() {
         }
         if (hasSearchFragment()) {
             scheduleSearchLocate();
+        } else if (window.location.hash) {
+            window.requestAnimationFrame(function() {
+                navigateReaderChapter(window.location.href, { history: false });
+            });
         }
     }
     
@@ -603,15 +600,7 @@ function initScript() {
         for (var p = 0; p < paginationToolbarControls.length; p++) {
             paginationToolbarControls[p].hidden = false;
         }
-        
-        document.querySelectorAll('.eb-content a').forEach(function(item) {
-            var href = item.getAttribute('href');
-            if (href) {
-                item.setAttribute('data-original-href', href);
-                item.removeAttribute('href');
-            }
-        });
-        
+
         createPages();
         loadReadingProgress();
         updateNavButtons();
@@ -715,7 +704,7 @@ function initScript() {
         showLoading();
         var hasPDFPage = !!content.querySelector('[data-pdf-page-number]');
         if (hasPDFPage) dispatchChapterContentLifecycle('removed', content);
-        var original = hasPDFPage ? content.innerHTML : preprocessContent(content);
+        var original = content.innerHTML;
         if (!hasPDFPage) dispatchChapterContentLifecycle('removed', content);
         content.innerHTML = original;
         dispatchChapterContentLifecycle('added', content);
@@ -738,6 +727,7 @@ function initScript() {
                 calculateTotalPages();
                 watchPaginationCanvas();
                 if (target) scrollToPaginationTarget(target);
+                else if (window.location.hash && !hasSearchFragment()) scrollToPaginationTarget({ hash: window.location.hash });
                 if (hasSearchFragment()) scheduleSearchLocate();
                 setTimeout(function() {
                     hideLoading();
@@ -749,10 +739,16 @@ function initScript() {
         }, 200);
     }
 
+    function decodeChapterFragment(hash) {
+        var value = hash.substring(1);
+        try { return decodeURIComponent(value); }
+        catch (error) { return value; }
+    }
+
     function scrollToPaginationTarget(target) {
         var anchor = null;
         if (target.hash) {
-            var anchorId = decodeURIComponent(target.hash.substring(1));
+            var anchorId = decodeChapterFragment(target.hash);
             var anchors = content.querySelectorAll('[id]');
             for (var i = 0; i < anchors.length; i++) {
                 if (anchors[i].id === anchorId) {
@@ -770,12 +766,6 @@ function initScript() {
         wrapAllElements('img', 'div', content);
         prepareChapterCodeBlocks(content);
         highlightCodeBlocks(content);
-        document.querySelectorAll('.eb-content a').forEach(function(item) {
-            var href = item.getAttribute('href');
-            if (!href) return;
-            item.setAttribute('data-original-href', href);
-            item.removeAttribute('href');
-        });
         currentPage = 0;
         totalPages = 0;
         setBookTocActiveChapter(target.index, true);
@@ -849,15 +839,7 @@ function initScript() {
         for (var p = 0; p < paginationToolbarControls.length; p++) {
             paginationToolbarControls[p].hidden = true;
         }
-        
-        document.querySelectorAll('.eb-content a').forEach(function(item) {
-            var href = item.getAttribute('data-original-href');
-            if (href) {
-                item.setAttribute('href', href);
-                item.removeAttribute('data-original-href');
-            }
-        });
-        
+
         var toc = document.getElementById('tocToggle');
         if (toc) toc.style.display = 'flex';
         var mtoc = document.getElementById('mobileTocBtn');
@@ -918,7 +900,7 @@ function initScript() {
     }
 
     function loadReadingProgress() {
-        if (hasSearchFragment()) {
+        if (window.location.hash) {
             return;
         }
         if (isPaginationMode) {
@@ -944,6 +926,7 @@ function initScript() {
                 var pos = localStorage.getItem(key);
                 var wh = window.innerHeight;
                 var scrollRestoreTimer = setTimeout(function() {
+                    if (window.location.hash) return;
                     if (pos && parseInt(pos) > 0) {
                         window.scrollTo(0, parseInt(pos));
                         var total = document.documentElement.scrollHeight - wh;
@@ -1064,7 +1047,7 @@ function initScript() {
         var link = document.createElement('a');
         link.href = url;
         var match = link.pathname.match(/\/chapter_(\d+)\.html$/);
-        if (!match) return null;
+        if (!match || link.origin !== window.location.origin) return null;
         // Compare path segments so deployments behind a URL prefix still
         // recognize their own book, and tolerate percent-encoded hashes.
         var parts = link.pathname.split('/');
@@ -1156,7 +1139,7 @@ function initScript() {
         window.requestAnimationFrame(function() {
             var anchor = null;
             if (target.hash) {
-                var anchorId = decodeURIComponent(target.hash.substring(1));
+                var anchorId = decodeChapterFragment(target.hash);
                 var anchors = content.querySelectorAll('[id]');
                 for (var i = 0; i < anchors.length; i++) {
                     if (anchors[i].id === anchorId) {
@@ -1260,7 +1243,14 @@ function initScript() {
     function navigateReaderChapter(url, options) {
         options = options || {};
         var target = chapterTargetFromUrl(url);
-        if (!target || (!isContinuousScroll && target.index === parseInt(chapter_index, 10))) return false;
+        if (!target) return false;
+        if (!isContinuousScroll && target.index === parseInt(chapter_index, 10)) {
+            if (!target.hash) return false;
+            updateReaderChapterHistory(target, options);
+            if (isPaginationMode) scrollToPaginationTarget(target);
+            else scrollToChapterTarget(target);
+            return true;
+        }
         closeReaderDrawers(false);
         if (isContinuousScroll) {
             var loadedChapter = content.querySelector(
@@ -1358,6 +1348,7 @@ function initScript() {
     });
     window.addEventListener('hashchange', function() {
         if (hasSearchFragment()) scheduleSearchLocate();
+        else if (window.location.hash) navigateReaderChapter(window.location.href, { history: false });
     });
     window.addEventListener('epub-browser:book-search-locate', function() {
         scheduleSearchLocate();
@@ -1382,6 +1373,19 @@ function initScript() {
         if (!navigateReaderChapter(href, { history: true })) {
             window.location.assign(href);
         }
+    });
+    content.addEventListener('click', function(event) {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        var link = event.target.closest('a[href]');
+        if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+        // PDF destinations are handled by the PDF adapter.
+        if (content.querySelector('[data-pdf-page-number]')) return;
+        var href = link.getAttribute('href');
+        if (href.charAt(0) === '#' && isContinuousScroll) {
+            var section = link.closest('.continuous-chapter');
+            if (section) href = getChapterUrl(section.getAttribute('data-chapter-index')) + href;
+        }
+        if (navigateReaderChapter(href, { history: true })) event.preventDefault();
     });
     wireReaderChapterNavigation();
     
@@ -2736,7 +2740,7 @@ function initScript() {
         window.requestAnimationFrame(function() {
             var destination = chapterSection;
             if (target.hash) {
-                var anchorId = decodeURIComponent(target.hash.substring(1));
+                var anchorId = decodeChapterFragment(target.hash);
                 var anchors = chapterSection.querySelectorAll('[id]');
                 for (var i = 0; i < anchors.length; i++) {
                     if (anchors[i].id === anchorId) {
