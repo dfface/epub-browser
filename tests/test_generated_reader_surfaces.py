@@ -42,6 +42,46 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0)
                 self.assertIn('DEPTH_PASS', result.stdout[-300:], stylesheet)
 
+    def test_chapter_navigation_focus_does_not_frame_the_reading_surface(self):
+        chromium = os.environ.get('EPUB_BROWSER_CHROMIUM') or shutil.which('chromium')
+        if not chromium:
+            candidate = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+            chromium = candidate if Path(candidate).exists() else None
+        if not chromium:
+            self.skipTest('Chromium is needed for reader geometry checks')
+        css = Path('epub_browser/assets/theme.css').read_text() + Path('epub_browser/assets/chapter.css').read_text()
+        sample = """<!doctype html><meta name="viewport" content="width=device-width,initial-scale=1">
+        <style>CSS
+a:focus { outline: 2px solid blue; transition: none !important; }</style><div class="container"><div class="eb-content-container" id="card">
+        <article id="eb-content" tabindex="-1"><p>Text</p><p id="indent" style="margin-left:30px">Verse</p>
+        <a id="link" href="#target">Read more</a></article></div></div>
+        <script>
+        window.addEventListener('load', function() { setTimeout(function() {
+        const results = [];
+        const article = document.getElementById('eb-content');
+        article.focus({preventScroll:true});
+        results.push(document.activeElement === article);
+        results.push(getComputedStyle(article).outlineStyle === 'none');
+        const link = document.getElementById('link'); link.focus();
+        results.push(getComputedStyle(link).outlineStyle !== 'none');
+        document.body.dataset.check = results.every(Boolean) ? 'CANVAS_PASS' : JSON.stringify({results,active:document.activeElement.id,outline:getComputedStyle(link).outlineStyle,focus:link.matches(':focus')});
+        }, 50); });
+        </script>""".replace('CSS', css)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, 'canvas.html')
+            path.write_text(sample)
+            for width in (600, 1200):
+                with self.subTest(width=width):
+                    result = subprocess.run([
+                        chromium, '--headless', '--no-sandbox', '--disable-gpu',
+                        '--no-first-run', '--no-default-browser-check',
+                        '--user-data-dir=' + str(Path(directory, f'profile-{width}')),
+                        f'--window-size={width},900', '--virtual-time-budget=500', '--dump-dom', path.as_uri(),
+                    ], capture_output=True, text=True, timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stderr[-1000:])
+                    from lxml import html as parser
+                    self.assertEqual(parser.fromstring(result.stdout).find('body').get('data-check'), 'CANVAS_PASS')
+
     def test_publisher_body_margins_do_not_push_reader_content_outside_card(self):
         chromium = os.environ.get('EPUB_BROWSER_CHROMIUM') or shutil.which('chromium')
         if not chromium:
