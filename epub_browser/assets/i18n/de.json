@@ -144,7 +144,7 @@
   "settings.resetConfirm": "Zurücksetzen?",
   "settings.continuousScrollUnavailable": "Fortlaufendes Scrollen ist nur im Scrollmodus verfügbar. Wechsle zuerst in diesen Modus.",
   "library.title": "Bibliothek",
-  "library.pageTitle": "EPUB-Bibliothek",
+  "library.pageTitle": "Bibliothek",
   "library.description": "EPUB-Bibliothek – ein webbasierter EPUB-Reader",
   "library.information": "Bibliotheksinformationen",
   "library.navigation": "Hauptnavigation",

@@ -144,7 +144,7 @@
   "settings.resetConfirm": "रीसेट करें?",
   "settings.continuousScrollUnavailable": "लगातार स्क्रॉल केवल स्क्रॉल मोड में उपलब्ध है। पहले उस मोड पर जाएँ।",
   "library.title": "पुस्तकालय",
-  "library.pageTitle": "EPUB पुस्तकालय",
+  "library.pageTitle": "पुस्तकालय",
   "library.description": "EPUB पुस्तकालय — वेब आधारित EPUB रीडर",
   "library.information": "पुस्तकालय की जानकारी",
   "library.navigation": "मुख्य नेविगेशन",

@@ -144,7 +144,7 @@
   "settings.resetConfirm": "リセットしますか?",
   "settings.continuousScrollUnavailable": "連続スクロールはスクロール モードでのみ使用できます。この機能を有効にするには、まずスクロール モードに切り替えます。",
   "library.title": "ライブラリ",
-  "library.pageTitle": "EPUB ライブラリ",
+  "library.pageTitle": "ライブラリ",
   "library.description": "EPUB ライブラリ - Web ベースの EPUB リーダー",
   "library.information": "ライブラリ情報",
   "library.navigation": "プライマリ ナビゲーション",

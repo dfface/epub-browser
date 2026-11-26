@@ -144,7 +144,7 @@
   "settings.resetConfirm": "초기화하시겠습니까?",
   "settings.continuousScrollUnavailable": "연속 스크롤은 스크롤 모드에서만 사용할 수 있습니다. 활성화하려면 먼저 스크롤 모드로 전환하세요.",
   "library.title": "라이브러리",
-  "library.pageTitle": "EPUB 라이브러리",
+  "library.pageTitle": "라이브러리",
   "library.description": "EPUB 라이브러리 - 웹 기반 EPUB 리더",
   "library.information": "라이브러리 정보",
   "library.navigation": "기본 탐색",

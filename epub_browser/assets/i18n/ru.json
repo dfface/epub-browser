@@ -144,7 +144,7 @@
   "settings.resetConfirm": "Сбросить?",
   "settings.continuousScrollUnavailable": "Непрерывная прокрутка доступна только в режиме «Прокрутка». Сначала переключитесь в этот режим.",
   "library.title": "Библиотека",
-  "library.pageTitle": "Библиотека EPUB",
+  "library.pageTitle": "Библиотека",
   "library.description": "Библиотека EPUB — веб-приложение для чтения EPUB",
   "library.information": "Информация о библиотеке",
   "library.navigation": "Основная навигация",

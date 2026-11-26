@@ -144,7 +144,7 @@
   "settings.resetConfirm": "要重置吗？",
   "settings.continuousScrollUnavailable": "连续滚动仅在滚动模式下可用。请先切换到滚动模式再启用此功能。",
   "library.title": "书库",
-  "library.pageTitle": "EPUB 书库",
+  "library.pageTitle": "书库",
   "library.description": "EPUB 书库 - 基于网页的 EPUB 阅读器",
   "library.information": "书库信息",
   "library.navigation": "主导航",

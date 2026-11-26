@@ -144,7 +144,7 @@
   "settings.resetConfirm": "重置？",
   "settings.continuousScrollUnavailable": "連續捲動僅在捲動模式下可用。首先切換到捲動模式以啟用此功能。",
   "library.title": "書庫",
-  "library.pageTitle": "EPUB 書庫",
+  "library.pageTitle": "書庫",
   "library.description": "EPUB 書庫 — 網頁版 EPUB 閱讀器",
   "library.information": "圖書館資訊",
   "library.navigation": "主要導航",

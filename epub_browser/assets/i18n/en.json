@@ -144,7 +144,7 @@
   "settings.resetConfirm": "Reset?",
   "settings.continuousScrollUnavailable": "Continuous scroll is only available in Scrolling mode. Switch to Scrolling mode first to enable this feature.",
   "library.title": "Library",
-  "library.pageTitle": "EPUB Library",
+  "library.pageTitle": "Library",
   "library.description": "EPUB Library - A web-based EPUB reader",
   "library.information": "Library information",
   "library.navigation": "Primary navigation",

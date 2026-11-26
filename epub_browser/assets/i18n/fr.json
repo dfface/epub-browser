@@ -144,7 +144,7 @@
   "settings.resetConfirm": "Réinitialiser ?",
   "settings.continuousScrollUnavailable": "Le défilement continu n’est disponible qu’en mode Défilement. Activez d’abord ce mode pour utiliser cette fonction.",
   "library.title": "Bibliothèque",
-  "library.pageTitle": "Bibliothèque EPUB",
+  "library.pageTitle": "Bibliothèque",
   "library.description": "Bibliothèque EPUB — un lecteur EPUB sur le Web",
   "library.information": "Informations sur la bibliothèque",
   "library.navigation": "Navigation principale",

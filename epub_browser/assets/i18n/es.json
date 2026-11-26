@@ -144,7 +144,7 @@
   "settings.resetConfirm": "¿Restablecer?",
   "settings.continuousScrollUnavailable": "El desplazamiento continuo solo está disponible en el modo Desplazamiento. Cambia primero a ese modo para activar la función.",
   "library.title": "Biblioteca",
-  "library.pageTitle": "Biblioteca EPUB",
+  "library.pageTitle": "Biblioteca",
   "library.description": "Biblioteca EPUB: un lector EPUB para la web",
   "library.information": "Información de la biblioteca",
   "library.navigation": "Navegación principal",

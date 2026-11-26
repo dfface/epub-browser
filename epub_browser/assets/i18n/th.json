@@ -144,7 +144,7 @@
   "settings.resetConfirm": "รีเซ็ตหรือไม่?",
   "settings.continuousScrollUnavailable": "การเลื่อนต่อเนื่องใช้ได้เฉพาะในโหมดเลื่อน โปรดเปลี่ยนเป็นโหมดนั้นก่อน",
   "library.title": "ห้องสมุด",
-  "library.pageTitle": "ห้องสมุด EPUB",
+  "library.pageTitle": "ห้องสมุด",
   "library.description": "ห้องสมุด EPUB — โปรแกรมอ่าน EPUB บนเว็บ",
   "library.information": "ข้อมูลห้องสมุด",
   "library.navigation": "การนำทางหลัก",

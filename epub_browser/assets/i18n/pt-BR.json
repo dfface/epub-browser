@@ -144,7 +144,7 @@
   "settings.resetConfirm": "Redefinir?",
   "settings.continuousScrollUnavailable": "A rolagem contínua só está disponível no modo Rolagem. Mude primeiro para esse modo para ativar o recurso.",
   "library.title": "Biblioteca",
-  "library.pageTitle": "Biblioteca EPUB",
+  "library.pageTitle": "Biblioteca",
   "library.description": "Biblioteca EPUB — um leitor EPUB para a Web",
   "library.information": "Informações da biblioteca",
   "library.navigation": "Navegação principal",
