@@ -11,7 +11,7 @@ from epub_browser.processor import EPUBProcessor
 from epub_browser.server_pages import ServerPageRenderer
 
 
-def write_link_epub(path, website=False):
+def write_link_epub(path, website=False, root_layout=False):
     paths = ['Text/one.xhtml', 'Notes/one.xhtml', 'Text/space name.xhtml', 'Text/resources/space name.xhtml']
     bodies = [
         '<h1 id="start">Start</h1><a href="#local">Local</a><p id="local">Local target</p>'
@@ -24,6 +24,14 @@ def write_link_epub(path, website=False):
         '<p id="注">Encoded target</p>',
         '<p id="nested">Nested target</p><a href="../one.xhtml#start">Return</a>',
     ]
+    if root_layout:
+        paths = ['065.html', '069.html', '070.html', 'resources/071.html']
+        bodies = [
+            '<h1>Contents</h1><a href="069.html#a168">Part I</a><a href="070.html#a169">1</a>',
+            '<h1 id="a168">Part I</h1><a href="065.html#body-target">Contents</a>',
+            '<h1 id="a169">Chapter 1</h1>',
+            '<p>Additional chapter</p>',
+        ]
     if website:
         bodies[0] += '<a href="/guide/notes/#note">Website note</a><a href="/unrelated/">Unrelated</a>'
         bodies[0] += '<a href="https://docs.example/guide/notes/">Original external</a>'
@@ -34,7 +42,9 @@ def write_link_epub(path, website=False):
         manifest = '<item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>' + ''.join(f'<item id="c{i}" href="{p}" media-type="application/xhtml+xml"/>' for i,p in enumerate(paths))
         spine = ''.join(f'<itemref idref="c{i}"/>' for i in range(4))
         z.writestr('OEBPS/content.opf', f'<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Link regression</dc:title><dc:identifier id="uid">urn:issue80:links</dc:identifier><dc:language>en</dc:language></metadata><manifest>{manifest}</manifest><spine>{spine}</spine></package>')
-        z.writestr('OEBPS/nav.xhtml', '<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="Text/one.xhtml#start">Start</a></li><li><a href="Text/space%20name.xhtml#%E6%B3%A8">Encoded</a></li></ol></nav></body></html>')
+        nav_start = '065.html#body-target' if root_layout else 'Text/one.xhtml#start'
+        nav_other = '070.html#a169' if root_layout else 'Text/space%20name.xhtml#%E6%B3%A8'
+        z.writestr('OEBPS/nav.xhtml', f'<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="{nav_start}">Start</a></li><li><a href="{nav_other}">Other</a></li></ol></nav></body></html>')
         for p, body in zip(paths, bodies):
             z.writestr('OEBPS/'+p, '<html><head><title>Links</title></head><body id="body-target">'+body+'</body></html>')
 
@@ -93,3 +103,24 @@ class EPUBLinkTests(unittest.TestCase):
                 self.assertEqual(html.fromstring(markup).xpath('//a[text()="Website note"]/@href'), ['/guide/notes/#note'])
                 self.assertIn('/unrelated/', links)
                 self.assertIn('https://docs.example/guide/notes/', links)
+
+    def test_contents_links_to_numeric_sibling_files_and_back(self):
+        for mode in ('ssg', 'server'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                source = Path(tmp, 'numeric.epub')
+                write_link_epub(source, root_layout=True)
+                result = EPUBProcessor(source, tmp, deployment_mode=mode).convert()
+
+                def page(index):
+                    if mode == 'server':
+                        markup = json.loads((result.output_dir / f'content/chapter_{index}.json').read_text())['content']
+                    else:
+                        markup = (result.output_dir / f'chapter_{index}.html').read_text()
+                    return html.fromstring(markup)
+
+                contents = page(0)
+                self.assertEqual(contents.xpath('//a[text()="Part I"]/@href'), ['chapter_1.html#a168'])
+                self.assertEqual(contents.xpath('//a[text()="1"]/@href'), ['chapter_2.html#a169'])
+                self.assertTrue(page(1).xpath('//*[@id="a168"]'))
+                self.assertTrue(page(2).xpath('//*[@id="a169"]'))
+                self.assertEqual(page(1).xpath('//a[text()="Contents"]/@href'), ['chapter_0.html#body-target'])
