@@ -2475,12 +2475,6 @@ html[data-reader-text-alignment="justify"] :is(#eb-content, .eb-content) :is(p, 
     white-space: nowrap;
 }
 
-@media (min-width: 769px) {
-    .mobile-toolbar-settings {
-        display: none;
-    }
-}
-
 .mobile-toolbar-order-toggle {
     align-self: flex-start;
     min-height: 44px;
