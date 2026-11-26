@@ -1477,6 +1477,7 @@ class ReaderPageRenderer:
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
+    <link rel="stylesheet" href="/assets/toc-tree.css">
     {book_search_stylesheet}
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
@@ -1963,9 +1964,15 @@ document.addEventListener('DOMContentLoaded', function() {{
                             toc_item.get('level', 0),
                             section_index,
                         ))
+                    elif target_index is not None:
+                        # Hierarchy does not disable navigation. A parent may
+                        # deliberately share its child's existing spine target.
+                        toc_data.append(chapter_record(
+                            toc_item['title'], toc_item.get('level', 0),
+                            target_index, toc_item.get('anchor'),
+                        ))
                     else:
-                        # Keep genuinely structural groups, but never let one
-                        # claim an OPF chapter index belonging to its child.
+                        # Only unresolved groups have no navigation target.
                         toc_data.append({
                             'title': toc_item['title'],
                             'level': toc_item.get('level', 0),
@@ -2876,6 +2883,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=18">
+    <link rel="stylesheet" href="/assets/toc-tree.css">
     {book_search_stylesheet}
     {pdf_stylesheet}
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">

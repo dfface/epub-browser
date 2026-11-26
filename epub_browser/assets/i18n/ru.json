@@ -982,6 +982,7 @@
   "settings.keyboardNavigation": "Навигация с клавиатуры",
   "settings.arrowKeyNavigation": "Использовать стрелки влево и вправо для навигации",
   "settings.spaceKeyNavigation": "Использовать Пробел для перехода к следующей странице или главе",
+  "reader.toggleTocSection": "Развернуть или свернуть раздел",
   "reader.locateCurrentChapter": "Найти текущую главу",
   "reader.locateCurrentSection": "Найти текущий раздел",
   "annotations.addImageNote": "Добавить заметку к изображению",

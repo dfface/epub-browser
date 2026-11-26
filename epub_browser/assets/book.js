@@ -1,3 +1,5 @@
+var bookPageTocTree = null;
+
 function updateFontFamily(fontFamily, fontFamilyInput) {
     if (fontFamily === "ebook-default") {
         document.body.style.fontFamily = '';
@@ -43,6 +45,14 @@ function initScript() {
     pathParts = pathParts.filter(function(item) { return item !== ""; });
     var book_hash = pathParts[pathParts.indexOf('book') + 1];
     var readingProgressLoadVersion = 0;
+    var bookTocList = document.querySelector('.chapter-list');
+    if (bookTocList && window.EpubReaderLayout && window.EpubReaderLayout.initBookTocTree) {
+        bookPageTocTree = window.EpubReaderLayout.initBookTocTree(bookTocList, {
+            bookId: book_hash,
+            storage: localStorage,
+            label: bookT('reader.toggleTocSection')
+        });
+    }
 
     function renderEffectiveBookTags(tags) {
         var container = document.querySelector('.book-info-tags');
@@ -412,7 +422,13 @@ function markReadingChapter(readKey, username) {
     }
 
     var tocContainer = document.querySelector('.chapter-list');
-    if (tocContainer) tocContainer.scrollTop = chapterElement.offsetTop - tocContainer.offsetTop - 50;
+    if (bookPageTocTree) bookPageTocTree.reveal(chapterElement.closest('[data-toc-level]'));
+    if (tocContainer) {
+        // TOC rows are positioned for their disclosure buttons, so offsetTop
+        // on the link is relative to its row, not to the scroll container.
+        tocContainer.scrollTop += chapterElement.getBoundingClientRect().top
+            - tocContainer.getBoundingClientRect().top - tocContainer.clientTop - 50;
+    }
 }
 
 function updateContinueReadingButton(bookHash) {

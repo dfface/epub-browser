@@ -982,6 +982,7 @@
   "settings.keyboardNavigation": "Keyboard navigation",
   "settings.arrowKeyNavigation": "Use Left and Right Arrow keys to navigate",
   "settings.spaceKeyNavigation": "Use Space for the next page or chapter",
+  "reader.toggleTocSection": "Expand or collapse section",
   "reader.locateCurrentChapter": "Locate current chapter",
   "reader.locateCurrentSection": "Locate current section",
   "annotations.addImageNote": "Add image note",

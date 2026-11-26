@@ -12,12 +12,13 @@ function readerFunction(name) {
 for (const mode of ['scrolling', 'pagination', 'continuous']) {
     test(`${mode}: same-chapter encoded fragment uses the current chapter target`, () => {
         const calls = [];
+        const drawerClosures = [];
         const target = {index: 2, path: '/book/demo/chapter_2.html', hash: '#%E6%B3%A8'};
         const section = {getAttribute: () => ''};
         const context = vm.createContext({
             isPaginationMode: mode === 'pagination', isContinuousScroll: mode === 'continuous',
             chapter_index: '2', chapterTargetFromUrl: () => target,
-            closeReaderDrawers: () => {}, updateReaderChapterHistory: () => {},
+            closeReaderDrawers: restore => drawerClosures.push(restore), updateReaderChapterHistory: () => {},
             scrollToPaginationTarget: t => calls.push(t), scrollToChapterTarget: t => calls.push(t),
             scrollToContinuousChapterTarget: t => calls.push(t),
             content: {querySelector: () => section}, activeReaderChapterRequest: 0, readerChapterXhr: null,
@@ -28,6 +29,7 @@ for (const mode of ['scrolling', 'pagination', 'continuous']) {
         vm.runInContext(readerFunction('navigateReaderChapter'), context);
         assert.equal(context.navigateReaderChapter('chapter_2.html#%E6%B3%A8', {history:true}), true);
         assert.equal(calls[0], target);
+        assert.deepEqual(drawerClosures, [false], "navigation dismisses overlays without returning focus to the opener");
     });
 }
 test('an explicit fragment takes precedence over saved reading progress', () => {
@@ -95,4 +97,23 @@ test('external and modified clicks keep native link behavior', () => {
 });
 test('PDF content clicks remain with the PDF adapter', () => {
     assert.deepEqual(clickHarness({pdf:true}).click(), {prevented:false, destination:undefined});
+});
+
+test('book TOC highlights the matching encoded fragment among entries in one chapter', () => {
+    const items = ['first', 'parent', '注', '注'].map((id, index) => {
+        const attributes = {};
+        const link = {hash: '#' + encodeURIComponent(id), setAttribute: (k,v) => {attributes[k]=v;}, removeAttribute: k => {delete attributes[k];}};
+        return {attributes, link, active: index === 0, querySelector: () => link,
+            getAttribute: () => index === 3 ? '2' : '1',
+            classList: {add() {items[index].active=true;}, remove() {items[index].active=false;}}};
+    });
+    const list = {querySelector: () => items[0], querySelectorAll: selector => selector.includes('.active') ? items.filter(i=>i.active) : items};
+    const context = vm.createContext({bookTocTree:null, document: {getElementById: () => list},
+        window: {location: {href: 'https://reader.test/book/demo/chapter_8.html#%E6%B3%A8', hash:'#%E6%B3%A8'}},
+        chapterTargetFromUrl: () => ({index:8}), decodeChapterFragment: hash => decodeURIComponent(hash.slice(1))});
+    vm.runInContext(readerFunction('setBookTocActiveChapter'), context);
+    context.setBookTocActiveChapter(8, false);
+    assert.deepEqual(items.map(i=>i.active), [false,false,false,true]);
+    assert.equal(items[3].attributes['aria-current'], 'location');
+    assert.equal(items[0].attributes['aria-current'], undefined);
 });

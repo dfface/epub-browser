@@ -131,7 +131,7 @@ class FixedUnitToEmConversionTests(unittest.TestCase):
     def test_content_revision_bumped_for_semantics_change(self):
         # The stored chapter CSS now differs (px/pt -> em), so the content
         # revision must be bumped; SSG/Server regenerates derived content.
-        self.assertEqual(SERVER_OUTPUT_REVISION, "server-content-v12")
+        self.assertEqual(SERVER_OUTPUT_REVISION, "server-content-v13")
 
 
 class ReaderContentCssUsesEmTests(unittest.TestCase):

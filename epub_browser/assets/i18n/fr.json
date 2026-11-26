@@ -982,6 +982,7 @@
   "settings.keyboardNavigation": "Navigation au clavier",
   "settings.arrowKeyNavigation": "Utiliser les flèches gauche et droite pour naviguer",
   "settings.spaceKeyNavigation": "Utiliser Espace pour passer à la page ou au chapitre suivant",
+  "reader.toggleTocSection": "Développer ou réduire la section",
   "reader.locateCurrentChapter": "Repérer le chapitre actuel",
   "reader.locateCurrentSection": "Repérer la section actuelle",
   "annotations.addImageNote": "Ajouter une note à l’image",
