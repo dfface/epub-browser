@@ -362,6 +362,14 @@ body.reader-drawer-open {
 .toc-level-2 { margin-left: 15px; font-size: 0.85em; }
 .toc-level-3 { margin-left: 30px; font-size: 0.8em; }
 
+/* Source TOC levels are zero-based; the body-heading outline above is not.
+   Keep every source depth distinct, including non-clickable group labels. */
+#bookHomeTocList > [data-toc-level] {
+    margin-left: 0;
+    margin-inline-start: calc(var(--toc-depth) * 15px);
+    font-size: inherit;
+}
+
 /* Keep the book-level chapter list as an overlay so opening it never narrows
    the reading stage. chapter.js only enables it when the same horizontal
    budget fits: sidebar + page width + two gutters + the outer offset. */

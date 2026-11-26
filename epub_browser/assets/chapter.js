@@ -1840,7 +1840,10 @@ function initScript() {
                 for (var i = 0; i < data.length; i++) {
                     var item = data[i];
                     var li = document.createElement('li');
-                    li.className = 'toc-item toc-level-' + Math.min(item.level, 3);
+                    var depth = Math.max(0, Number(item.level) || 0);
+                    li.className = 'toc-item toc-level-' + Math.min(depth, 3);
+                    li.setAttribute('data-toc-level', depth);
+                    li.style.setProperty('--toc-depth', depth);
                     if (item.kind === 'section') {
                         li.classList.add('toc-section');
                         var sectionTitle = document.createElement('span');

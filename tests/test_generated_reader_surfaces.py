@@ -23,6 +23,25 @@ from epub_browser.urls import SiteURLs
 
 
 class GeneratedReaderSurfaceTests(unittest.TestCase):
+    def test_source_toc_indentation_keeps_every_depth_distinct(self):
+        chromium = shutil.which('chromium') or '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        if not Path(chromium).exists():
+            self.skipTest('Chromium is needed for TOC geometry')
+        with tempfile.TemporaryDirectory() as directory:
+            for stylesheet, container in [('book.css', 'class="chapter-list"'),
+                                          ('chapter.css', 'id="bookHomeTocList"')]:
+                css = Path('epub_browser/assets', stylesheet).read_text()
+                rows = ''.join(f'<li class="toc-item toc-level-{min(i, 3)}" data-toc-level="{i}" style="--toc-depth:{i}">Level {i}</li>' for i in range(6))
+                page = Path(directory, 'toc.html')
+                page.write_text('<style>' + css + '</style><ul ' + container + '>' + rows + '</ul><script>' +
+                    "const xs = [...document.querySelectorAll('[data-toc-level]')].map(x => x.getBoundingClientRect().left);" +
+                    "document.body.textContent = xs.every((x,i) => !i || x > xs[i-1]) ? 'DEPTH_PASS' : 'DEPTH_FAIL';</script>")
+                result = subprocess.run([chromium, '--headless', '--no-sandbox', '--disable-gpu',
+                    '--user-data-dir=' + str(Path(directory, 'profile')), '--dump-dom', page.as_uri()],
+                    capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0)
+                self.assertIn('DEPTH_PASS', result.stdout[-300:], stylesheet)
+
     def test_publisher_body_margins_do_not_push_reader_content_outside_card(self):
         chromium = os.environ.get('EPUB_BROWSER_CHROMIUM') or shutil.which('chromium')
         if not chromium:
