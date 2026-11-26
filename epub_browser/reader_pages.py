@@ -1591,14 +1591,16 @@ class ReaderPageRenderer:
                 )
         elif not pdf_layout:
             for toc_item in epub_toc:
-                level_class = f"toc-level-{min(toc_item.get('level', 0), 3)}"
+                level = max(0, int(toc_item.get("level", 0)))
+                level_class = f"toc-level-{min(level, 3)}"
+                level_attributes = f'data-toc-level="{level}" style="--toc-depth: {level}"'
                 toc_title = html.escape(
                     metadata_text(toc_item.get("title")), quote=False
                 )
                 toc_title_attributes = f' lang="{book_language}" dir="auto"'
                 outline_labels_html = ""
                 if toc_item.get('kind') == 'section':
-                    toc_rows += f'        <li class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}" dir="auto">{toc_title}</span></li>\n'
+                    toc_rows += f'        <li {level_attributes} class="{level_class} toc-section"><span class="chapter-section-title" lang="{book_language}" dir="auto">{toc_title}</span></li>\n'
                     continue
 
                 chapter_index = toc_item['chapter_index']
@@ -1609,9 +1611,9 @@ class ReaderPageRenderer:
                 )
                 if chapter_anchor is not None:
                     safe_anchor = urllib.parse.quote(str(chapter_anchor), safe='')
-                    toc_rows += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                    toc_rows += f'        <li {level_attributes} class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html#{safe_anchor}" id="eb_ci_{chapter_index}#{safe_anchor}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
                 else:
-                    toc_rows += f'        <li class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
+                    toc_rows += f'        <li {level_attributes} class="{level_class}"><a class="chapter-link" href="/book/{book_id_url}/chapter_{chapter_index}.html" id="eb_ci_{chapter_index}" data-chapter-index="{chapter_index}">{chapter_title_group}<span class="chapter-page">chapter_{chapter_index}.html</span></a></li>\n'
 
         if toc_rows:
             toc_body = f'        <ul class="chapter-list">\n{toc_rows}        </ul>\n'

@@ -1094,3 +1094,9 @@ body {
 @media (max-width: 768px) {
     #toggleShelfBtn { flex: 0 1 auto; }
 }
+
+/* Preserve the complete zero-based source TOC depth. */
+li[data-toc-level] {
+    margin-left: 0;
+    margin-inline-start: calc(var(--toc-depth) * 25px);
+}
