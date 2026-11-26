@@ -982,6 +982,7 @@
   "settings.keyboardNavigation": "キーボードナビゲーション",
   "settings.arrowKeyNavigation": "左右の矢印キーで移動",
   "settings.spaceKeyNavigation": "スペースキーで次のページまたは章へ進む",
+  "reader.toggleTocSection": "セクションを展開または折りたたむ",
   "reader.locateCurrentChapter": "現在の章を表示",
   "reader.locateCurrentSection": "現在の節を表示",
   "annotations.addImageNote": "画像メモを追加",

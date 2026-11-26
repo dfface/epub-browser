@@ -982,6 +982,7 @@
   "settings.keyboardNavigation": "التنقل بلوحة المفاتيح",
   "settings.arrowKeyNavigation": "استخدام مفتاحي السهم الأيسر والأيمن للتنقل",
   "settings.spaceKeyNavigation": "استخدام مفتاح المسافة للصفحة أو الفصل التالي",
+  "reader.toggleTocSection": "توسيع القسم أو طيه",
   "reader.locateCurrentChapter": "تحديد الفصل الحالي",
   "reader.locateCurrentSection": "تحديد القسم الحالي",
   "annotations.addImageNote": "إضافة ملاحظة للصورة",

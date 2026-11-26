@@ -65,7 +65,8 @@ SERVER_OUTPUT_REVISION_FILE = ".server-content-revision"
 # properties are converted to `em` so the reader font-size control affects every
 # EPUB; stored chapter CSS therefore differs and must be regenerated.
 # v12: spine-resolved internal links and body anchor IDs replace broken targets.
-SERVER_OUTPUT_REVISION = "server-content-v12"
+# v13: retain navigable parent TOC targets and targetless NCX groups.
+SERVER_OUTPUT_REVISION = "server-content-v13"
 
 
 class EPUBProcessor(ReaderPageRenderer):
@@ -582,7 +583,7 @@ class EPUBProcessor(ReaderPageRenderer):
                 child_targets = [navpoint_target(child) for child in child_navpoints]
                 # Publishers often use a parent navPoint as a section label
                 # and repeat its first child's target.  It is not another OPF
-                # chapter; retain it for hierarchy, but make it non-navigable.
+                # chapter; retain its hierarchy without allocating another spine index.
                 is_section = target is not None and any(
                     child_target is not None
                     and child_target[0] == target[0]
@@ -595,6 +596,12 @@ class EPUBProcessor(ReaderPageRenderer):
                     if nav_label_element is not None else None
                 )
 
+                if nav_label is not None and nav_label.text and target is None and child_navpoints:
+                    toc.append({
+                        'title': nav_label.text,
+                        'level': level,
+                        'kind': 'section',
+                    })
                 if nav_label is not None and nav_label.text and target is not None:
                     full_src, anchor, old_file_name = target
                     toc_item = {

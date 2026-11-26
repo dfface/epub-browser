@@ -982,6 +982,7 @@
   "settings.keyboardNavigation": "Navegação pelo teclado",
   "settings.arrowKeyNavigation": "Usar as setas esquerda e direita para navegar",
   "settings.spaceKeyNavigation": "Usar Espaço para avançar à próxima página ou capítulo",
+  "reader.toggleTocSection": "Expandir ou recolher seção",
   "reader.locateCurrentChapter": "Localizar capítulo atual",
   "reader.locateCurrentSection": "Localizar seção atual",
   "annotations.addImageNote": "Adicionar nota à imagem",

@@ -982,6 +982,7 @@
   "settings.keyboardNavigation": "Điều hướng bằng bàn phím",
   "settings.arrowKeyNavigation": "Dùng phím mũi tên trái và phải để điều hướng",
   "settings.spaceKeyNavigation": "Dùng Phím cách để sang trang hoặc chương tiếp theo",
+  "reader.toggleTocSection": "Mở rộng hoặc thu gọn mục",
   "reader.locateCurrentChapter": "Tìm chương hiện tại",
   "reader.locateCurrentSection": "Tìm phần hiện tại",
   "annotations.addImageNote": "Thêm ghi chú ảnh",

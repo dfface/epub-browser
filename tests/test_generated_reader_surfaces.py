@@ -1475,7 +1475,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
             self.assertEqual(
                 processor._build_toc_data(),
                 [
-                    {"title": "Leaders", "level": 0, "kind": "section"},
+                    {"title": "Leaders", "level": 0, "kind": "chapter", "chapter_index": 0, "chapter_file": "chapter_0.html"},
                     {
                         "title": "First article", "level": 1,
                         "kind": "chapter", "chapter_index": 0,
@@ -2444,7 +2444,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         toc_end = script.index('\n                    });', toc_start)
         book_toc = script[toc_start:toc_end]
         self.assertIn('navigateReaderChapter(this.href, { history: true });', book_toc)
-        self.assertIn('!isContinuousScroll', book_toc)
+        self.assertIn('if (navigated) e.preventDefault();', book_toc)
 
     def test_ajax_reader_navigation_handles_continuous_and_pagination_modes(self):
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
@@ -2462,10 +2462,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         toc_end = script.index('\n                    });', toc_start)
         book_toc = script[toc_start:toc_end]
         self.assertIn('navigateReaderChapter(this.href, { history: true });', book_toc)
-        self.assertIn('if (isContinuousScroll) {', book_toc)
-        continuous_start = book_toc.index('if (isContinuousScroll) {')
-        continuous_end = book_toc.index('if (!isDifferentScrollingChapter(this.href)) return;', continuous_start)
-        self.assertIn('e.preventDefault();', book_toc[continuous_start:continuous_end])
+        self.assertIn('if (navigated) e.preventDefault();', book_toc)
         self.assertNotIn('window.scrollTo({top: targetTop, behavior:', book_toc)
 
     def test_pagination_mode_removes_reader_card_geometry_from_its_page_canvas(self):

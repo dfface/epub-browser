@@ -1,0 +1,19 @@
+/* Flat source ordering remains intact; disclosure controls hide descendants. */
+:is(#bookHomeTocList, .chapter-list) > [data-toc-level] { position: relative; padding-inline-start: 36px; }
+:is(#bookHomeTocList, .chapter-list) > [data-toc-level][hidden] { display: none !important; }
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+    width: 36px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle:hover { background: var(--bg-secondary); }
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }

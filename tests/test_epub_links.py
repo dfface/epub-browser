@@ -155,3 +155,58 @@ class EPUBLinkTests(unittest.TestCase):
                 self.assertTrue(page(1).xpath('//*[@id="a168"]'))
                 self.assertTrue(page(2).xpath('//*[@id="a169"]'))
                 self.assertEqual(page(1).xpath('//a[text()="Contents"]/@href'), ['chapter_0.html#body-target'])
+
+    def test_parent_targets_are_preserved_independently_of_toc_hierarchy(self):
+        for navigation_format in ('ncx', 'nav'):
+            for mode in ('ssg', 'server'):
+                with self.subTest(format=navigation_format, mode=mode), tempfile.TemporaryDirectory() as tmp:
+                    source = Path(tmp, 'parent-toc.epub')
+                    if navigation_format == 'ncx':
+                        navigation = '''<ncx><navMap>
+<navPoint><navLabel><text>Shared parent</text></navLabel><content src="body.xhtml#shared"/>
+ <navPoint><navLabel><text>Shared child</text></navLabel><content src="body.xhtml#shared"/></navPoint>
+</navPoint>
+<navPoint><navLabel><text>Independent parent</text></navLabel><content src="body.xhtml#parent"/>
+ <navPoint><navLabel><text>Independent child</text></navLabel><content src="body.xhtml#child"/></navPoint>
+</navPoint>
+<navPoint><navLabel><text>Label only</text></navLabel>
+ <navPoint><navLabel><text>Grouped child</text></navLabel><content src="body.xhtml#child"/></navPoint>
+</navPoint></navMap></ncx>'''
+                        item = '<item id="navigation" href="navigation.ncx" media-type="application/x-dtbncx+xml"/>'
+                        filename = 'navigation.ncx'
+                    else:
+                        navigation = '''<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol>
+<li><a href="body.xhtml#shared">Shared parent</a><ol><li><a href="body.xhtml#shared">Shared child</a></li></ol></li>
+<li><a href="body.xhtml#parent">Independent parent</a><ol><li><a href="body.xhtml#child">Independent child</a></li></ol></li>
+<li><span>Label only</span><ol><li><a href="body.xhtml#child">Grouped child</a></li></ol></li>
+</ol></nav></body></html>'''
+                        item = '<item id="navigation" href="navigation.xhtml" media-type="application/xhtml+xml" properties="nav"/>'
+                        filename = 'navigation.xhtml'
+                    with zipfile.ZipFile(source, 'w') as archive:
+                        archive.writestr('META-INF/container.xml', '<container><rootfiles><rootfile full-path="content.opf"/></rootfiles></container>')
+                        archive.writestr('content.opf', '<package><metadata><title>Parent navigation</title></metadata><manifest>' + item + '<item id="body" href="body.xhtml" media-type="application/xhtml+xml"/></manifest><spine toc="navigation"><itemref idref="body"/></spine></package>')
+                        archive.writestr(filename, navigation)
+                        archive.writestr('body.xhtml', '<html><body><h2 id="shared">Shared</h2><h2 id="parent">Parent</h2><h3 id="child">Child</h3></body></html>')
+                    result = EPUBProcessor(source, tmp, deployment_mode=mode).convert()
+                    toc_path = 'toc.json' if mode == 'ssg' else 'content/toc.json'
+                    toc = json.loads((result.output_dir / toc_path).read_text())
+                    self.assertEqual([item['title'] for item in toc], ['Shared parent', 'Shared child', 'Independent parent', 'Independent child', 'Label only', 'Grouped child'])
+                    self.assertEqual([item['level'] for item in toc], [0, 1, 0, 1, 0, 1])
+                    for index, anchor in ((0, 'shared'), (1, 'shared'), (2, 'parent'), (3, 'child'), (5, 'child')):
+                        self.assertEqual(toc[index]['chapter_file'], 'chapter_0.html')
+                        self.assertEqual(toc[index]['anchor'], anchor)
+                    self.assertEqual(toc[4], {'title': 'Label only', 'level': 0, 'kind': 'section'})
+                    if mode == 'ssg':
+                        markup = (result.output_dir / 'index.html').read_text()
+                    else:
+                        public = Path(tmp, 'public')
+                        target = public / 'book' / result.book_id
+                        target.parent.mkdir(parents=True)
+                        shutil.copytree(result.output_dir, target)
+                        AssetPublisher(Path('epub_browser/assets'), public).publish()
+                        markup = ServerPageRenderer(public, result.book_id).render_index()
+                    page = html.fromstring(markup)
+                    for title, anchor in (('Shared parent', 'shared'), ('Independent parent', 'parent')):
+                        links = page.xpath('//a[contains(., $title)]/@href', title=title)
+                        self.assertTrue(any(link.endswith('chapter_0.html#' + anchor) for link in links), links)
+                    self.assertFalse(page.xpath('//a[contains(., "Label only")]'))

@@ -667,9 +667,10 @@ test('reader source TOC preserves groups, deep levels and distinct chapter fragm
   let request;
   const context = {
     window: { location: { pathname: '/book/id/chapter_0.html' }, EpubBrowserURL: { publicPath: x => x },
-      EpubReaderLayout: { chapterNavigationPresentation } },
+      EpubReaderLayout: { chapterNavigationPresentation, initBookTocTree: () => ({reveal() {}}) } },
     document: { getElementById: () => list, createElement: element, dispatchEvent() {} },
     XMLHttpRequest: function() { request = this; this.open = () => {}; this.send = () => {}; },
+    localStorage: {getItem: () => null, setItem() {}},
     i18n: { t: x => x }, CustomEvent: function() {},
     setBookTocActiveChapter() {}, visibleChapterIndex: 0,
   };

@@ -1251,7 +1251,9 @@ function initScript() {
         if (!target) return false;
         if (!isContinuousScroll && target.index === parseInt(chapter_index, 10)) {
             if (!target.hash) return false;
+            closeReaderDrawers(false);
             updateReaderChapterHistory(target, options);
+            setBookTocActiveChapter(target.index, true);
             if (isPaginationMode) scrollToPaginationTarget(target);
             else scrollToChapterTarget(target);
             return true;
@@ -1825,6 +1827,8 @@ function initScript() {
     
     loadBookHomeToc();
     
+    var bookTocTree = null;
+
     function loadBookHomeToc() {
         var list = document.getElementById('bookHomeTocList');
         var path = window.location.pathname;
@@ -1873,23 +1877,18 @@ function initScript() {
                         a.appendChild(outlineLabels);
                     }
                     a.addEventListener('click', function(e) {
-                        if (!isContinuousScroll && isDifferentScrollingChapter(this.href)) {
-                            e.preventDefault();
-                            navigateReaderChapter(this.href, { history: true });
-                            return;
-                        }
-                        if (isContinuousScroll) {
-                            e.preventDefault();
-                            navigateReaderChapter(this.href, { history: true });
-                            return;
-                        }
-                        if (!isDifferentScrollingChapter(this.href)) return;
-                        e.preventDefault();
-                        navigateReaderChapter(this.href, { history: true });
+                        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                        var navigated = navigateReaderChapter(this.href, { history: true });
+                        if (navigated) e.preventDefault();
                     });
                     li.appendChild(a);
                     list.appendChild(li);
                 }
+                bookTocTree = window.EpubReaderLayout.initBookTocTree(list, {
+                    bookId: hash,
+                    storage: localStorage,
+                    label: i18n.t('reader.toggleTocSection')
+                });
                 // ai-reading-hub may have loaded before this asynchronous TOC.
                 // Notify it explicitly as well as allowing its observer fallback.
                 if (window.EpubBrowserAIReadingHub && window.EpubBrowserAIReadingHub.refreshChapterIndicators) {
@@ -1912,13 +1911,28 @@ function initScript() {
     function setBookTocActiveChapter(index, keepVisible, focusLink) {
         var list = document.getElementById('bookHomeTocList');
         if (!list) return;
-        var active = list.querySelector('.toc-item[data-chapter-index="' + index + '"]');
+        var candidates = list.querySelectorAll('.toc-item[data-chapter-index="' + index + '"]');
+        var active = candidates[0];
+        var locationTarget = chapterTargetFromUrl(window.location.href);
+        if (locationTarget && locationTarget.index === Number(index) && window.location.hash) {
+            var anchor = decodeChapterFragment(window.location.hash);
+            var activeDepth = -1;
+            for (var i = 0; i < candidates.length; i++) {
+                var link = candidates[i].querySelector('a');
+                var depth = Number(candidates[i].getAttribute('data-toc-level')) || 0;
+                if (link && decodeChapterFragment(link.hash) === anchor && depth >= activeDepth) {
+                    active = candidates[i];
+                    activeDepth = depth;
+                }
+            }
+        }
         if (!active) return;
         list.querySelectorAll('.toc-item.active').forEach(function(item) {
             item.classList.remove('active');
             var link = item.querySelector('a');
             if (link) link.removeAttribute('aria-current');
         });
+        if (keepVisible !== false && bookTocTree) bookTocTree.reveal(active);
         active.classList.add('active');
         var activeLink = active.querySelector('a');
         if (activeLink) {

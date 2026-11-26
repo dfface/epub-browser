@@ -982,6 +982,7 @@
   "settings.keyboardNavigation": "Navigasi papan kekunci",
   "settings.arrowKeyNavigation": "Gunakan kekunci anak panah kiri dan kanan untuk menavigasi",
   "settings.spaceKeyNavigation": "Gunakan Space untuk halaman atau bab seterusnya",
+  "reader.toggleTocSection": "Kembangkan atau runtuhkan bahagian",
   "reader.locateCurrentChapter": "Cari bab semasa",
   "reader.locateCurrentSection": "Cari bahagian semasa",
   "annotations.addImageNote": "Tambah nota imej",
