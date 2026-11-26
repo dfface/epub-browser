@@ -4,7 +4,7 @@ import time
 from urllib.request import Request, urlopen
 
 
-VERSION = "2.17.1"
+VERSION = "2.18.0"
 
 REPOSITORY_URL = "https://github.com/dfface/epub-browser"
 LATEST_RELEASE_API_URL = "https://api.github.com/repos/dfface/epub-browser/releases/latest"
