@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "Suche ist vorübergehend nicht verfügbar. Versuchen Sie es später erneut.",
   "book.closeSearch": "Suche schließen",
   "admin.general.searchIndexCacheLimit": "Auf dem Datenträger zwischengespeicherte Suchindizes",
-  "admin.general.searchIndexCacheLimitHelp": "Der Server behält so viele zuletzt verwendete Suchindizes. Ein entfernter Index wird bei der nächsten Suche in diesem Buch neu erstellt."
+  "admin.general.searchIndexCacheLimitHelp": "Der Server behält so viele zuletzt verwendete Suchindizes. Ein entfernter Index wird bei der nächsten Suche in diesem Buch neu erstellt.",
+  "settings.textAlignment": "Textausrichtung",
+  "settings.alignLeft": "Linksbündig",
+  "settings.alignRight": "Rechtsbündig",
+  "settings.alignCenter": "Zentriert",
+  "settings.alignJustify": "Blocksatz",
+  "settings.imageNoteEntrances": "Bildnotiz-Schaltflächen anzeigen",
+  "settings.imageNoteEntrancesHelp": "Aktivieren, um Bildnotizen hinzuzufügen. Vorhandene Notizmarkierungen bleiben sichtbar."
 }

@@ -548,3 +548,39 @@ test('mode changes reset motion at the current non-zero scroll position', () => 
   controller.handleScroll(scrollY);
   assert.equal(header.classList.contains('is-navigation-hidden'), true);
 });
+
+test('reading appearance restores preferences, persists choices and restores book alignment', () => {
+  const { initContentPreferences } = require('../epub_browser/assets/reader-layout.js');
+  const values = new Map([['reader_text_alignment', 'justify']]);
+  const attributes = {};
+  function control() {
+    return { addEventListener(type, listener) { this.change = listener; } };
+  }
+  const alignment = control();
+  const imageNotes = control();
+  let changes = 0;
+  const root = {
+    localStorage: { getItem: key => values.get(key) || null, setItem: (key, value) => values.set(key, value) },
+    document: {
+      getElementById: id => ({ textAlignmentSelect: alignment, imageNoteEntrancesToggle: imageNotes })[id],
+      documentElement: { setAttribute: (key, value) => { attributes[key] = value; } },
+      dispatchEvent() { changes++; },
+    },
+    CustomEvent: function(type) { this.type = type; },
+  };
+  initContentPreferences(root);
+  assert.equal(alignment.value, 'justify');
+  assert.equal(attributes['data-reader-text-alignment'], 'justify');
+  assert.equal(imageNotes.checked, false);
+  imageNotes.checked = true;
+  imageNotes.change();
+  assert.equal(values.get('show_image_note_entrances'), 'true');
+  assert.equal(attributes['data-image-note-entrances'], 'true');
+  alignment.value = 'default';
+  alignment.change();
+  assert.equal(values.get('reader_text_alignment'), 'default');
+  assert.equal(attributes['data-reader-text-alignment'], 'default');
+  assert.equal(changes, 1);
+  initContentPreferences(root);
+  assert.equal(imageNotes.checked, true);
+});

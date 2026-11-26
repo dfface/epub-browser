@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "Tìm kiếm tạm thời không khả dụng. Hãy thử lại sau.",
   "book.closeSearch": "Đóng tìm kiếm",
   "admin.general.searchIndexCacheLimit": "Chỉ mục tìm kiếm sách được lưu trên đĩa",
-  "admin.general.searchIndexCacheLimitHelp": "Máy chủ giữ số chỉ mục tìm kiếm được dùng gần đây. Chỉ mục bị xóa sẽ được tạo lại khi tìm kiếm sách đó lần sau."
+  "admin.general.searchIndexCacheLimitHelp": "Máy chủ giữ số chỉ mục tìm kiếm được dùng gần đây. Chỉ mục bị xóa sẽ được tạo lại khi tìm kiếm sách đó lần sau.",
+  "settings.textAlignment": "Căn chỉnh văn bản",
+  "settings.alignLeft": "Trái",
+  "settings.alignRight": "Phải",
+  "settings.alignCenter": "Giữa",
+  "settings.alignJustify": "Đều hai bên",
+  "settings.imageNoteEntrances": "Hiện nút ghi chú hình ảnh",
+  "settings.imageNoteEntrancesHelp": "Bật để thêm ghi chú cho hình ảnh. Dấu ghi chú hiện có vẫn hiển thị."
 }

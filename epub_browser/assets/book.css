@@ -820,9 +820,6 @@ body {
         gap: 10px;
     }
 
-    #toggleShelfBtn {
-        font-size: 0.5rem;
-    }
 
     .chapter-sync-tag {
         min-width: 24px;
@@ -839,7 +836,15 @@ body {
 
 /* 书架按钮样式 */
 #toggleShelfBtn {
-    margin-right: 10px;
+    box-sizing: border-box;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 1rem;
+    line-height: 1.4;
+    font-weight: 600;
+    white-space: normal;
+    max-width: 100%;
 }
 
 #toggleShelfBtn.in-shelf {
@@ -1080,4 +1085,12 @@ body {
     .breadcrumb, .book-info-card, .eb-header, .toc-container {
         box-shadow: var(--shadow-lg);
     }
+}
+
+#toggleShelfBtn:focus-visible {
+    outline: 3px solid var(--button-bg);
+    outline-offset: 3px;
+}
+@media (max-width: 768px) {
+    #toggleShelfBtn { flex: 0 1 auto; }
 }

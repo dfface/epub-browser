@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "Carian tidak tersedia buat sementara. Cuba lagi kemudian.",
   "book.closeSearch": "Tutup carian",
   "admin.general.searchIndexCacheLimit": "Indeks carian buku yang dicache pada cakera",
-  "admin.general.searchIndexCacheLimitHelp": "Pelayan menyimpan sebanyak ini indeks carian yang baru digunakan. Indeks yang dibuang akan dibina semula pada carian seterusnya untuk buku itu."
+  "admin.general.searchIndexCacheLimitHelp": "Pelayan menyimpan sebanyak ini indeks carian yang baru digunakan. Indeks yang dibuang akan dibina semula pada carian seterusnya untuk buku itu.",
+  "settings.textAlignment": "Penjajaran teks",
+  "settings.alignLeft": "Kiri",
+  "settings.alignRight": "Kanan",
+  "settings.alignCenter": "Tengah",
+  "settings.alignJustify": "Kiri dan kanan",
+  "settings.imageNoteEntrances": "Tunjukkan butang nota imej",
+  "settings.imageNoteEntrancesHelp": "Aktifkan untuk menambah nota pada imej. Penanda nota sedia ada kekal kelihatan."
 }

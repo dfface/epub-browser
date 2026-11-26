@@ -24,6 +24,42 @@
         offset: 20
     };
 
+    // Reader-owned preferences live outside book content and apply to newly
+    // appended chapters through root attributes as well as the initial chapter.
+    function initContentPreferences(root) {
+        var doc = root.document;
+        if (!doc || !doc.getElementById) return;
+        var alignment = doc.getElementById('textAlignmentSelect');
+        var imageNotes = doc.getElementById('imageNoteEntrancesToggle');
+        function read(key) {
+            try { return root.localStorage.getItem(key); } catch (error) { return null; }
+        }
+        function save(key, value) {
+            try { root.localStorage.setItem(key, value); } catch (error) {}
+        }
+        function normalize(value) {
+            return ['left', 'right', 'center', 'justify'].indexOf(value) >= 0 ? value : 'default';
+        }
+        if (alignment) {
+            alignment.value = normalize(read('reader_text_alignment'));
+            doc.documentElement.setAttribute('data-reader-text-alignment', alignment.value);
+            alignment.addEventListener('change', function() {
+                alignment.value = normalize(alignment.value);
+                save('reader_text_alignment', alignment.value);
+                doc.documentElement.setAttribute('data-reader-text-alignment', alignment.value);
+                doc.dispatchEvent(new root.CustomEvent('epub:reader-typography-change'));
+            });
+        }
+        if (imageNotes) {
+            imageNotes.checked = read('show_image_note_entrances') === 'true';
+            doc.documentElement.setAttribute('data-image-note-entrances', String(imageNotes.checked));
+            imageNotes.addEventListener('change', function() {
+                save('show_image_note_entrances', String(imageNotes.checked));
+                doc.documentElement.setAttribute('data-image-note-entrances', String(imageNotes.checked));
+            });
+        }
+    }
+
     function normalizePageWidth(value) {
         var key = String(value || '');
         return Object.prototype.hasOwnProperty.call(PAGE_WIDTHS, key)
@@ -396,6 +432,7 @@
 
     return {
         PAGE_WIDTHS: PAGE_WIDTHS,
+        initContentPreferences: initContentPreferences,
         allowsReaderNavigationEvent: allowsReaderNavigationEvent,
         applyDesktopChapterSidebarAutoHide: applyDesktopChapterSidebarAutoHide,
         applyDesktopToolbarAutoHide: applyDesktopToolbarAutoHide,
@@ -418,9 +455,11 @@
 if (typeof window !== 'undefined' && window.document) {
     if (window.document.readyState === 'loading') {
         window.document.addEventListener('DOMContentLoaded', function() {
+            window.EpubReaderLayout.initContentPreferences(window);
             window.EpubReaderLayout.initNavigationBehavior(window);
         });
     } else {
+        window.EpubReaderLayout.initContentPreferences(window);
         window.EpubReaderLayout.initNavigationBehavior(window);
     }
 }

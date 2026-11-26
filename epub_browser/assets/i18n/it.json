@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "La ricerca non è temporaneamente disponibile. Riprova più tardi.",
   "book.closeSearch": "Chiudi ricerca",
   "admin.general.searchIndexCacheLimit": "Indici di ricerca memorizzati su disco",
-  "admin.general.searchIndexCacheLimitHelp": "Il server mantiene questo numero di indici di ricerca usati di recente. Un indice rimosso viene ricreato alla successiva ricerca in quel libro."
+  "admin.general.searchIndexCacheLimitHelp": "Il server mantiene questo numero di indici di ricerca usati di recente. Un indice rimosso viene ricreato alla successiva ricerca in quel libro.",
+  "settings.textAlignment": "Allineamento del testo",
+  "settings.alignLeft": "Sinistra",
+  "settings.alignRight": "Destra",
+  "settings.alignCenter": "Centro",
+  "settings.alignJustify": "Giustificato",
+  "settings.imageNoteEntrances": "Mostra pulsanti per note sulle immagini",
+  "settings.imageNoteEntrancesHelp": "Attiva per aggiungere note alle immagini. I segni delle note esistenti restano visibili."
 }

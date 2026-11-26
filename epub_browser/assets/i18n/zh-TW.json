@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "搜尋暫時無法使用，請稍後再試。",
   "book.closeSearch": "關閉搜尋",
   "admin.general.searchIndexCacheLimit": "快取的書籍搜尋索引",
-  "admin.general.searchIndexCacheLimitHelp": "伺服器保留最近使用過的搜尋索引數量。刪除後僅需在下次搜尋該書時重新建立。"
+  "admin.general.searchIndexCacheLimitHelp": "伺服器保留最近使用過的搜尋索引數量。刪除後僅需在下次搜尋該書時重新建立。",
+  "settings.textAlignment": "正文對齊",
+  "settings.alignLeft": "靠左對齊",
+  "settings.alignRight": "靠右對齊",
+  "settings.alignCenter": "置中",
+  "settings.alignJustify": "左右對齊",
+  "settings.imageNoteEntrances": "顯示圖片筆記按鈕",
+  "settings.imageNoteEntrancesHelp": "開啟後可為圖片新增筆記；已有筆記標記始終顯示。"
 }

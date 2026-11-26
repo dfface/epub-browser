@@ -486,11 +486,15 @@ function hydrateBookShelfMembership(bookHash) {
         .then(function(payload) {
             if (!payload || typeof payload.in_shelf !== 'boolean') throw new Error('invalid_bookshelf_membership');
             var key = payload.in_shelf ? 'book.removeFromShelf' : 'book.addToShelf';
+            label.setAttribute('data-i18n', key);
+            button.setAttribute('aria-pressed', String(payload.in_shelf));
             label.textContent = bookT(key);
             button.setAttribute('aria-label', label.textContent);
             button.classList.toggle('in-shelf', payload.in_shelf);
         })
         .catch(function() {
+            label.setAttribute('data-i18n', 'book.addToShelf');
+            button.setAttribute('aria-pressed', 'false');
             label.textContent = bookT('book.addToShelf');
             button.setAttribute('aria-label', label.textContent);
             button.classList.remove('in-shelf');
@@ -592,11 +596,14 @@ function initBookShelfButton(bookHash) {
         var shelfData = getBookshelf();
         var inShelf = isBookInShelf(bookHash, shelfData);
 
+        toggleShelfBtn.setAttribute('aria-pressed', String(inShelf));
         if (inShelf) {
+            toggleShelfBtnText.setAttribute('data-i18n', 'book.removeFromShelf');
             toggleShelfBtnText.textContent = bookT('book.removeFromShelf');
             toggleShelfBtn.setAttribute('aria-label', bookT('book.removeFromShelf'));
             toggleShelfBtn.classList.add('in-shelf');
         } else {
+            toggleShelfBtnText.setAttribute('data-i18n', 'book.addToShelf');
             toggleShelfBtnText.textContent = bookT('book.addToShelf');
             toggleShelfBtn.setAttribute('aria-label', bookT('book.addToShelf'));
             toggleShelfBtn.classList.remove('in-shelf');

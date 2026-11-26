@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "Search is temporarily unavailable. Try again later.",
   "book.closeSearch": "Close search",
   "admin.general.searchIndexCacheLimit": "Book search indexes cached on disk",
-  "admin.general.searchIndexCacheLimitHelp": "The server keeps this many recently used search indexes. Removing one only means it is rebuilt the next time that book is searched."
+  "admin.general.searchIndexCacheLimitHelp": "The server keeps this many recently used search indexes. Removing one only means it is rebuilt the next time that book is searched.",
+  "settings.textAlignment": "Text alignment",
+  "settings.alignLeft": "Left",
+  "settings.alignRight": "Right",
+  "settings.alignCenter": "Center",
+  "settings.alignJustify": "Justify",
+  "settings.imageNoteEntrances": "Show image note buttons",
+  "settings.imageNoteEntrancesHelp": "Enable to add notes to images. Existing note markers remain visible."
 }

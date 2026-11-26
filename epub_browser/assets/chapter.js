@@ -2603,6 +2603,17 @@ function initScript() {
         });
     }
 
+    var textAlignmentSelect = document.getElementById('textAlignmentSelect');
+    if (textAlignmentSelect) {
+        textAlignmentSelect.addEventListener('change', function() {
+            if (isPaginationMode && totalPages) {
+                var progress = totalPages > 1 ? currentPage / (totalPages - 1) : 0;
+                calculateTotalPages();
+                showPage(Math.round(progress * (totalPages - 1)));
+            }
+        });
+    }
+
     var pageWidthSlider = document.getElementById('pageWidthSlider');
     if (pageWidthSlider) {
         pageWidthSlider.addEventListener('input', function() {

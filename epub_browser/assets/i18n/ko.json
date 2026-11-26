@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "검색을 일시적으로 사용할 수 없습니다. 나중에 다시 시도하세요.",
   "book.closeSearch": "검색 닫기",
   "admin.general.searchIndexCacheLimit": "디스크에 캐시되는 책 검색 인덱스",
-  "admin.general.searchIndexCacheLimitHelp": "최근 사용한 검색 인덱스를 이 개수만큼 유지합니다. 삭제되면 다음에 해당 책을 검색할 때 다시 만들어집니다."
+  "admin.general.searchIndexCacheLimitHelp": "최근 사용한 검색 인덱스를 이 개수만큼 유지합니다. 삭제되면 다음에 해당 책을 검색할 때 다시 만들어집니다.",
+  "settings.textAlignment": "본문 정렬",
+  "settings.alignLeft": "왼쪽",
+  "settings.alignRight": "오른쪽",
+  "settings.alignCenter": "가운데",
+  "settings.alignJustify": "양쪽",
+  "settings.imageNoteEntrances": "이미지 메모 버튼 표시",
+  "settings.imageNoteEntrancesHelp": "이미지에 메모를 추가하려면 켜세요. 기존 메모 표시는 계속 표시됩니다."
 }

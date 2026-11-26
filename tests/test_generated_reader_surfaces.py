@@ -23,6 +23,84 @@ from epub_browser.urls import SiteURLs
 
 
 class GeneratedReaderSurfaceTests(unittest.TestCase):
+    def test_publisher_body_margins_do_not_push_reader_content_outside_card(self):
+        chromium = os.environ.get('EPUB_BROWSER_CHROMIUM') or shutil.which('chromium')
+        if not chromium:
+            candidate = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+            chromium = candidate if Path(candidate).exists() else None
+        if not chromium:
+            self.skipTest('Chromium is needed for the reader geometry regression')
+        css = Path('epub_browser/assets/chapter.css').read_text()
+        # Gutenberg-style body margins scope onto the article. The reader owns
+        # its outer geometry, while intentional paragraph indents remain intact.
+        sample = """<style>CSS</style>
+        <style>[data-eb-styles]{margin-left:15%;margin-right:15%}
+        [data-eb-styles] p.poem{margin-left:30%}</style>
+        <div class="eb-content-container" id="card">
+          <article id="eb-content" data-eb-styles><a id="scene">
+            <h3>ACT I</h3><p>SCENE I. London.</p><p class="poem">A verse</p>
+          </a></article>
+        </div><script>
+        const results = [];
+        for (const width of [340, 720, 1000]) {
+          const card = document.getElementById('card');
+          card.style.width = width + 'px';
+          const article = document.getElementById('eb-content');
+          const outer = card.getBoundingClientRect();
+          const inner = article.getBoundingClientRect();
+          results.push(inner.left >= outer.left && inner.right <= outer.right);
+          results.push(parseFloat(getComputedStyle(document.querySelector('.poem')).marginLeft) > 0);
+        }
+        document.body.textContent = results.every(Boolean) ? 'GEOMETRY_PASS' : 'GEOMETRY_FAIL';
+        </script>""".replace('CSS', css)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, 'geometry.html')
+            path.write_text(sample)
+            result = subprocess.run([
+                chromium, '--headless', '--no-sandbox', '--disable-gpu',
+                '--no-first-run', '--no-default-browser-check',
+                '--user-data-dir=' + str(Path(directory, 'profile')),
+                '--dump-dom', path.as_uri(),
+            ], capture_output=True, text=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stderr[-2000:])
+            self.assertIn('GEOMETRY_PASS', result.stdout[-500:])
+
+    def test_reader_preferences_and_shelf_controls_share_format_and_mode_boundaries(self):
+        from lxml import html as parser
+        for mode in ('ssg', 'server'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory:
+                assets = AssetPublisher(Path('epub_browser/assets'), directory).publish()
+                epub = EPUBProcessor('book.epub', directory, asset_manifest=assets,
+                                     book_id='epub-book', deployment_mode=mode)
+                epub.book_title = 'An EPUB'
+                epub.chapters = [{'title': 'One'}]
+                pdf = ReaderPageRenderer.from_pdf_metadata(
+                    book_id='pdf-book', metadata=PDFMetadata(
+                        title='A PDF', authors=(), tags=(), language='en',
+                        pages=(PDFPageMetadata(1, 612.0, 792.0),), encrypted=False,
+                        has_extractable_text=True, cover=None),
+                    cover_path=None, asset_manifest=assets, urls=SiteURLs(),
+                    deployment_mode=mode)
+                for renderer in (epub, pdf):
+                    page = parser.fromstring(renderer.render_index())
+                    button = page.get_element_by_id('toggleShelfBtn')
+                    self.assertEqual(button.get('aria-pressed'), 'false')
+                    self.assertEqual(page.get_element_by_id('toggleShelfBtnText').get('aria-live'), 'polite')
+                epub_page = parser.fromstring(epub.create_chapter_template('<p>Text</p>', '', 0, 'One'))
+                alignment = epub_page.get_element_by_id('textAlignmentSelect')
+                self.assertEqual([o.get('value') for o in alignment],
+                                 ['default', 'left', 'right', 'center', 'justify'])
+                self.assertEqual(alignment.getparent().getparent().get('id'), 'font-tab')
+                pdf_page = parser.fromstring(pdf.create_pdf_chapter_template(0, 'document.pdf'))
+                self.assertFalse(pdf_page.xpath('//*[@id="textAlignmentSelect"]'))
+                for page in (epub_page, pdf_page):
+                    toggle = page.get_element_by_id('imageNoteEntrancesToggle')
+                    self.assertIsNone(toggle.get('checked'))
+                    self.assertTrue(toggle.xpath('ancestor::*[@id="reading-tab"]'))
+                    help_button = page.get_element_by_id('imageNoteEntrancesHelp')
+                    self.assertEqual(help_button.tag, 'button')
+                    self.assertIsNotNone(help_button.get('data-settings-tip'))
+
     def test_pdf_metadata_hydrates_page_chapters_and_a_complete_page_toc(self):
         with tempfile.TemporaryDirectory() as directory:
             assets = AssetPublisher(
@@ -4449,7 +4527,7 @@ assert.deepEqual(
             )
             self.assertIn(f'data-i18n="{key}"', reading)
         self.assertEqual(reading.count('class="settings-switch keyboard-navigation-option"'), 2)
-        self.assertEqual(reading.count('class="switch-slider"'), 9)
+        self.assertEqual(reading.count('class="switch-slider"'), 10)
 
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(
             encoding='utf-8'

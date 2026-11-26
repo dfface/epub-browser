@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "Pencarian sementara tidak tersedia. Coba lagi nanti.",
   "book.closeSearch": "Tutup pencarian",
   "admin.general.searchIndexCacheLimit": "Indeks pencarian buku yang di-cache di disk",
-  "admin.general.searchIndexCacheLimitHelp": "Server menyimpan sebanyak ini indeks pencarian yang terakhir digunakan. Indeks yang dihapus akan dibuat ulang saat buku itu dicari lagi."
+  "admin.general.searchIndexCacheLimitHelp": "Server menyimpan sebanyak ini indeks pencarian yang terakhir digunakan. Indeks yang dihapus akan dibuat ulang saat buku itu dicari lagi.",
+  "settings.textAlignment": "Perataan teks",
+  "settings.alignLeft": "Kiri",
+  "settings.alignRight": "Kanan",
+  "settings.alignCenter": "Tengah",
+  "settings.alignJustify": "Rata kiri kanan",
+  "settings.imageNoteEntrances": "Tampilkan tombol catatan gambar",
+  "settings.imageNoteEntrancesHelp": "Aktifkan untuk menambahkan catatan pada gambar. Penanda catatan yang ada tetap terlihat."
 }

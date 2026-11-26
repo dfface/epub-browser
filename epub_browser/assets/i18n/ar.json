@@ -1604,5 +1604,12 @@
   "book.searchUnavailable": "البحث غير متاح مؤقتًا. حاول لاحقًا.",
   "book.closeSearch": "إغلاق البحث",
   "admin.general.searchIndexCacheLimit": "فهارس البحث المخزنة على القرص",
-  "admin.general.searchIndexCacheLimitHelp": "يحتفظ الخادم بهذا العدد من فهارس البحث المستخدمة حديثًا. عند حذف فهرس، يُعاد بناؤه عند البحث التالي في ذلك الكتاب."
+  "admin.general.searchIndexCacheLimitHelp": "يحتفظ الخادم بهذا العدد من فهارس البحث المستخدمة حديثًا. عند حذف فهرس، يُعاد بناؤه عند البحث التالي في ذلك الكتاب.",
+  "settings.textAlignment": "محاذاة النص",
+  "settings.alignLeft": "يسار",
+  "settings.alignRight": "يمين",
+  "settings.alignCenter": "توسيط",
+  "settings.alignJustify": "ضبط",
+  "settings.imageNoteEntrances": "إظهار أزرار ملاحظات الصور",
+  "settings.imageNoteEntrancesHelp": "فعّل لإضافة ملاحظات إلى الصور. تبقى علامات الملاحظات الحالية ظاهرة."
 }
