@@ -114,6 +114,40 @@
         return value !== 'false';
     }
 
+    function mobileToolbarShortcutState(alwaysVisible, scrollTop, threshold, pagination, continuous) {
+        return {
+            visible: Boolean(alwaysVisible || (scrollTop > threshold && !pagination && !continuous)),
+            topDisabled: Boolean(alwaysVisible && scrollTop <= 0)
+        };
+    }
+
+    function createMobileToolbarController(options) {
+        options = options || {};
+        var alwaysVisible = Boolean(options.alwaysVisible);
+        var lastScrollTop = Math.max(0, Number(options.scrollTop) || 0);
+        var visible = true;
+        function render() {
+            if (options.render) options.render(visible);
+        }
+        render();
+        return {
+            onScroll: function(scrollTop) {
+                var current = Math.max(0, Number(scrollTop) || 0);
+                if (alwaysVisible || current <= 0) visible = true;
+                else if (current - lastScrollTop > 1) visible = false;
+                else if (lastScrollTop - current > 1) visible = true;
+                lastScrollTop = current;
+                render();
+            },
+            setAlwaysVisible: function(enabled, scrollTop) {
+                alwaysVisible = Boolean(enabled);
+                lastScrollTop = Math.max(0, Number(scrollTop) || 0);
+                visible = true;
+                render();
+            }
+        };
+    }
+
     function applyDesktopToolbarAutoHide(documentObject, enabled) {
         var active = Boolean(enabled);
         if (documentObject && documentObject.body && documentObject.body.classList) {
@@ -408,8 +442,8 @@
         }
     }
 
-    function syncChapterTocAvailability(documentObject, continuous, pdf) {
-        var disabled = Boolean(continuous || pdf);
+    function syncChapterTocAvailability(documentObject, continuous, pdf, showOutline) {
+        var disabled = Boolean(continuous || pdf || showOutline === false);
         var controls = [
             documentObject.getElementById('tocToggle'),
             documentObject.getElementById('mobileTocBtn')
@@ -431,6 +465,8 @@
     }
 
     return {
+        mobileToolbarShortcutState: mobileToolbarShortcutState,
+        createMobileToolbarController: createMobileToolbarController,
         PAGE_WIDTHS: PAGE_WIDTHS,
         initContentPreferences: initContentPreferences,
         allowsReaderNavigationEvent: allowsReaderNavigationEvent,

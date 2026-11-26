@@ -106,6 +106,40 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                     self.assertEqual(button.get('aria-pressed'), 'false')
                     self.assertEqual(page.get_element_by_id('toggleShelfBtnText').get('aria-live'), 'polite')
                 epub_page = parser.fromstring(epub.create_chapter_template('<p>Text</p>', '', 0, 'One'))
+                outline = epub_page.get_element_by_id('showChapterOutlineToggle')
+                self.assertIn('checked', outline.attrib)
+                help_text = epub_page.get_element_by_id(outline.get('aria-describedby'))
+                self.assertEqual(help_text.get('data-i18n'), 'settings.chapterOutlineHelp')
+                tip = outline.getparent().getparent().xpath('.//button[@data-settings-tip]')[0]
+                self.assertEqual(tip.get('data-i18n-data-tip'), 'settings.chapterOutlineHelp')
+                self.assertEqual(tip.get('data-i18n-aria-label'), 'settings.chapterOutlineHelp')
+                self.assertEqual(outline.getparent().xpath('.//span[@data-i18n]')[0].get('data-i18n'),
+                                 'settings.showChapterOutline')
+                pdf_page = parser.fromstring(pdf.create_pdf_chapter_template(0, '/book/pdf-book/document.pdf'))
+                self.assertFalse(pdf_page.xpath('//*[@id="showChapterOutlineToggle"]'))
+                for page in (epub_page, pdf_page):
+                    arrange = page.get_element_by_id('mobileToolbarOrderToggle')
+                    self.assertEqual(arrange.get('aria-expanded'), 'false')
+                    self.assertIn('hidden', page.get_element_by_id(arrange.get('aria-controls')).attrib)
+                    buttons = page.xpath('//div[contains(concat(" ", normalize-space(@class), " "), " mobile-controls ")]/*')
+                    ids = [button.get('id') for button in buttons]
+                    self.assertTrue(all(ids))
+                    self.assertEqual(len(ids), len(set(ids)))
+                    mobile = page.get_element_by_id('keepMobileToolbarVisibleToggle')
+                    self.assertNotIn('checked', mobile.attrib)
+                    self.assertEqual(mobile.xpath('ancestor::fieldset')[0].find('legend').get('data-i18n'),
+                                     'settings.mobileToolbar')
+                    self.assertEqual(page.get_element_by_id(mobile.get('aria-describedby')).get('data-i18n'),
+                                     'settings.mobileToolbarHelp')
+                    for control, group in (
+                        ('paginationModeToggle', 'settings.readingMode'),
+                        ('showReadingProgressBarToggle', 'settings.displayOptions'),
+                        ('imageNoteEntrancesToggle', 'settings.displayOptions'),
+                    ):
+                        fieldset = page.get_element_by_id(control).xpath('ancestor::fieldset')[0]
+                        self.assertEqual(fieldset.find('legend').get('data-i18n'), group)
+                self.assertEqual(outline.xpath('ancestor::fieldset')[0].find('legend').get('data-i18n'),
+                                 'settings.displayOptions')
                 alignment = epub_page.get_element_by_id('textAlignmentSelect')
                 self.assertEqual([o.get('value') for o in alignment],
                                  ['default', 'left', 'right', 'center', 'justify'])
@@ -2407,7 +2441,7 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
             'padding: 0;',
             'border: 0;',
             'border-radius: 0;',
-            'background: transparent;',
+            'background: var(--reader-page, var(--card-bg));',
             'box-sizing: border-box;',
         ):
             self.assertIn(declaration, container_rule)
@@ -3238,8 +3272,7 @@ assert.deepEqual(
             r"\.mobile-controls\s+\.control-btn[^}]*min-height:\s*44px;",
         )
         self.assertIn(".mobile-controls .control-btn span {\n    display: none;", chapter_css)
-        self.assertIn("content: attr(aria-label);", chapter_mobile)
-        self.assertNotIn("@media (hover: hover)", chapter_mobile)
+        self.assertNotIn(".mobile-controls .control-btn::after", chapter_mobile)
         self.assertRegex(
             chapter_mobile,
             r"\.mobile-controls\s*\{[^}]*overflow-x:\s*auto;",
@@ -3257,10 +3290,10 @@ assert.deepEqual(
         chapter_script = Path("epub_browser/assets/chapter.js").read_text(
             encoding="utf-8"
         )
-        self.assertIn("mobileTopBtn.classList.add('is-visible')", chapter_script)
-        self.assertIn("mobileTopBtn.classList.remove('is-visible')", chapter_script)
+        self.assertIn("mobileTopBtn.classList.toggle('is-visible', mobileState.visible)", chapter_script)
+        self.assertIn("mobileTopBtn.disabled = mobileState.topDisabled", chapter_script)
         self.assertIn(
-            "mobileBookHomeShortcut.classList.toggle('is-visible', visible)",
+            "mobileBookHomeShortcut.classList.toggle('is-visible', mobileState.visible)",
             chapter_script,
         )
 
@@ -3999,7 +4032,7 @@ assert.deepEqual(
         )
         self.assertIsNotNone(mobile_toc)
         self.assertIn(
-            'syncChapterTocAvailability(document, isContinuousScroll, Boolean(window.EpubPDFConfig))',
+            'document, isContinuousScroll, Boolean(window.EpubPDFConfig), showChapterOutline',
             chapter_js,
         )
         self.assertIn('.reader-toolbar.top-controls .control-btn[hidden]', chapter_css)
@@ -4546,7 +4579,7 @@ assert.deepEqual(
             )
             self.assertIn(f'data-i18n="{key}"', reading)
         self.assertEqual(reading.count('class="settings-switch keyboard-navigation-option"'), 2)
-        self.assertEqual(reading.count('class="switch-slider"'), 10)
+        self.assertEqual(reading.count('class="switch-slider"'), 12)
 
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(
             encoding='utf-8'

@@ -1454,8 +1454,9 @@ body.pagination-mode .desktop-setting-only {
     bottom: 0;
     left: 0;
     right: 0;
-    background: var(--card-bg);
-    box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+    background: var(--reader-page, var(--card-bg));
+    border: 0;
+    box-shadow: none;
     display: none;
     justify-content: space-around;
     padding: 10px 0;
@@ -1473,13 +1474,34 @@ body.pagination-mode .desktop-setting-only {
     font: inherit;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: var(--transition);
+    transition: color 120ms ease, background-color 120ms ease;
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.mobile-controls .control-btn.active,
+.mobile-controls .control-btn[aria-pressed="true"] {
+    color: var(--reader-action, var(--button-bg));
+    background: var(--hover-bg);
+}
+
+/* Keep hover feedback inside the target; touch taps must not leave it stuck. */
+@media (hover: hover) and (pointer: fine) {
+    .mobile-controls .control-btn:not(:disabled):hover {
+        background: var(--hover-bg);
+        color: var(--text);
+    }
+}
+
+.mobile-controls .control-btn:focus-visible,
+.mobile-controls > a:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: -2px;
     border-radius: 8px;
 }
 
-.mobile-controls .control-btn:hover,
-.mobile-controls .control-btn.active {
-    color: var(--button-bg);
+.mobile-controls .control-btn:not(:disabled):active {
+    background: var(--hover-bg);
 }
 
 .mobile-controls .control-btn:disabled,
@@ -1746,7 +1768,7 @@ body.pagination-mode {
     padding: 0;
     border: 0;
     border-radius: 0;
-    background: transparent;
+    background: var(--reader-page, var(--card-bg));
     box-shadow: none !important;
     box-sizing: border-box;
     overflow: hidden;
@@ -1792,7 +1814,7 @@ body.pagination-mode {
     -ms-overflow-style: none;
     scrollbar-width: none;
     padding: 0;
-    background: var(--background);
+    background: var(--reader-page, var(--card-bg));
 }
 
 /* 确保内容能够正确分割到不同列中 */
@@ -2025,6 +2047,7 @@ body.pagination-mode {
 @media (max-width: 768px) {
     body {
         padding: 0;
+        background: var(--reader-page, var(--card-bg));
     }
 
     .custom-css-panel, .eb-content-container {
@@ -2121,39 +2144,8 @@ body.pagination-mode {
         width: 100%;
     }
 
-    /* The bottom bar has more reader actions than a conventional app tab bar.
-       Keep the targets comfortably tappable while making the visual language
-       icon-first; the accessible name is still present on every action. */
-    .mobile-controls .control-btn::after {
-        content: attr(aria-label);
-        position: absolute;
-        z-index: 2;
-        bottom: calc(100% + 8px);
-        left: 50%;
-        width: max-content;
-        max-width: min(220px, calc(100vw - 24px));
-        padding: 7px 9px;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--card-bg);
-        box-shadow: var(--shadow-sm);
-        color: var(--text);
-        font-size: .76rem;
-        font-weight: 600;
-        line-height: 1.2;
-        opacity: 0;
-        pointer-events: none;
-        transform: translate(-50%, 4px);
-        transition: opacity 140ms ease, transform 140ms ease;
-    }
-
-    .mobile-controls .control-btn:hover::after,
-    .mobile-controls .control-btn:focus-visible::after,
-    .mobile-controls > a:focus-visible .control-btn::after {
-        opacity: 1;
-        transform: translate(-50%, 0);
-    }
-
+    /* Accessible names and native title hints avoid clipped floating labels
+       above this horizontally scrolling bar. */
     .mobile-controls #mobileTopBtn,
     .mobile-controls #mobileBookHomeShortcut {
         display: none;
@@ -2208,8 +2200,8 @@ body.pagination-mode {
 body.continuous-scroll-mode .reading-controls,
 body.continuous-scroll-mode #scrollToTopBtn,
 body.continuous-scroll-mode #bookHomeShortcut,
-body.continuous-scroll-mode #mobileTopBtn,
-body.continuous-scroll-mode #mobileBookHomeShortcut {
+body.continuous-scroll-mode:not(.mobile-toolbar-fixed) #mobileTopBtn,
+body.continuous-scroll-mode:not(.mobile-toolbar-fixed) #mobileBookHomeShortcut {
     display: none !important;
 }
 
@@ -2381,4 +2373,165 @@ html[data-reader-text-alignment="center"] :is(#eb-content, .eb-content) :is(p, d
 html[data-reader-text-alignment="justify"] :is(#eb-content, .eb-content),
 html[data-reader-text-alignment="justify"] :is(#eb-content, .eb-content) :is(p, div, li, blockquote, h1, h2, h3, h4, h5, h6, td, th) {
     text-align: justify !important;
+}
+
+/* Reading settings share a consistent row rhythm and keyboard focus treatment. */
+#reading-tab > fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    gap: 6px;
+}
+
+#reading-tab > fieldset > legend {
+    text-align: left;
+    box-sizing: border-box;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 16px 0 0;
+    border-top: 1px solid var(--border);
+}
+
+#reading-tab > fieldset:first-child > legend {
+    padding-top: 0;
+    border-top: 0;
+}
+
+#reading-tab .desktop-layout-options,
+#reading-tab .keyboard-navigation-options {
+    gap: 6px;
+}
+
+#reading-tab .settings-switch {
+    position: relative;
+    min-height: 44px;
+    margin: 0;
+}
+
+#reading-tab .settings-switch input[type="checkbox"] {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+#reading-tab .switch-slider {
+    flex-shrink: 0;
+}
+
+#reading-tab .settings-switch:has(input:focus-visible) {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+#reading-tab .settings-switch:has(input:disabled) {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+#reading-tab .desktop-layout-option:focus-within,
+#reading-tab .keyboard-navigation-option:focus-within {
+    outline: none;
+}
+
+#reading-tab .desktop-layout-option:has(input:focus-visible),
+#reading-tab .keyboard-navigation-option:has(input:focus-visible) {
+    outline: 2px solid var(--text);
+}
+
+/* Apply disabled styling to the label once, including nested sidebar options. */
+#reading-tab .desktop-layout-option:has(input:disabled) {
+    opacity: 1;
+}
+#reading-tab .settings-switch:has(input:disabled) {
+    opacity: .5;
+}
+
+#reading-tab .desktop-layout-options,
+#reading-tab .keyboard-navigation-options,
+#reading-tab .settings-switch {
+    min-width: 0;
+    max-width: 100%;
+}
+
+#reading-tab .switch-text {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+}
+
+#chapterOutlineHelpText,
+.reader-setting-help {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+@media (min-width: 769px) {
+    .mobile-toolbar-settings {
+        display: none;
+    }
+}
+
+.mobile-toolbar-order-toggle {
+    align-self: flex-start;
+    min-height: 44px;
+}
+.mobile-toolbar-order-panel[hidden] { display: none; }
+.mobile-toolbar-order-panel { min-width: 0; }
+.mobile-toolbar-order-panel .settings-section-description {
+    margin: 8px 0 12px;
+    text-align: start;
+}
+.mobile-toolbar-order-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 12px;
+}
+.mobile-toolbar-order-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card-bg);
+    color: var(--text);
+    font-size: .85rem;
+}
+.mobile-toolbar-drag-handle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    min-height: 44px;
+    flex-shrink: 0;
+    cursor: grab;
+    touch-action: none;
+    font-size: 1.3rem;
+}
+.mobile-toolbar-order-name { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.mobile-toolbar-move {
+    flex-shrink: 0;
+    width: 44px;
+    min-height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--card-bg);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 1.1rem;
+}
+.mobile-toolbar-move:disabled { opacity: .4; cursor: not-allowed; }
+.mobile-toolbar-move:focus-visible,
+.mobile-toolbar-order-toggle:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
 }

@@ -585,6 +585,63 @@ test('reading appearance restores preferences, persists choices and restores boo
   assert.equal(imageNotes.checked, true);
 });
 
+
+test('outline preference hides and closes chapter outline and survives mode changes', () => {
+  const document = fakeDocument();
+  for (const continuous of [false, true, false]) {
+    syncChapterTocAvailability(document, continuous, false, false);
+    for (const id of ['tocToggle', 'mobileTocBtn']) {
+      assert.equal(document.elements[id].hidden, true);
+      assert.equal(document.elements[id].disabled, true);
+    }
+    assert.equal(document.elements.tocFloating.classList.contains('active'), false);
+    assert.equal(document.elements.tocFloating.getAttribute('aria-hidden'), 'true');
+  }
+  syncChapterTocAvailability(document, false, false, true);
+  assert.equal(document.elements.tocToggle.hidden, false);
+  syncChapterTocAvailability(document, false, true, true);
+  assert.equal(document.elements.tocToggle.hidden, true);
+});
+
+test('mobile toolbar can remain visible and resume directional hiding without a scroll jump', () => {
+  const { createMobileToolbarController } = require('../epub_browser/assets/reader-layout.js');
+  const states = [];
+  const controller = createMobileToolbarController({
+    scrollTop: 400,
+    render: visible => states.push(visible),
+  });
+  controller.onScroll(420);
+  assert.equal(states.at(-1), false);
+  controller.setAlwaysVisible(true, 420);
+  assert.equal(states.at(-1), true);
+  controller.onScroll(600);
+  assert.equal(states.at(-1), true);
+  controller.setAlwaysVisible(false, 600);
+  assert.equal(states.at(-1), true);
+  controller.onScroll(620);
+  assert.equal(states.at(-1), false);
+  controller.onScroll(610);
+  assert.equal(states.at(-1), true);
+});
+
+test('fixed mobile shortcuts keep their slots and disable Top only at the top', () => {
+  const { mobileToolbarShortcutState } = require('../epub_browser/assets/reader-layout.js');
+  assert.deepEqual(mobileToolbarShortcutState(true, 0, 600, false, false),
+    { visible: true, topDisabled: true });
+  assert.deepEqual(mobileToolbarShortcutState(true, 20, 600, false, true),
+    { visible: true, topDisabled: false });
+  assert.deepEqual(mobileToolbarShortcutState(true, 0, 600, true, false),
+    { visible: true, topDisabled: true });
+  assert.deepEqual(mobileToolbarShortcutState(false, 20, 600, false, false),
+    { visible: false, topDisabled: false });
+  assert.deepEqual(mobileToolbarShortcutState(false, 700, 600, false, false),
+    { visible: true, topDisabled: false });
+  assert.deepEqual(mobileToolbarShortcutState(false, 700, 600, false, true),
+    { visible: false, topDisabled: false });
+  assert.deepEqual(mobileToolbarShortcutState(false, 700, 600, true, false),
+    { visible: false, topDisabled: false });
+});
+
 test('reader source TOC preserves groups, deep levels and distinct chapter fragments', () => {
   const fs = require('node:fs');
   const vm = require('node:vm');
