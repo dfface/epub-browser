@@ -408,8 +408,8 @@
         }
     }
 
-    function syncChapterTocAvailability(documentObject, continuous, pdf) {
-        var disabled = Boolean(continuous || pdf);
+    function syncChapterTocAvailability(documentObject, continuous, pdf, showOutline) {
+        var disabled = Boolean(continuous || pdf || showOutline === false);
         var controls = [
             documentObject.getElementById('tocToggle'),
             documentObject.getElementById('mobileTocBtn')

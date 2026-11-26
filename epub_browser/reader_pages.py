@@ -2681,6 +2681,18 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                             <span>100%</span>
                             <span>200%</span>
                             <span>400%</span>'''
+        chapter_outline_control = "" if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT else """
+                    <div class="settings-option-with-tip">
+                        <label class="settings-switch chapter-outline-setting">
+                            <input type="checkbox" id="showChapterOutlineToggle" checked aria-describedby="chapterOutlineHelpText">
+                            <span class="switch-slider" aria-hidden="true"></span>
+                            <span class="switch-text" data-i18n="settings.showChapterOutline">Show chapter outline button</span>
+                        </label>
+                        <button type="button" class="settings-info-tip" data-settings-tip data-tip="Show the “This chapter” outline generated from chapter headings. Turning this off hides its button and closes the outline, without affecting the book contents. Saved in this browser for all EPUB books on this site; unavailable in continuous scroll and PDF pages." data-i18n-data-tip="settings.chapterOutlineHelp" aria-label="Show the “This chapter” outline generated from chapter headings. Turning this off hides its button and closes the outline, without affecting the book contents. Saved in this browser for all EPUB books on this site; unavailable in continuous scroll and PDF pages." data-i18n-aria-label="settings.chapterOutlineHelp">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i>
+                        </button>
+                        <span id="chapterOutlineHelpText" class="sr-only" data-i18n="settings.chapterOutlineHelp">Show the “This chapter” outline generated from chapter headings. Turning this off hides its button and closes the outline, without affecting the book contents. Saved in this browser for all EPUB books on this site; unavailable in continuous scroll and PDF pages.</span>
+                    </div>"""
         text_alignment_control = "" if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT else """
                 <div class="settings-group">
                     <label class="settings-label" for="textAlignmentSelect" data-i18n="settings.textAlignment">Text alignment</label>
@@ -3073,13 +3085,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                 </div>
             </div>
             <div class="settings-tab-panel" id="reading-tab">
-                <div class="settings-group">
-                    <label class="settings-label" data-i18n="settings.readingMode">Reading mode</label>
-                    <label class="settings-switch">
-                        <input type="checkbox" id="showReadingProgressBarToggle" checked>
-                        <span class="switch-slider"></span>
-                        <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
-                    </label>
+                <fieldset class="settings-group reading-settings-section reading-mode-settings">
+                    <legend class="settings-section-title" data-i18n="settings.readingMode">Reading mode</legend>
                     <label class="settings-switch">
                         <input type="checkbox" id="paginationModeToggle">
                         <span class="switch-slider"></span>
@@ -3103,6 +3110,15 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                             <i class="fas fa-info-circle" aria-hidden="true"></i>
                         </span>
                     </label>
+                </fieldset>
+                <fieldset class="settings-group reading-settings-section display-options-settings">
+                    <legend class="settings-section-title" data-i18n="settings.displayOptions">Display options</legend>
+                    <label class="settings-switch">
+                        <input type="checkbox" id="showReadingProgressBarToggle" checked>
+                        <span class="switch-slider"></span>
+                        <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
+                    </label>
+                    {chapter_outline_control}
                     <div class="settings-option-with-tip">
                         <label class="settings-switch">
                             <input type="checkbox" id="imageNoteEntrancesToggle" aria-describedby="imageNoteEntrancesHelp">
@@ -3113,22 +3129,22 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                             <i class="fas fa-info-circle" aria-hidden="true"></i>
                         </button>
                     </div>
-                </div>
+                </fieldset>
                 <fieldset class="settings-group desktop-layout-settings">
                     <legend class="settings-section-title" data-i18n="settings.desktopLayout">Desktop layout</legend>
                     <div class="desktop-layout-options">
                         <label class="settings-switch desktop-layout-option desktop-setting-only">
                             <input type="checkbox" id="desktopChapterSidebarToggle">
                             <span class="switch-slider"></span>
-                            <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show chapter sidebar</span>
+                            <span class="switch-text" data-i18n="settings.desktopChapterSidebar">Show book contents sidebar</span>
                         </label>
                         <div class="desktop-layout-option settings-option-with-tip desktop-setting-only">
                             <label class="settings-switch">
                                 <input type="checkbox" id="autoHideDesktopChapterSidebarToggle" disabled aria-disabled="true">
                                 <span class="switch-slider"></span>
-                                <span class="switch-text" data-i18n="settings.autoHideDesktopChapterSidebar">Auto-hide chapter sidebar</span>
+                                <span class="switch-text" data-i18n="settings.autoHideDesktopChapterSidebar">Auto-hide book contents sidebar</span>
                             </label>
-                            <button type="button" class="settings-info-tip" data-settings-tip data-tip="Move the pointer to the left edge, or use Tab, to show the chapter sidebar." data-i18n-data-tip="settings.autoHideDesktopChapterSidebarHelp" aria-label="Move the pointer to the left edge, or use Tab, to show the chapter sidebar." data-i18n-aria-label="settings.autoHideDesktopChapterSidebarHelp">
+                            <button type="button" class="settings-info-tip" data-settings-tip data-tip="Enable the book contents sidebar first. Move the pointer to the left edge, or use Tab, to reveal it." data-i18n-data-tip="settings.autoHideDesktopChapterSidebarHelp" aria-label="Enable the book contents sidebar first. Move the pointer to the left edge, or use Tab, to reveal it." data-i18n-aria-label="settings.autoHideDesktopChapterSidebarHelp">
                                 <i class="fas fa-info-circle" aria-hidden="true"></i>
                             </button>
                         </div>

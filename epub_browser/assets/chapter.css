@@ -2374,3 +2374,102 @@ html[data-reader-text-alignment="justify"] :is(#eb-content, .eb-content),
 html[data-reader-text-alignment="justify"] :is(#eb-content, .eb-content) :is(p, div, li, blockquote, h1, h2, h3, h4, h5, h6, td, th) {
     text-align: justify !important;
 }
+
+/* Reading settings share a consistent row rhythm and keyboard focus treatment. */
+#reading-tab > fieldset {
+    min-width: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    gap: 6px;
+}
+
+#reading-tab > fieldset > legend {
+    text-align: left;
+    box-sizing: border-box;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 16px 0 0;
+    border-top: 1px solid var(--border);
+}
+
+#reading-tab > fieldset:first-child > legend {
+    padding-top: 0;
+    border-top: 0;
+}
+
+#reading-tab .desktop-layout-options,
+#reading-tab .keyboard-navigation-options {
+    gap: 6px;
+}
+
+#reading-tab .settings-switch {
+    position: relative;
+    min-height: 44px;
+    margin: 0;
+}
+
+#reading-tab .settings-switch input[type="checkbox"] {
+    display: block;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+#reading-tab .switch-slider {
+    flex-shrink: 0;
+}
+
+#reading-tab .settings-switch:has(input:focus-visible) {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+#reading-tab .settings-switch:has(input:disabled) {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+#reading-tab .desktop-layout-option:focus-within,
+#reading-tab .keyboard-navigation-option:focus-within {
+    outline: none;
+}
+
+#reading-tab .desktop-layout-option:has(input:focus-visible),
+#reading-tab .keyboard-navigation-option:has(input:focus-visible) {
+    outline: 2px solid var(--text);
+}
+
+/* Apply disabled styling to the label once, including nested sidebar options. */
+#reading-tab .desktop-layout-option:has(input:disabled) {
+    opacity: 1;
+}
+#reading-tab .settings-switch:has(input:disabled) {
+    opacity: .5;
+}
+
+#reading-tab .desktop-layout-options,
+#reading-tab .keyboard-navigation-options,
+#reading-tab .settings-switch {
+    min-width: 0;
+    max-width: 100%;
+}
+
+#reading-tab .switch-text {
+    min-width: 0;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+}
+
+#chapterOutlineHelpText {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}

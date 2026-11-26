@@ -87,6 +87,27 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                     self.assertEqual(button.get('aria-pressed'), 'false')
                     self.assertEqual(page.get_element_by_id('toggleShelfBtnText').get('aria-live'), 'polite')
                 epub_page = parser.fromstring(epub.create_chapter_template('<p>Text</p>', '', 0, 'One'))
+                outline = epub_page.get_element_by_id('showChapterOutlineToggle')
+                self.assertIn('checked', outline.attrib)
+                help_text = epub_page.get_element_by_id(outline.get('aria-describedby'))
+                self.assertEqual(help_text.get('data-i18n'), 'settings.chapterOutlineHelp')
+                tip = outline.getparent().getparent().xpath('.//button[@data-settings-tip]')[0]
+                self.assertEqual(tip.get('data-i18n-data-tip'), 'settings.chapterOutlineHelp')
+                self.assertEqual(tip.get('data-i18n-aria-label'), 'settings.chapterOutlineHelp')
+                self.assertEqual(outline.getparent().xpath('.//span[@data-i18n]')[0].get('data-i18n'),
+                                 'settings.showChapterOutline')
+                pdf_page = parser.fromstring(pdf.create_pdf_chapter_template(0, '/book/pdf-book/document.pdf'))
+                self.assertFalse(pdf_page.xpath('//*[@id="showChapterOutlineToggle"]'))
+                for page in (epub_page, pdf_page):
+                    for control, group in (
+                        ('paginationModeToggle', 'settings.readingMode'),
+                        ('showReadingProgressBarToggle', 'settings.displayOptions'),
+                        ('imageNoteEntrancesToggle', 'settings.displayOptions'),
+                    ):
+                        fieldset = page.get_element_by_id(control).xpath('ancestor::fieldset')[0]
+                        self.assertEqual(fieldset.find('legend').get('data-i18n'), group)
+                self.assertEqual(outline.xpath('ancestor::fieldset')[0].find('legend').get('data-i18n'),
+                                 'settings.displayOptions')
                 alignment = epub_page.get_element_by_id('textAlignmentSelect')
                 self.assertEqual([o.get('value') for o in alignment],
                                  ['default', 'left', 'right', 'center', 'justify'])
@@ -3980,7 +4001,7 @@ assert.deepEqual(
         )
         self.assertIsNotNone(mobile_toc)
         self.assertIn(
-            'syncChapterTocAvailability(document, isContinuousScroll, Boolean(window.EpubPDFConfig))',
+            'document, isContinuousScroll, Boolean(window.EpubPDFConfig), showChapterOutline',
             chapter_js,
         )
         self.assertIn('.reader-toolbar.top-controls .control-btn[hidden]', chapter_css)
@@ -4527,7 +4548,7 @@ assert.deepEqual(
             )
             self.assertIn(f'data-i18n="{key}"', reading)
         self.assertEqual(reading.count('class="settings-switch keyboard-navigation-option"'), 2)
-        self.assertEqual(reading.count('class="switch-slider"'), 10)
+        self.assertEqual(reading.count('class="switch-slider"'), 11)
 
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(
             encoding='utf-8'

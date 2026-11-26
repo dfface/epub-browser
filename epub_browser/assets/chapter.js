@@ -381,6 +381,7 @@ function initScript() {
         readingProgressContainer.classList.toggle('is-progress-bar-hidden', className !== '');
     }
 
+    var showChapterOutline = getReadingPreference('showChapterOutline') !== 'false';
     var showReadingProgressBar = window.EpubReadingProgress
         ? window.EpubReadingProgress.showProgressBar(getReadingPreference('showReadingProgressBar'))
         : getReadingPreference('showReadingProgressBar') !== 'false';
@@ -2220,7 +2221,24 @@ function initScript() {
     }
 
     if (window.EpubReaderLayout) {
-        window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll, Boolean(window.EpubPDFConfig));
+        syncChapterOutlineVisibility();
+    }
+
+    function syncChapterOutlineVisibility() {
+        if (!window.EpubReaderLayout) return;
+        // Close through the shared drawer lifecycle to release its backdrop.
+        if ((!showChapterOutline || isContinuousScroll || window.EpubPDFConfig) &&
+                tocFloating.classList.contains('active')) {
+            var focusWasInside = tocFloating.contains(document.activeElement);
+            closeReaderDrawers(false);
+            if (focusWasInside) {
+                var preference = document.getElementById('showChapterOutlineToggle');
+                if (preference) preference.focus();
+            }
+        }
+        window.EpubReaderLayout.syncChapterTocAvailability(
+            document, isContinuousScroll, Boolean(window.EpubPDFConfig), showChapterOutline
+        );
     }
 
     tocToggle.addEventListener('click', function() {
@@ -3186,6 +3204,15 @@ function initScript() {
             setReadingPreference('spaceKeyNavigation', spaceKeyNavigationEnabled ? 'true' : 'false');
         });
     }
+    var showChapterOutlineToggle = document.getElementById('showChapterOutlineToggle');
+    if (showChapterOutlineToggle) {
+        showChapterOutlineToggle.checked = showChapterOutline;
+        showChapterOutlineToggle.addEventListener('change', function() {
+            showChapterOutline = this.checked;
+            setReadingPreference('showChapterOutline', showChapterOutline ? 'true' : 'false');
+            syncChapterOutlineVisibility();
+        });
+    }
     if (showReadingProgressBarToggle) {
         showReadingProgressBarToggle.checked = showReadingProgressBar;
         showReadingProgressBarToggle.addEventListener('change', function() {
@@ -3257,7 +3284,7 @@ function initScript() {
             
             isContinuousScroll = this.checked;
             if (window.EpubReaderLayout) {
-                window.EpubReaderLayout.syncChapterTocAvailability(document, isContinuousScroll, Boolean(window.EpubPDFConfig));
+                syncChapterOutlineVisibility();
             }
             localStorage.setItem('continuousScroll', isContinuousScroll ? 'true' : 'false');
             if (!window.epubBrowserCache) window.epubBrowserCache = {};

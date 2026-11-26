@@ -584,3 +584,21 @@ test('reading appearance restores preferences, persists choices and restores boo
   initContentPreferences(root);
   assert.equal(imageNotes.checked, true);
 });
+
+
+test('outline preference hides and closes chapter outline and survives mode changes', () => {
+  const document = fakeDocument();
+  for (const continuous of [false, true, false]) {
+    syncChapterTocAvailability(document, continuous, false, false);
+    for (const id of ['tocToggle', 'mobileTocBtn']) {
+      assert.equal(document.elements[id].hidden, true);
+      assert.equal(document.elements[id].disabled, true);
+    }
+    assert.equal(document.elements.tocFloating.classList.contains('active'), false);
+    assert.equal(document.elements.tocFloating.getAttribute('aria-hidden'), 'true');
+  }
+  syncChapterTocAvailability(document, false, false, true);
+  assert.equal(document.elements.tocToggle.hidden, false);
+  syncChapterTocAvailability(document, false, true, true);
+  assert.equal(document.elements.tocToggle.hidden, true);
+});
