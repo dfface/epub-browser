@@ -2829,8 +2829,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
         next_href = f'href="/book/{book_id_url}/chapter_{chapter_index+1}.html"' if chapter_index < len(self.chapters) - 1 else ''
         prev_link = f'<a {prev_href} id="readerPreviousChapter" class="control-btn prev-chapter" aria-label="Previous chapter" data-i18n-aria-label="reader.previous" aria-disabled="{"false" if prev_href else "true"}"><i class="fas fa-arrow-left" aria-hidden="true"></i><span class="control-name" data-i18n="reader.previous">Previous chapter</span></a>'
         next_link = f'<a {next_href} id="readerNextChapter" class="control-btn next-chapter" aria-label="Next chapter" data-i18n-aria-label="reader.next" aria-disabled="{"false" if next_href else "true"}"><i class="fas fa-arrow-right" aria-hidden="true"></i><span class="control-name" data-i18n="reader.next">Next chapter</span></a>'
-        prev_link_mobile = f'<a {prev_href} aria-label="Previous chapter" title="Previous chapter" data-i18n-aria-label="reader.previous" data-i18n-title="reader.previous"> <div class="control-btn" aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
-        next_link_mobile = f'<a {next_href} aria-label="Next chapter" title="Next chapter" data-i18n-aria-label="reader.next" data-i18n-title="reader.next"> <div class="control-btn" aria-label="Next chapter" data-i18n-aria-label="reader.next"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
+        prev_link_mobile = f'<a id="mobilePrevChapter" {prev_href} aria-label="Previous chapter" title="Previous chapter" data-i18n-aria-label="reader.previous" data-i18n-title="reader.previous"> <div class="control-btn" aria-label="Previous chapter" data-i18n-aria-label="reader.previous"> <i class="fas fa-arrow-left"></i><span data-i18n="reader.previous">Previous chapter</span></div></a>'
+        next_link_mobile = f'<a id="mobileNextChapter" {next_href} aria-label="Next chapter" title="Next chapter" data-i18n-aria-label="reader.next" data-i18n-title="reader.next"> <div class="control-btn" aria-label="Next chapter" data-i18n-aria-label="reader.next"> <i class="fas fa-arrow-right"></i><span data-i18n="reader.next">Next chapter</span></div></a>'
         bookshelf_data_actions = """
                     <button class="bookshelf-action-btn" id="exportShelfBtn">
                         <i class="fas fa-upload" aria-hidden="true"></i> <span data-i18n="bookshelf.export">Export</span>
@@ -3130,6 +3130,27 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                         </button>
                     </div>
                 </fieldset>
+                <fieldset class="settings-group mobile-toolbar-settings">
+                    <legend class="settings-section-title" data-i18n="settings.mobileToolbar">Mobile toolbar</legend>
+                    <div class="settings-option-with-tip">
+                        <label class="settings-switch">
+                            <input type="checkbox" id="keepMobileToolbarVisibleToggle" aria-describedby="mobileToolbarHelpText">
+                            <span class="switch-slider" aria-hidden="true"></span>
+                            <span class="switch-text" data-i18n="settings.keepMobileToolbarVisible">Keep bottom toolbar visible</span>
+                        </label>
+                        <button type="button" class="settings-info-tip" data-settings-tip data-tip="Keep the mobile bottom toolbar visible while scrolling. When off, scrolling down hides it and scrolling up shows it. Saved in this browser for all books on this site. Pure reading mode can still hide the controls. Top and Book home stay in place; Top is disabled at the top." data-i18n-data-tip="settings.mobileToolbarHelp" aria-label="Keep the mobile bottom toolbar visible while scrolling. When off, scrolling down hides it and scrolling up shows it. Saved in this browser for all books on this site. Pure reading mode can still hide the controls. Top and Book home stay in place; Top is disabled at the top." data-i18n-aria-label="settings.mobileToolbarHelp">
+                            <i class="fas fa-info-circle" aria-hidden="true"></i>
+                        </button>
+                        <span id="mobileToolbarHelpText" class="reader-setting-help" data-i18n="settings.mobileToolbarHelp">Keep the mobile bottom toolbar visible while scrolling. When off, scrolling down hides it and scrolling up shows it. Saved in this browser for all books on this site. Pure reading mode can still hide the controls. Top and Book home stay in place; Top is disabled at the top.</span>
+                    </div>
+                    <button type="button" class="css-btn secondary mobile-toolbar-order-toggle" id="mobileToolbarOrderToggle" aria-expanded="false" aria-controls="mobileToolbarOrderPanel" data-i18n="settings.toolbarArrange">Arrange toolbar buttons</button>
+                    <div id="mobileToolbarOrderPanel" class="mobile-toolbar-order-panel" hidden>
+                        <p class="settings-section-description" data-i18n="settings.toolbarArrangeHelp">Drag the handles or use the arrows to reorder this book’s buttons. Changes apply immediately to all books on this site in this browser. Unavailable buttons keep their saved positions.</p>
+                        <ol id="mobileToolbarOrderList" class="mobile-toolbar-order-list" aria-label="Toolbar button order" data-i18n-aria-label="settings.toolbarArrange"></ol>
+                        <button type="button" class="css-btn secondary" id="mobileToolbarOrderReset" data-i18n="settings.toolbarReset">Restore default order</button>
+                        <p id="mobileToolbarOrderStatus" class="reader-setting-help" role="status" aria-live="polite"></p>
+                    </div>
+                </fieldset>
                 <fieldset class="settings-group desktop-layout-settings">
                     <legend class="settings-section-title" data-i18n="settings.desktopLayout">Desktop layout</legend>
                     <div class="desktop-layout-options">
@@ -3214,7 +3235,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
         {mobile_ai_reading_button}
         {mobile_ai_followup_button}
         {prev_link_mobile}
-        <a href="/" aria-label="Home" title="Home" data-i18n-aria-label="reader.home" data-i18n-title="reader.home">
+        <a id="mobileHomeBtn" href="/" aria-label="Home" title="Home" data-i18n-aria-label="reader.home" data-i18n-title="reader.home">
             <div class="control-btn" aria-label="Home" data-i18n-aria-label="reader.home">
                 <i class="fas fa-home"></i>
                 <span data-i18n="reader.home">Home</span>
@@ -3360,6 +3381,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <script src="/assets/reader-layout.js" defer></script>
     {pdf_chapter_script}
     {book_search_script}
+    <script src="/assets/mobile-toolbar.js" defer></script>
     <script src="/assets/chapter.js?v=18" defer></script>
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>

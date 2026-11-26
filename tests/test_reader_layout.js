@@ -602,3 +602,42 @@ test('outline preference hides and closes chapter outline and survives mode chan
   syncChapterTocAvailability(document, false, true, true);
   assert.equal(document.elements.tocToggle.hidden, true);
 });
+
+test('mobile toolbar can remain visible and resume directional hiding without a scroll jump', () => {
+  const { createMobileToolbarController } = require('../epub_browser/assets/reader-layout.js');
+  const states = [];
+  const controller = createMobileToolbarController({
+    scrollTop: 400,
+    render: visible => states.push(visible),
+  });
+  controller.onScroll(420);
+  assert.equal(states.at(-1), false);
+  controller.setAlwaysVisible(true, 420);
+  assert.equal(states.at(-1), true);
+  controller.onScroll(600);
+  assert.equal(states.at(-1), true);
+  controller.setAlwaysVisible(false, 600);
+  assert.equal(states.at(-1), true);
+  controller.onScroll(620);
+  assert.equal(states.at(-1), false);
+  controller.onScroll(610);
+  assert.equal(states.at(-1), true);
+});
+
+test('fixed mobile shortcuts keep their slots and disable Top only at the top', () => {
+  const { mobileToolbarShortcutState } = require('../epub_browser/assets/reader-layout.js');
+  assert.deepEqual(mobileToolbarShortcutState(true, 0, 600, false, false),
+    { visible: true, topDisabled: true });
+  assert.deepEqual(mobileToolbarShortcutState(true, 20, 600, false, true),
+    { visible: true, topDisabled: false });
+  assert.deepEqual(mobileToolbarShortcutState(true, 0, 600, true, false),
+    { visible: true, topDisabled: true });
+  assert.deepEqual(mobileToolbarShortcutState(false, 20, 600, false, false),
+    { visible: false, topDisabled: false });
+  assert.deepEqual(mobileToolbarShortcutState(false, 700, 600, false, false),
+    { visible: true, topDisabled: false });
+  assert.deepEqual(mobileToolbarShortcutState(false, 700, 600, false, true),
+    { visible: false, topDisabled: false });
+  assert.deepEqual(mobileToolbarShortcutState(false, 700, 600, true, false),
+    { visible: false, topDisabled: false });
+});

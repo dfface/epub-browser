@@ -381,6 +381,7 @@ function initScript() {
         readingProgressContainer.classList.toggle('is-progress-bar-hidden', className !== '');
     }
 
+    var keepMobileToolbarVisible = getReadingPreference('keepMobileToolbarVisible') === 'true';
     var showChapterOutline = getReadingPreference('showChapterOutline') !== 'false';
     var showReadingProgressBar = window.EpubReadingProgress
         ? window.EpubReadingProgress.showProgressBar(getReadingPreference('showReadingProgressBar'))
@@ -1100,9 +1101,12 @@ function initScript() {
             source.querySelector('.next-chapter')
         );
         var currentMobileLinks = document.querySelectorAll('.mobile-controls > a');
-        var incomingMobileLinks = source.querySelectorAll('.mobile-controls > a');
-        for (var i = 0; i < currentMobileLinks.length && i < incomingMobileLinks.length; i++) {
-            copyChapterNavigationHref(currentMobileLinks[i], incomingMobileLinks[i]);
+        for (var i = 0; i < currentMobileLinks.length; i++) {
+            var link = currentMobileLinks[i];
+            var incoming = Array.prototype.find.call(source.querySelectorAll('.mobile-controls > a'), function(item) {
+                return item.id === link.id;
+            });
+            copyChapterNavigationHref(link, incoming);
         }
     }
 
@@ -2377,13 +2381,20 @@ function initScript() {
         var threshold = Math.max(320, (window.innerHeight || 0) * 0.75);
         var visible = scrollTop > threshold && !document.body.classList.contains('pagination-mode') && !isContinuousScroll;
         if (bookHomeShortcut) bookHomeShortcut.classList.toggle('is-visible', visible);
-        if (mobileBookHomeShortcut) mobileBookHomeShortcut.classList.toggle('is-visible', visible);
+        var mobileState = window.EpubReaderLayout.mobileToolbarShortcutState(
+            keepMobileToolbarVisible, scrollTop, threshold, isPaginationMode, isContinuousScroll
+        );
+        document.body.classList.toggle('mobile-toolbar-fixed', keepMobileToolbarVisible);
+        if (mobileBookHomeShortcut) mobileBookHomeShortcut.classList.toggle('is-visible', mobileState.visible);
+        if (mobileTopBtn) {
+            mobileTopBtn.classList.toggle('is-visible', mobileState.visible);
+            mobileTopBtn.disabled = mobileState.topDisabled;
+            mobileTopBtn.setAttribute('aria-disabled', mobileState.topDisabled ? 'true' : 'false');
+        }
         if (visible) {
             if (scrollTopBtn) scrollTopBtn.classList.add('is-visible');
-            if (mobileTopBtn) mobileTopBtn.classList.add('is-visible');
         } else {
             if (scrollTopBtn) scrollTopBtn.classList.remove('is-visible');
-            if (mobileTopBtn) mobileTopBtn.classList.remove('is-visible');
         }
     }
     var scrollToTopVisibilityPending = false;
@@ -2403,32 +2414,37 @@ function initScript() {
         });
     }
     
-    var lastScrollTop = 0;
     var mobileControls = document.querySelector('.mobile-controls');
-    if (!document.body.classList.contains('pagination-mode')) {
+    var mobileToolbarController = window.EpubReaderLayout.createMobileToolbarController({
+        alwaysVisible: keepMobileToolbarVisible || isPaginationMode,
+        scrollTop: window.pageYOffset || document.documentElement.scrollTop,
+        render: function(visible) {
+            if (mobileControls) mobileControls.style.transform = visible ? 'translateY(0)' : 'translateY(100%)';
+        }
+    });
+    if (!isPaginationMode) {
         var mobileControlsScrollPending = false;
         function scheduleMobileControlsVisibility() {
             if (mobileControlsScrollPending) return;
             mobileControlsScrollPending = true;
             window.requestAnimationFrame(function() {
                 mobileControlsScrollPending = false;
-            var st = window.pageYOffset || document.documentElement.scrollTop;
-            if (st > lastScrollTop && st - lastScrollTop > 1) {
-                mobileControls.style.transform = 'translateY(100%)';
-            } else if (st < lastScrollTop && lastScrollTop - st > 1) {
-                mobileControls.style.transform = 'translateY(0)';
-            }
-            lastScrollTop = st;
+                mobileToolbarController.onScroll(window.pageYOffset || document.documentElement.scrollTop);
             });
         }
         window.addEventListener('scroll', scheduleMobileControlsVisibility, { passive: true });
-    } else {
-        mobileControls.style.transform = 'translateY(0)';
     }
 
     Fancybox.bind('#eb-content img', {
         // Your custom options
     });
+
+    if (window.EpubMobileToolbar) {
+        window.EpubMobileToolbar.init({
+            document: document, toolbar: mobileControls, storage: localStorage,
+            i18n: i18n, Sortable: window.Sortable, pdf: Boolean(window.EpubPDFConfig)
+        });
+    }
 
     var settingsControlBtn = document.getElementById('settingsControlBtn');
     var mobileSettingsBtn = document.getElementById('mobileSettingsBtn');
@@ -3202,6 +3218,19 @@ function initScript() {
         spaceKeyNavigationToggle.addEventListener('change', function() {
             spaceKeyNavigationEnabled = this.checked;
             setReadingPreference('spaceKeyNavigation', spaceKeyNavigationEnabled ? 'true' : 'false');
+        });
+    }
+    var keepMobileToolbarVisibleToggle = document.getElementById('keepMobileToolbarVisibleToggle');
+    if (keepMobileToolbarVisibleToggle) {
+        keepMobileToolbarVisibleToggle.checked = keepMobileToolbarVisible;
+        keepMobileToolbarVisibleToggle.addEventListener('change', function() {
+            keepMobileToolbarVisible = this.checked;
+            setReadingPreference('keepMobileToolbarVisible', keepMobileToolbarVisible ? 'true' : 'false');
+            updateScrollToTopVisibility();
+            mobileToolbarController.setAlwaysVisible(
+                keepMobileToolbarVisible || isPaginationMode,
+                window.pageYOffset || document.documentElement.scrollTop
+            );
         });
     }
     var showChapterOutlineToggle = document.getElementById('showChapterOutlineToggle');
