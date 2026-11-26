@@ -171,7 +171,9 @@ class EPUBProcessor(ReaderPageRenderer):
                 or "\\" in decoded_probe
                 or decoded_drive
                 or decoded_candidate.is_absolute()
-                or ".." in decoded_candidate.parts
+                # Reject traversal introduced by decoding, while allowing
+                # ordinary ../ paths whose filenames contain encoded spaces.
+                or decoded_candidate.parts.count("..") > candidate.parts.count("..")
             ):
                 raise ValueError(f"Unsafe EPUB internal path: {reference}")
             probe = decoded_probe
@@ -321,7 +323,6 @@ class EPUBProcessor(ReaderPageRenderer):
         """Convert one EPUB into its caller-owned staging directory."""
         self.prepare()
         self.generate_hash()
-        self._index_chapter_source_urls()
         self.create_web_interface()
         if self.deployment_mode == "server":
             Path(self.web_dir, SERVER_OUTPUT_REVISION_FILE).write_text(
@@ -1304,52 +1305,6 @@ class EPUBProcessor(ReaderPageRenderer):
         replaced_content = re.sub(img_pattern2, replace_img_link, replaced_content)
         return replaced_content
 
-    @staticmethod
-    def _source_url_key(url):
-        parsed = urllib.parse.urlsplit(url)
-        if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
-            return None
-        return (parsed.scheme.lower(), parsed.netloc.lower(),
-                posixpath.normpath(urllib.parse.unquote(parsed.path)))
-
-    def _index_chapter_source_urls(self):
-        """Index explicit import provenance, never infer it from ordinary links.
-
-        Website-derived EPUBs can retain origin-relative links after renaming
-        their chapter files. Canonical metadata or a source attribution supplies
-        the missing identity. Duplicate identities are deliberately unresolved.
-        """
-        self._chapter_source_urls = {}
-        candidates = {}
-        for index, chapter in enumerate(self.chapters):
-            try:
-                root = parse_xhtml_document(self._internal_file(chapter['path']))
-            except (EPUBParseError, OSError):
-                continue
-            declared = {
-                node.get('href') for node in iter_local(root, 'link')
-                if 'canonical' in node.get('rel', '').lower().split()
-            }
-            for block in iter_local(root, 'blockquote'):
-                label = (block.text or '').strip().casefold()
-                if label not in {'原文：', '原文:', 'source:', 'original:'}:
-                    continue
-                links = list(iter_local(block, 'a'))
-                if len(links) == 1:
-                    link = links[0]
-                    if ''.join(link.itertext()).strip() == link.get('href'):
-                        declared.add(link.get('href'))
-            sources = {url for url in declared if url and self._source_url_key(url)}
-            if len(sources) != 1:
-                continue
-            url = sources.pop()
-            self._chapter_source_urls[chapter['path']] = url
-            candidates.setdefault(self._source_url_key(url), set()).add(index)
-        self._source_url_chapters = {
-            key: f"chapter_{next(iter(indexes))}.html"
-            for key, indexes in candidates.items() if len(indexes) == 1
-        }
-
     def fix_html_file_links(self, content, chapter_path):
         """修复html/xhtml文件链接"""
         # The spine owns public chapter indexes, including chapters absent
@@ -1363,15 +1318,10 @@ class EPUBProcessor(ReaderPageRenderer):
         def replace_link(match):
             reference = html.unescape(match.group(3)).strip()
             parsed = urllib.parse.urlsplit(reference)
-            if parsed.scheme or parsed.netloc or not parsed.path:
+            if parsed.scheme or parsed.netloc or parsed.path.startswith('/') or not parsed.path:
                 return match.group(0)
-            if parsed.path.startswith('/'):
-                source = getattr(self, '_chapter_source_urls', {}).get(chapter_path)
-                key = self._source_url_key(urllib.parse.urljoin(source, reference)) if source else None
-                destination = getattr(self, '_source_url_chapters', {}).get(key)
-            else:
-                resolved = self._resolve_internal_path(reference, posixpath.dirname(chapter_path))
-                destination = destinations.get(resolved)
+            resolved = self._resolve_internal_path(reference, posixpath.dirname(chapter_path))
+            destination = destinations.get(resolved)
             if destination is None:
                 return match.group(0)
             if parsed.query:
