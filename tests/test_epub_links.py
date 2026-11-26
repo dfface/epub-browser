@@ -11,7 +11,7 @@ from epub_browser.processor import EPUBProcessor
 from epub_browser.server_pages import ServerPageRenderer
 
 
-def write_link_epub(path, website=False, root_layout=False):
+def write_link_epub(path, website=False, root_layout=False, navigation=None):
     paths = ['Text/one.xhtml', 'Notes/one.xhtml', 'Text/space name.xhtml', 'Text/resources/space name.xhtml']
     bodies = [
         '<h1 id="start">Start</h1><a href="#local">Local</a><p id="local">Local target</p>'
@@ -44,12 +44,43 @@ def write_link_epub(path, website=False, root_layout=False):
         z.writestr('OEBPS/content.opf', f'<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="uid"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Link regression</dc:title><dc:identifier id="uid">urn:issue80:links</dc:identifier><dc:language>en</dc:language></metadata><manifest>{manifest}</manifest><spine>{spine}</spine></package>')
         nav_start = '065.html#body-target' if root_layout else 'Text/one.xhtml#start'
         nav_other = '070.html#a169' if root_layout else 'Text/space%20name.xhtml#%E6%B3%A8'
-        z.writestr('OEBPS/nav.xhtml', f'<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="{nav_start}">Start</a></li><li><a href="{nav_other}">Other</a></li></ol></nav></body></html>')
+        z.writestr('OEBPS/nav.xhtml', navigation or f'<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol><li><a href="{nav_start}">Start</a></li><li><a href="{nav_other}">Other</a></li></ol></nav></body></html>')
         for p, body in zip(paths, bodies):
             z.writestr('OEBPS/'+p, '<html><head><title>Links</title></head><body id="body-target">'+body+'</body></html>')
 
 
 class EPUBLinkTests(unittest.TestCase):
+    def test_nested_source_navigation_survives_both_publishers(self):
+        leaf = '<li><a href="Text/one.xhtml#local">Second target</a></li>'
+        for depth in reversed(range(5)):
+            leaf = f'<li><span>Group {depth}</span><ol>{leaf}</ol></li>'
+        nav = '<html xmlns:epub="http://www.idpf.org/2007/ops"><body><nav epub:type="toc"><ol>' + leaf + '<li><a href="Text/one.xhtml#start">First target</a></li></ol></nav></body></html>'
+        for mode in ('ssg', 'server'):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
+                source = Path(tmp, 'nested.epub')
+                write_link_epub(source, navigation=nav)
+                result = EPUBProcessor(source, tmp, deployment_mode=mode).convert()
+                toc = json.loads((result.output_dir / ('toc.json' if mode == 'ssg' else 'content/toc.json')).read_text())
+                self.assertEqual([x['level'] for x in toc], [0, 1, 2, 3, 4, 5, 0])
+                self.assertEqual([x['title'] for x in toc], [f'Group {i}' for i in range(5)] + ['Second target', 'First target'])
+                self.assertEqual([x.get('anchor') for x in toc[-2:]], ['local', 'start'])
+                self.assertEqual([x['kind'] for x in toc[:5]], ['section'] * 5)
+                if mode == 'server':
+                    public = Path(tmp, 'public')
+                    target = public / 'book' / result.book_id
+                    target.parent.mkdir(parents=True)
+                    shutil.copytree(result.output_dir, target)
+                    AssetPublisher(Path('epub_browser/assets'), public).publish()
+                    markup = ServerPageRenderer(public, result.book_id).render_index()
+                else:
+                    markup = (result.output_dir / 'index.html').read_text()
+                page = html.fromstring(markup)
+                rows = page.xpath('//li[@data-toc-level]')
+                self.assertEqual([r.get('data-toc-level') for r in rows], ['0', '1', '2', '3', '4', '5', '0'])
+                self.assertFalse(rows[0].xpath('.//a'))
+                self.assertTrue(rows[-2].xpath('.//a/@href')[0].endswith('chapter_0.html#local'))
+                self.assertTrue(rows[-1].xpath('.//a/@href')[0].endswith('chapter_0.html#start'))
+
     def test_spine_links_and_ids_survive_ssg_and_server_conversion(self):
         for mode in ('ssg', 'server'):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as tmp:
