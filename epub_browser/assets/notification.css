@@ -47,3 +47,31 @@
 @media (prefers-reduced-motion: reduce) {
     .custom-css-notification { transition-duration: .01ms; }
 }
+
+.notification-action {
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--app-action, inherit);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.notification-action:hover { background: var(--app-hover, #0001); }
+.notification-action:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.notification-action:disabled { opacity: .6; cursor: wait; }
+
+/* Center positions also serve narrow screens without changing the saved choice. */
+.custom-css-notification[data-notification-placement^="top"] { top:max(var(--notification-top,16px), env(safe-area-inset-top)); bottom:auto; }
+.custom-css-notification[data-notification-placement^="bottom"] { top:auto; bottom:max(var(--notification-bottom,16px), env(safe-area-inset-bottom)); }
+.custom-css-notification[data-notification-placement$="left"] { left:max(16px, env(safe-area-inset-left)); right:auto; transform:none; }
+.custom-css-notification[data-notification-placement$="right"] { right:max(16px, env(safe-area-inset-right)); left:auto; transform:none; }
+.custom-css-notification[data-notification-placement$="left"].fade-out,
+.custom-css-notification[data-notification-placement$="right"].fade-out { transform:translateY(-8px); }
+.notification-position-settings #notificationPreview { margin-top:8px; }
+.notification-position-settings .reader-setting-help { margin:8px 0 0; }

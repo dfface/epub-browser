@@ -516,7 +516,7 @@ function hydrateBookShelfMembership(bookHash) {
             button.classList.remove('in-shelf');
         })
         .finally(function() {
-            if (icon) icon.className = 'fas fa-bookmark';
+            if (icon) icon.className = 'fas fa-layer-group';
             button.disabled = false;
             button.removeAttribute('aria-busy');
             button.classList.remove('is-loading');

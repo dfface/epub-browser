@@ -46,6 +46,7 @@ WEB_MANIFEST_LOCALIZATIONS = {
 # of a static export prevents orphaned account/AI controls and API clients from
 # crossing the SSG boundary.
 SERVER_ONLY_ASSET_PATHS = frozenset({
+    'bookmarks-server.js',
     'account.css',
     'api-docs.css',
     'api-docs.js',

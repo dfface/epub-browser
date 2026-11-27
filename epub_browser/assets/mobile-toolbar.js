@@ -5,7 +5,7 @@
 })(typeof self !== 'undefined' ? self : this, function() {
     var KEY = 'mobileToolbarOrder';
     var DEFAULT_ORDER = [
-        'mobileTocBtn', 'mobileBookHomeBtn', 'mobilePdfSearchToggle',
+        'mobileBookHomeBtn', 'mobileBookmarkBtn', 'mobilePdfSearchToggle',
         'mobilePdfZoomOut', 'mobilePdfZoomIn', 'mobilePdfFitWidth',
         'mobilePdfFitPage', 'mobilePdfRotate', 'mobileBookSearchToggle',
         'mobileAIReadingBtn', 'mobileAIChatBtn', 'mobilePrevChapter',
@@ -68,7 +68,7 @@
         }
         function editable() {
             return Array.prototype.slice.call(toolbar.children).filter(function(node) {
-                return !!node.id && !(options.pdf && node.id === 'mobileTocBtn');
+                return !!node.id;
             });
         }
         function text(key, params) { return i18n.t(key, params); }

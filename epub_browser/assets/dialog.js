@@ -22,6 +22,15 @@
             var cancel = document.createElement('button');
             var confirm = document.createElement('button');
             var input = null;
+            var pending = false, closed = false;
+            function bind(node, key, value, params) {
+                if (key) {
+                    node.setAttribute('data-i18n',key);
+                    if(params)node.setAttribute('data-i18n-params',JSON.stringify(params));
+                    node.textContent=root.EpubBrowserI18n ? root.EpubBrowserI18n.t(key,params) : value || key;
+                } else node.textContent=value || '';
+            }
+
 
             modal.className = 'app-dialog-modal';
             modal.setAttribute('role', options.destructive ? 'alertdialog' : 'dialog');
@@ -31,21 +40,21 @@
             dialog.className = 'app-dialog';
             header.className = 'app-dialog-header';
             title.id = 'appDialogTitle';
-            title.textContent = text(options.title, localized('title'));
+            bind(title,options.titleKey,text(options.title,localized('title')));
             message.className = 'app-dialog-message';
             message.id = 'appDialogMessage';
-            message.textContent = options.message || '';
+            bind(message,options.messageKey,options.message,options.messageParams);
             footer.className = 'app-dialog-footer';
             cancel.type = 'button';
             cancel.className = 'app-dialog-button app-dialog-cancel';
-            cancel.textContent = text(options.cancelText, localized('cancel'));
+            bind(cancel,options.cancelTextKey,text(options.cancelText,localized('cancel')));
             confirm.type = 'button';
             confirm.className = 'app-dialog-button app-dialog-confirm' + (options.destructive ? ' app-dialog-destructive' : '');
-            confirm.textContent = text(options.confirmText, localized('confirm'));
+            bind(confirm,options.confirmTextKey,text(options.confirmText,localized('confirm')));
 
             header.appendChild(title);
             dialog.appendChild(header);
-            if (options.message) {
+            if (options.message || options.messageKey) {
                 dialog.appendChild(message);
                 modal.setAttribute('aria-describedby', message.id);
             }
@@ -61,7 +70,7 @@
                 dialog.appendChild(details);
                 modal.setAttribute(
                     'aria-describedby',
-                    (options.message ? message.id + ' ' : '') + details.id
+                    (options.message || options.messageKey ? message.id + ' ' : '') + details.id
                 );
             }
             if (options.input) {
@@ -69,14 +78,20 @@
                 input = document.createElement('input');
                 label.className = 'app-dialog-label';
                 label.htmlFor = 'appDialogInput';
-                label.textContent = text(options.inputLabel, text(options.title, localized('value')));
+                bind(label,options.inputLabelKey,text(options.inputLabel,text(options.title,localized('value'))));
                 input.id = 'appDialogInput';
                 input.className = 'app-dialog-input';
                 input.type = options.inputType || 'text';
                 input.value = options.defaultValue || '';
                 input.autocomplete = 'off';
+                if(options.maxLength)input.maxLength=options.maxLength;
                 dialog.appendChild(label);
                 dialog.appendChild(input);
+                if(options.inputHelp || options.inputHelpKey) {
+                    var help=document.createElement('p');help.id='appDialogHelp';help.className='app-dialog-help';
+                    bind(help,options.inputHelpKey,options.inputHelp);
+                    input.setAttribute('aria-describedby',help.id);dialog.appendChild(help);
+                }
                 if (options.expectedValue !== undefined) {
                     confirm.disabled = input.value !== String(options.expectedValue);
                     input.addEventListener('input', function() {
@@ -84,6 +99,8 @@
                     });
                 }
             }
+            var error=document.createElement('p');error.className='app-dialog-error';error.id='appDialogError';
+            error.hidden=true;error.setAttribute('role','alert');dialog.appendChild(error);
             footer.appendChild(cancel);
             footer.appendChild(confirm);
             dialog.appendChild(footer);
@@ -92,10 +109,12 @@
             document.body.appendChild(modal);
 
             function close(result) {
+                if(pending || closed)return;closed=true;
                 var restoreFocus = function() {
-                    if (previousFocus && typeof previousFocus.focus === 'function') previousFocus.focus();
+                    var target=typeof options.returnFocus==='function'?options.returnFocus():options.returnFocus || previousFocus;
+                    if(target && typeof target.focus==='function')target.focus();
                 };
-                document.removeEventListener('keydown', onKeydown);
+                document.removeEventListener('keydown', onKeydown, true);
                 modal.remove();
                 resolve(result);
                 if (typeof root.setTimeout === 'function') root.setTimeout(restoreFocus, 0);
@@ -105,12 +124,26 @@
 
             function submit() {
                 if (confirm.disabled) return;
-                close(input ? input.value : true);
+                if(typeof options.onSubmit!=='function') {close(input ? input.value : true);return;}
+                var value=input ? input.value : true;
+                pending=true;confirm.disabled=true;cancel.disabled=true;error.hidden=true;
+                if(input)input.disabled=true;
+                modal.setAttribute('aria-busy','true');
+                Promise.resolve().then(function(){return options.onSubmit(value);}).then(function(){
+                    pending=false;close(value);
+                }).catch(function(){
+                    pending=false;confirm.disabled=false;cancel.disabled=false;error.hidden=false;
+                    if(input)input.disabled=false;
+                    modal.setAttribute('aria-busy','false');
+                    bind(error,options.errorKey,options.errorText || localized('error'));
+                    if(input){input.setAttribute('aria-describedby','appDialogError'+(options.inputHelpKey || options.inputHelp?' appDialogHelp':''));input.focus();}
+                });
             }
 
             function onKeydown(event) {
                 if (event.key === 'Escape') {
                     event.preventDefault();
+                    if(event.stopImmediatePropagation)event.stopImmediatePropagation();
                     close(options.input ? null : false);
                 } else if (event.key === 'Enter' && input && document.activeElement === input) {
                     event.preventDefault();
@@ -132,7 +165,7 @@
             cancel.addEventListener('click', function() { close(options.input ? null : false); });
             confirm.addEventListener('click', submit);
             backdrop.addEventListener('click', function() { close(options.input ? null : false); });
-            document.addEventListener('keydown', onKeydown);
+            document.addEventListener('keydown', onKeydown, true);
             (input || (options.destructive ? cancel : confirm)).focus();
             if (input && options.selectOnOpen) input.select();
         });

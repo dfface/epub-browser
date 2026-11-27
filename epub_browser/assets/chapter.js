@@ -383,7 +383,6 @@ function initScript() {
     }
 
     var keepMobileToolbarVisible = getReadingPreference('keepMobileToolbarVisible') === 'true';
-    var showChapterOutline = getReadingPreference('showChapterOutline') !== 'false';
     var showReadingProgressBar = window.EpubReadingProgress
         ? window.EpubReadingProgress.showProgressBar(getReadingPreference('showReadingProgressBar'))
         : getReadingPreference('showReadingProgressBar') !== 'false';
@@ -734,7 +733,7 @@ function initScript() {
                 if (hasSearchFragment()) scheduleSearchLocate();
                 setTimeout(function() {
                     hideLoading();
-                    Fancybox.bind('#eb-content img', {
+                    if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {
                         // Your custom options
                     });
                 }, 500);
@@ -843,11 +842,6 @@ function initScript() {
             paginationToolbarControls[p].hidden = true;
         }
 
-        var toc = document.getElementById('tocToggle');
-        if (toc) toc.style.display = 'flex';
-        var mtoc = document.getElementById('mobileTocBtn');
-        if (mtoc) mtoc.style.display = 'flex';
-        
         if (await window.EpubDialog.confirm({
             title: i18n.t('reader.exitTurning'),
             message: i18n.t('reader.exitTurningConfirm'),
@@ -2118,14 +2112,10 @@ function initScript() {
         if (readingProgressReporter) readingProgressReporter.flush(true);
     });
     
-    var tocToggle = document.getElementById('tocToggle');
     var bookHomeToggle = document.getElementById('bookHomeToggle');
     var tocFloating = document.getElementById('tocFloating');
     var bookHomeFloating = document.getElementById('bookHomeFloating');
-    var mobileTocBtn = document.getElementById('mobileTocBtn');
     var mobileBookHomeBtn = document.getElementById('mobileBookHomeBtn');
-    var tocClose = document.getElementById('tocClose');
-    var tocLocateCurrent = document.getElementById('tocLocateCurrent');
     var bookHomeClose = document.getElementById('bookHomeClose');
     var bookHomeLocateCurrent = document.getElementById('bookHomeLocateCurrent');
     var tocList = document.getElementById('tocList');
@@ -2183,12 +2173,6 @@ function initScript() {
         };
     }
 
-    registerReaderDrawer({
-        panel: tocFloating,
-        toggle: tocToggle,
-        mobileToggle: mobileTocBtn,
-        afterOpen: tocFloatingScrolling
-    });
     registerReaderDrawer({
         panel: bookHomeFloating,
         toggle: bookHomeToggle,
@@ -2248,47 +2232,23 @@ function initScript() {
 
     function syncChapterOutlineVisibility() {
         if (!window.EpubReaderLayout) return;
-        // Close through the shared drawer lifecycle to release its backdrop.
-        if ((!showChapterOutline || isContinuousScroll || window.EpubPDFConfig) &&
-                tocFloating.classList.contains('active')) {
-            var focusWasInside = tocFloating.contains(document.activeElement);
-            closeReaderDrawers(false);
-            if (focusWasInside) {
-                var preference = document.getElementById('showChapterOutlineToggle');
-                if (preference) preference.focus();
-            }
-        }
-        window.EpubReaderLayout.syncChapterTocAvailability(
-            document, isContinuousScroll, Boolean(window.EpubPDFConfig), showChapterOutline
-        );
+        window.EpubReaderLayout.syncChapterTocAvailability(document,isContinuousScroll,Boolean(window.EpubPDFConfig));
+        window.dispatchEvent(new CustomEvent('epub:reader-outline-availability'));
     }
 
-    tocToggle.addEventListener('click', function() {
-        openReaderDrawer(tocFloating, tocToggle, mobileTocBtn, tocFloatingScrolling, tocToggle);
-    });
     bookHomeToggle.addEventListener('click', function() {
         openReaderDrawer(bookHomeFloating, bookHomeToggle, mobileBookHomeBtn, bookHomeFloatingScrolling, bookHomeToggle);
-    });
-    mobileTocBtn.addEventListener('click', function() {
-        openReaderDrawer(tocFloating, tocToggle, mobileTocBtn, tocFloatingScrolling, mobileTocBtn);
     });
     mobileBookHomeBtn.addEventListener('click', function() {
         openReaderDrawer(bookHomeFloating, bookHomeToggle, mobileBookHomeBtn, bookHomeFloatingScrolling, mobileBookHomeBtn);
     });
-    tocClose.addEventListener('click', function() {
-        closeReaderDrawers(true);
-    });
-    if (tocLocateCurrent) {
-        tocLocateCurrent.addEventListener('click', function() {
-            updateTocHighlight(true);
-        });
-    }
     bookHomeClose.addEventListener('click', function() {
         closeReaderDrawers(true);
     });
     if (bookHomeLocateCurrent) {
         bookHomeLocateCurrent.addEventListener('click', function() {
-            setBookTocActiveChapter(visibleChapterIndex, true, true);
+            if (!tocFloating.hidden) updateTocHighlight(true);
+            else setBookTocActiveChapter(visibleChapterIndex, true, true);
         });
     }
     readerDrawerBackdrop.addEventListener('click', function() {
@@ -2307,13 +2267,50 @@ function initScript() {
         window.dispatchEvent(new CustomEvent('epub-browser:reader-drawers-ready'));
     }
     
+    function outlineTopInset() {
+        var inset=16, canvas=content.getBoundingClientRect();
+        document.querySelectorAll('.app-header,.reader-toolbar').forEach(function(bar){
+            if(!bar.getClientRects().length)return;
+            var position=window.getComputedStyle(bar).position;
+            if(position!=='fixed' && position!=='sticky')return;
+            var rect=bar.getBoundingClientRect();
+            if(rect.top<=inset && rect.bottom>0 && rect.right>canvas.left && rect.left<canvas.right) {
+                inset=Math.max(inset,rect.bottom+12);
+            }
+        });
+        return inset;
+    }
+    function outlinePageFor(heading) {
+        return Math.floor((heading.getBoundingClientRect().left-content.getBoundingClientRect().left+content.scrollLeft)/pageWidth);
+    }
+    function revealOutlineHeading(heading) {
+        closeReaderDrawers(false);
+        window.requestAnimationFrame(function(){
+            content.setAttribute('tabindex','-1');content.focus({preventScroll:true});
+            if(isPaginationMode)showPage(outlinePageFor(heading),true);
+            else {
+                var align=function(){window.scrollTo({top:Math.max(0,window.scrollY+heading.getBoundingClientRect().top-outlineTopInset()),behavior:'instant'});};
+                align();
+                window.requestAnimationFrame(function(){align();updateTocHighlight();});
+            }
+            updateTocHighlight();
+        });
+    }
+
     function generateToc() {
         var c = document.getElementById('eb-content');
         var heads = c.querySelectorAll('h2, h3, h4');
         tocList.innerHTML = '';
         if (heads.length === 0) {
-            tocList.innerHTML = '<li class="toc-item"></li>';
-            tocList.firstChild.textContent = i18n.t('reader.tocNoTitle');
+            var empty=document.createElement('li');empty.className='outline-empty';
+            ['outlineEmpty','outlineEmptyHelp'].forEach(function(key){
+                var line=document.createElement('p'), translationKey='bookmarks.'+key;
+                line.setAttribute('data-i18n',translationKey);
+                line.textContent=i18n.t(translationKey);empty.appendChild(line);
+            });
+            tocList.appendChild(empty);
+            window.dispatchEvent(new CustomEvent('epub:reader-outline-content'));
+
             return;
         }
         for (var i = 0; i < heads.length; i++) {
@@ -2329,17 +2326,12 @@ function initScript() {
                 e.preventDefault();
                 var t = document.getElementById(this.hash.substring(1));
                 if (!t) return;
-                if (isPaginationMode) {
-                    var page = Math.floor(t.offsetLeft / pageWidth);
-                    showPage(page, true);
-                } else {
-                    window.scrollTo({top: t.offsetTop-100, behavior:'smooth'});
-                }
-                closeReaderDrawers(false);
+                revealOutlineHeading(t);
             });
             li.appendChild(a);
             tocList.appendChild(li);
         }
+        window.dispatchEvent(new CustomEvent('epub:reader-outline-content'));
     }
     
     function updateTocHighlight(focusLink) {
@@ -2351,7 +2343,7 @@ function initScript() {
         if (isPaginationMode) {
             if (pageWidth > 0) {
                 for (var p = 0; p < heads.length; p++) {
-                    if (Math.floor(heads[p].offsetLeft / pageWidth) <= currentPage) {
+                    if (outlinePageFor(heads[p]) <= currentPage) {
                         id = heads[p].id;
                     } else {
                         break;
@@ -2359,10 +2351,10 @@ function initScript() {
                 }
             }
         } else {
-            var pos = window.scrollY + 150;
+            var pos = outlineTopInset() + 2;
             for (var i = heads.length-1; i >=0; i--) {
                 var h = heads[i];
-                if (h.offsetTop <= pos) {
+                if (h.getBoundingClientRect().top <= pos) {
                     id = h.id;
                     break;
                 }
@@ -2453,9 +2445,8 @@ function initScript() {
         window.addEventListener('scroll', scheduleMobileControlsVisibility, { passive: true });
     }
 
-    Fancybox.bind('#eb-content img', {
-        // Your custom options
-    });
+    // Optional image enhancement must not abort reader/navigation startup.
+    if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
 
     if (window.EpubMobileToolbar) {
         window.EpubMobileToolbar.init({
@@ -2842,7 +2833,7 @@ function initScript() {
         highlightCodeBlocks(chapterSection);
         dispatchChapterContentLifecycle('added', chapterSection);
         if (typeof Fancybox !== 'undefined') {
-            Fancybox.bind('#eb-content img', {});
+            if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
         }
         loadedChapters = {};
         loadedChapters[target.index] = true;
@@ -3012,7 +3003,7 @@ function initScript() {
                     
                     // 对新增内容重新绑定 Fancybox
                     if (typeof Fancybox !== 'undefined') {
-                        Fancybox.bind('#eb-content img', {});
+                        if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
                     }
                 }
             }
@@ -3125,7 +3116,7 @@ function initScript() {
                     loadedChapters[prevIdx] = true;
                     pruneContinuousWindow('previous', prevIdx);
                     if (typeof Fancybox !== 'undefined') {
-                        Fancybox.bind('#eb-content img', {});
+                        if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
                     }
                     EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
                     EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
@@ -3250,15 +3241,6 @@ function initScript() {
                 keepMobileToolbarVisible || isPaginationMode,
                 window.pageYOffset || document.documentElement.scrollTop
             );
-        });
-    }
-    var showChapterOutlineToggle = document.getElementById('showChapterOutlineToggle');
-    if (showChapterOutlineToggle) {
-        showChapterOutlineToggle.checked = showChapterOutline;
-        showChapterOutlineToggle.addEventListener('change', function() {
-            showChapterOutline = this.checked;
-            setReadingPreference('showChapterOutline', showChapterOutline ? 'true' : 'false');
-            syncChapterOutlineVisibility();
         });
     }
     if (showReadingProgressBarToggle) {
@@ -3417,6 +3399,30 @@ function initScript() {
     });
 
     scheduleNextChapterPrefetch();
+    // Position bookmarks share the reader's layout and TOC lifecycle, but keep
+    // their storage and semantics separate from automatic progress/annotations.
+    window.EpubReaderBookmarkBridge = {
+        reveal: function(target, rect, index, referenceY) {
+            if (isPaginationMode && pageWidth) {
+                var canvas = content.getBoundingClientRect();
+                showPage(Math.floor((rect.left - canvas.left + content.scrollLeft) / pageWidth));
+                // A zoomed PDF page can be taller than the pagination canvas.
+                // Its original-page point still needs a vertical canvas offset.
+                if (target.hasAttribute('data-pdf-page-number')) {
+                    content.scrollTop += rect.top - referenceY;
+                }
+            } else {
+                window.scrollBy(0, rect.top - referenceY);
+            }
+            visibleChapterIndex = index;
+            selectReadingChapter(index);
+            setBookTocActiveChapter(index, true);
+            updateTocHighlight();
+        }
+    };
+
+    window.dispatchEvent(new CustomEvent('epub-browser:bookmark-reader-ready'));
+
 }
 
 window.initScriptChapter = initScript;

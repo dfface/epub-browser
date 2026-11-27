@@ -40,7 +40,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 34
+DB_SCHEMA_VERSION = 35
 APPEARANCE_DEFAULTS = {"automatic": False, "day": "light", "night": "dark", "manual": "light"}
 APPEARANCE_THEMES = frozenset({"light", "dark", "sepia", "forest", "ocean", "peach", "lavender"})
 
@@ -512,6 +512,19 @@ class StateStore:
                     "TEXT NOT NULL DEFAULT 'monday'",
                 )
                 connection.execute("PRAGMA user_version = 34")
+            if version < 35:
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS bookmarks (
+                        id TEXT PRIMARY KEY NOT NULL,
+                        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        book_id TEXT NOT NULL REFERENCES books(book_id) ON DELETE CASCADE,
+                        position_key TEXT NOT NULL,
+                        position_json TEXT NOT NULL,
+                        name TEXT NOT NULL DEFAULT '',
+                        UNIQUE(user_id, book_id, position_key)
+                    )
+                """)
+                connection.execute("PRAGMA user_version = 35")
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -3209,6 +3222,7 @@ class StateStore:
                     ("account_appearance", "user_id"),
                     ("reading_progress", "user_id"),
                     ("annotations", "user_id"),
+                    ("bookmarks", "user_id"),
                     ("book_reviews", "user_id"),
                     ("reading_sessions", "user_id"),
                     ("vocabulary_words", "user_id"),
@@ -7955,6 +7969,97 @@ class StateStore:
                 "SELECT * FROM dictionary_import_jobs WHERE id = ?", (job_id,)
             ).fetchone()
         return self._dictionary_import_job(row)
+
+    @staticmethod
+    def validate_bookmark_position(position):
+        if not isinstance(position, dict):
+            raise ValueError("Invalid bookmark")
+        def integer(value, minimum=0):
+            return type(value) is int and minimum <= value <= 1000000
+        if position.get('format') == 'pdf':
+            y = position.get('y')
+            if (not integer(position.get('page'), 1) or type(y) not in (int, float)
+                    or not math.isfinite(y) or not 0 <= y <= 1):
+                raise ValueError("Invalid bookmark")
+            clean = {'format': 'pdf', 'page': position['page'], 'y': y}
+            key = ['pdf', position['page']]
+        elif position.get('format') == 'epub':
+            for field, maximum in (('chapter', 2048), ('element', 2048), ('text', 2048)):
+                if not isinstance(position.get(field), str) or not position[field] or len(position[field]) > maximum:
+                    raise ValueError("Invalid bookmark")
+            if not integer(position.get('chapter_index')) or not integer(position.get('offset')):
+                raise ValueError("Invalid bookmark")
+            clean = {field: position[field] for field in
+                     ('format', 'chapter', 'chapter_index', 'element', 'text', 'offset')}
+            if 'quote' in position:
+                quote, offset = position['quote'], position.get('quote_offset')
+                if (not isinstance(quote, str) or not 0 < len(quote) <= 256
+                        or not integer(offset) or offset > len(quote.encode('utf-16-le')) // 2):
+                    raise ValueError("Invalid bookmark")
+                clean.update(quote=quote, quote_offset=offset)
+            key = ['epub', clean['chapter'], clean['element']]
+        else:
+            raise ValueError("Invalid bookmark")
+        label = position.get('label', '')
+        if not isinstance(label, str) or len(label) > 200:
+            raise ValueError("Invalid bookmark")
+        if label:
+            clean['label'] = label
+        return clean, json.dumps(key, ensure_ascii=False)
+
+    @staticmethod
+    def validate_bookmark_name(name):
+        if not isinstance(name, str) or len(name) > 120:
+            raise ValueError("Invalid bookmark")
+        return name.strip()
+
+    @staticmethod
+    def _bookmark_data(row):
+        if row is None:
+            return None
+        return {'id': row['id'], 'name': row['name'], 'position': json.loads(row['position_json'])}
+
+    def list_bookmarks(self, book_id, user_id):
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT * FROM bookmarks WHERE user_id = ? AND book_id = ? ORDER BY id",
+                (user_id, book_id),
+            ).fetchall()
+        return [self._bookmark_data(row) for row in rows]
+
+    def save_bookmark(self, book_id, user_id, position, name=''):
+        position, key = self.validate_bookmark_position(position)
+        name = self.validate_bookmark_name(name)
+        with self._connection() as connection:
+            connection.execute(
+                "INSERT INTO bookmarks (id,user_id,book_id,position_key,position_json,name) "
+                "VALUES (?,?,?,?,?,?) ON CONFLICT(user_id,book_id,position_key) DO NOTHING",
+                (uuid.uuid4().hex, user_id, book_id, key, json.dumps(position, ensure_ascii=False), name),
+            )
+            row = connection.execute(
+                "SELECT * FROM bookmarks WHERE user_id=? AND book_id=? AND position_key=?",
+                (user_id, book_id, key),
+            ).fetchone()
+        return self._bookmark_data(row)
+
+    def change_bookmark(self, book_id, user_id, bookmark_id, *, name=None, delete=False):
+        if not delete:
+            name = self.validate_bookmark_name(name)
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT * FROM bookmarks WHERE user_id=? AND book_id=? AND id=?",
+                (user_id, book_id, bookmark_id),
+            ).fetchone()
+            if row is None:
+                return None
+            if delete:
+                connection.execute("DELETE FROM bookmarks WHERE id=?", (bookmark_id,))
+            else:
+                connection.execute("UPDATE bookmarks SET name=? WHERE id=?", (name, bookmark_id))
+        result = self._bookmark_data(row)
+        if not delete:
+            result['name'] = name
+        return result
 
     def get_annotation(self, annotation_id: str, user_id: str):
         with self._connection() as connection:

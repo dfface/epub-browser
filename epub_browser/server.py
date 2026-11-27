@@ -5428,6 +5428,35 @@ window.location.assign(payload.redirect||'/');
     def forbidden_book_response():
         return response(error_payload('forbidden', 'Forbidden'), 403)
 
+    async def bookmarks(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+        if await run_db(book_access_denied, principal, book_id):
+            return forbidden_book_response()
+        bookmark_id = request.path_params.get('bookmark_id')
+        if request.method != 'GET' and not runtime_status.is_ready():
+            return response(error_payload('not_ready', 'Server is not ready'), 503)
+        if request.method == 'GET':
+            return response({'data': await run_db(store.list_bookmarks, book_id, principal.user_id)}, cache_control='no-store')
+        data = None if request.method == 'DELETE' else await bounded_unique_json_object(request, 16384)
+        try:
+            if request.method == 'POST':
+                if data is None:
+                    raise ValueError()
+                row = await run_db(store.save_bookmark, book_id, principal.user_id,
+                                   data.get('position'), data.get('name', ''))
+                return response({'data': row}, 201, cache_control='no-store')
+            if request.method == 'PATCH' and data is None:
+                raise ValueError()
+            row = await run_db(store.change_bookmark, book_id, principal.user_id, bookmark_id,
+                               name=data.get('name') if data else None,
+                               delete=request.method == 'DELETE')
+        except ValueError:
+            return response(error_payload('invalid_bookmark', get_bundle(resolve_request_locale(request))['bookmarks.error']), 400)
+        if row is None:
+            return response(error_payload('bookmark_not_found', get_bundle(resolve_request_locale(request))['bookmarks.unresolved']), 404)
+        return response({'data': row}, cache_control='no-store')
+
     async def annotations(request):
         principal = require_principal(request)
         parts = [part for part in request.path_params['path'].split('/') if part]
@@ -6359,6 +6388,8 @@ window.location.assign(payload.redirect||'/');
         Route('/api/bookshelf', bookshelf, methods=['GET', 'PUT']),
         Route('/api/library-metadata', filtered_library_metadata, methods=['GET']),
         Route('/api/library-order', save_library_order, methods=['PUT']),
+        Route('/api/bookmarks/{book_id}', bookmarks, methods=['GET', 'POST']),
+        Route('/api/bookmarks/{book_id}/{bookmark_id}', bookmarks, methods=['PATCH', 'DELETE']),
         Route('/api/reading-progress/{book_hash}', reading_progress, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/reading-progress', recent_reading, methods=['GET']),
         Route('/api/book-reviews/{book_id}', book_review, methods=['GET', 'PUT', 'DELETE']),
