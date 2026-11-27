@@ -4103,7 +4103,11 @@ assert.deepEqual(
         script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         self.assertIn("localStorage.getItem('continuousScrollLoadPrevious') !== 'false'", script)
         self.assertIn("localStorage.setItem('continuousScrollLoadPrevious', loadPreviousOnScroll ? 'true' : 'false')", script)
-        self.assertIn('continuousDirectionSelect.disabled = !isContinuousScroll || isPaginationMode', script)
+        self.assertIn('continuousDirectionRow.hidden = !isContinuousScroll || isPaginationMode', script)
+        self.assertIn('role="group" aria-labelledby="continuousScrollDirectionLabel"', chapter)
+        self.assertIn('aria-describedby="continuousScrollDirectionHelp"', chapter)
+        self.assertIn('name="continuousScrollDirection" value="both"', chapter)
+        self.assertIn('name="continuousScrollDirection" value="down"', chapter)
 
     def test_continuous_reader_disables_the_chapter_local_toc(self):
         chapter = self._chapter_html()

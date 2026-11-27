@@ -2471,41 +2471,62 @@ html[data-reader-text-alignment="justify"] :is(#eb-content, .eb-content) :is(p, 
 }
 
 .continuous-scroll-direction {
-    margin-inline-start: 48px;
-    display: grid;
-    gap: 8px;
+    /* Match the text after the 44px switch and its 10px gap. */
+    margin-inline-start: 54px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
     min-width: 0;
-}
-
-.continuous-scroll-direction select {
-    width: 100%;
-    min-width: 0;
-    min-height: 44px;
-    padding: 8px 12px;
-    font: inherit;
-    color: var(--text);
-    background: var(--card-bg);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-}
-
-.continuous-scroll-direction select:focus-visible {
-    outline: 2px solid var(--text);
-    outline-offset: 2px;
-}
-
-.continuous-scroll-direction:has(select:disabled) label,
-.continuous-scroll-direction select:disabled {
-    opacity: .5;
-    cursor: not-allowed;
-}
-
-.continuous-scroll-direction p {
-    margin: 0;
+    font-size: .85rem;
     color: var(--text-secondary);
-    font-size: .875rem;
-    line-height: 1.5;
+}
+
+.continuous-scroll-direction[hidden] { display: none; }
+
+.continuous-direction-segments {
+    display: inline-flex;
+    flex-wrap: wrap;
+    max-width: 100%;
+    padding: 2px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+}
+
+.continuous-direction-segments label {
+    position: relative;
+    display: flex;
+    min-width: 0;
+    cursor: pointer;
+}
+
+.continuous-direction-segments input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+.continuous-direction-segments label > span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    padding: 6px 12px;
+    border-radius: 5px;
     overflow-wrap: anywhere;
+}
+
+.continuous-direction-segments input:checked + span {
+    background: var(--button-bg);
+    color: var(--button-text, #fff);
+}
+
+.continuous-direction-segments input:focus-visible + span {
+    outline: 2px solid var(--text);
+    outline-offset: -2px;
 }
 
 #chapterOutlineHelpText,

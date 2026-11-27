@@ -39,3 +39,36 @@ test('continuous scroll can stop loading previous chapters and resume on user ch
   vm.runInContext('loadPrevChapter();', context);
   assert.deepEqual(requests, ['chapter_2.html']);
 });
+
+test('direction segments preserve the choice while continuous scroll is hidden', () => {
+  const choices = [{value: 'both'}, {value: 'down'}];
+  const saved = [];
+  const row = {
+    querySelectorAll: () => choices,
+    addEventListener: (type, listener) => { row.change = listener; }
+  };
+  const context = {
+    document: {getElementById: () => row}, isContinuousScroll: true,
+    isPaginationMode: false, loadPreviousOnScroll: true,
+    localStorage: {setItem: (key, value) => saved.push([key, value])}
+  };
+  vm.createContext(context);
+  const start = chapterScript.indexOf('    var continuousDirectionRow =');
+  const end = chapterScript.indexOf('    if (continuousScrollToggle) {', start);
+  vm.runInContext(chapterScript.slice(start, end), context);
+  assert.equal(row.hidden, false);
+  assert.equal(choices[0].checked, true);
+  row.change({target: {name: 'continuousScrollDirection', value: 'down'}});
+  assert.equal(choices[1].checked, true);
+  assert.deepEqual(saved, [['continuousScrollLoadPrevious', 'false']]);
+  context.isContinuousScroll = false;
+  vm.runInContext('syncContinuousDirection()', context);
+  assert.equal(row.hidden, true);
+  context.isContinuousScroll = true;
+  vm.runInContext('syncContinuousDirection()', context);
+  assert.equal(row.hidden, false);
+  assert.equal(choices[1].checked, true);
+  context.isPaginationMode = true;
+  vm.runInContext('syncContinuousDirection()', context);
+  assert.equal(row.hidden, true);
+});

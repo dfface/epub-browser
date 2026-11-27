@@ -3304,13 +3304,22 @@ function initScript() {
             applyDesktopToolbarPreference();
         });
     }
-    var continuousDirectionSelect = document.getElementById('continuousScrollDirection');
-    if (continuousDirectionSelect) {
-        continuousDirectionSelect.value = loadPreviousOnScroll ? 'both' : 'down';
-        continuousDirectionSelect.disabled = !isContinuousScroll || isPaginationMode;
-        continuousDirectionSelect.addEventListener('change', function() {
-            loadPreviousOnScroll = this.value !== 'down';
+    var continuousDirectionRow = document.getElementById('continuousScrollDirection');
+    function syncContinuousDirection() {
+        if (!continuousDirectionRow) return;
+        continuousDirectionRow.hidden = !isContinuousScroll || isPaginationMode;
+        var choices = continuousDirectionRow.querySelectorAll('input[type="radio"]');
+        for (var i = 0; i < choices.length; i++) {
+            choices[i].checked = choices[i].value === (loadPreviousOnScroll ? 'both' : 'down');
+        }
+    }
+    if (continuousDirectionRow) {
+        syncContinuousDirection();
+        continuousDirectionRow.addEventListener('change', function(event) {
+            if (event.target.name !== 'continuousScrollDirection') return;
+            loadPreviousOnScroll = event.target.value !== 'down';
             localStorage.setItem('continuousScrollLoadPrevious', loadPreviousOnScroll ? 'true' : 'false');
+            syncContinuousDirection();
         });
     }
     if (continuousScrollToggle) {
@@ -3340,7 +3349,7 @@ function initScript() {
             }
             
             isContinuousScroll = this.checked;
-            if (continuousDirectionSelect) continuousDirectionSelect.disabled = !isContinuousScroll;
+            syncContinuousDirection();
             if (window.EpubReaderLayout) {
                 syncChapterOutlineVisibility();
             }

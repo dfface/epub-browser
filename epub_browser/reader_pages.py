@@ -3116,17 +3116,23 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                         <input type="checkbox" id="continuousScrollToggle">
                         <span class="switch-slider"></span>
                         <span class="switch-text" data-i18n="settings.continuousScroll">Enable continuous scroll</span>
-                        <span class="continuous-scroll-tip" id="continuousScrollTip" tabindex="0" data-settings-tip data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-data-tip="settings.continuousScrollTip" aria-label="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off." data-i18n-aria-label="settings.continuousScrollTip">
+                        <span class="continuous-scroll-tip" id="continuousScrollTip" tabindex="0" data-settings-tip data-tip="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off. Both directions: automatically loads previous and next chapters. Down only: automatically loads the next chapter; scrolling up only shows content already loaded." data-i18n-data-tip="settings.continuousScrollTip" aria-label="Automatically loads the next chapter when scrolling past the end. Note: scroll progress save/restore is disabled. Tip: press Space for a similar seamless reading experience when this is off. Both directions: automatically loads previous and next chapters. Down only: automatically loads the next chapter; scrolling up only shows content already loaded." data-i18n-aria-label="settings.continuousScrollTip">
                             <i class="fas fa-info-circle" aria-hidden="true"></i>
                         </span>
                     </label>
-                    <div class="continuous-scroll-direction pagination-incompatible-setting">
-                        <label for="continuousScrollDirection" data-i18n="settings.continuousScrollDirection">Automatic loading direction</label>
-                        <select id="continuousScrollDirection" aria-describedby="continuousScrollDirectionHelp" disabled>
-                            <option value="both" data-i18n="settings.continuousScrollBoth">Both directions</option>
-                            <option value="down" data-i18n="settings.continuousScrollDown">Down only</option>
-                        </select>
-                        <p id="continuousScrollDirectionHelp" data-i18n="settings.continuousScrollDirectionHelp">Down only: automatically loads the next chapter; scrolling up only shows content already loaded.</p>
+                    <div id="continuousScrollDirection" class="continuous-scroll-direction pagination-incompatible-setting" hidden>
+                        <span id="continuousScrollDirectionLabel" data-i18n="settings.continuousScrollDirection">Loading direction</span>
+                        <div class="continuous-direction-segments" role="group" aria-labelledby="continuousScrollDirectionLabel" aria-describedby="continuousScrollDirectionHelp">
+                            <label>
+                                <input type="radio" name="continuousScrollDirection" value="both" checked>
+                                <span data-i18n="settings.continuousScrollBoth">Both directions</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="continuousScrollDirection" value="down">
+                                <span data-i18n="settings.continuousScrollDown">Down only</span>
+                            </label>
+                        </div>
+                        <span id="continuousScrollDirectionHelp" class="reader-setting-help" data-i18n="settings.continuousScrollDirectionHelp">Both directions: automatically loads previous and next chapters. Down only: loads the next chapter; scrolling up only shows content already loaded.</span>
                     </div>
                 </fieldset>
                 <fieldset class="settings-group reading-settings-section display-options-settings">
