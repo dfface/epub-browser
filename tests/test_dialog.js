@@ -91,3 +91,22 @@ test('typed destructive confirmation renders semantic details and requires an ex
   confirm.listeners.click();
   assert.equal(await pending, 'reader');
 });
+
+test('prompt preserves its draft on a failed async save and closes after retry', async () => {
+  const document=fakeDocument(), api=loadDialog(document);
+  let attempts=0;
+  const pending=api.prompt({title:'Rename bookmark',defaultValue:'Original',maxLength:120,
+    inputHelp:'Leave blank to restore the title',errorText:'Save failed',
+    onSubmit:async ()=>{if(++attempts===1)throw Error('offline');}});
+  const modal=document.body.children.at(-1),content=modal.children[1];
+  const input=content.children.find(n=>n.tagName==='INPUT');
+  const confirm=content.children.at(-1).children[1];
+  input.value='My draft';
+  confirm.listeners.click();
+  await new Promise(r=>setTimeout(r,0));
+  assert.equal(document.body.children.includes(modal),true);
+  assert.equal(input.value,'My draft');
+  assert.equal(confirm.disabled,false);
+  confirm.listeners.click();
+  assert.equal(await pending,'My draft');
+});

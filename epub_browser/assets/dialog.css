@@ -19,3 +19,7 @@
 .app-dialog-button:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 2px; }
 @media (max-width: 600px) { .app-dialog-modal { padding: 14px; align-items: end; }.app-dialog { width: 100%; padding: 20px; }.app-dialog-footer { flex-direction: column-reverse; }.app-dialog-button { width: 100%; } }
 @media (prefers-reduced-motion: reduce) { .app-dialog-button { transition: none; } }
+.app-dialog-help { margin:8px 0 0; color:var(--text-secondary); font-size:.85rem; line-height:1.55; }
+.app-dialog-error { margin:12px 0 0; color:var(--notification-error); font-size:.9rem; line-height:1.55; }
+.app-dialog-error[hidden] { display:none; }
+@media(max-width:480px) { .app-dialog { padding:20px; box-sizing:border-box; } }

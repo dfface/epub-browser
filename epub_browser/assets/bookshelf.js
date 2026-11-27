@@ -760,7 +760,7 @@ function initBookshelf() {
             if (bookCount === 0 && groupCount === 0) {
                 bookshelfBody.innerHTML = 
                     '<div class="bookshelf-empty">' +
-                        '<i class="fas fa-bookmark"></i>' +
+                        '<i class="fas fa-layer-group"></i>' +
                         '<p data-i18n="bookshelf.empty">' + tr('empty') + '</p>' +
                     '</div>';
             }

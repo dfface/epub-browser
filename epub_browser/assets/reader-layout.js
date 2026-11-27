@@ -442,26 +442,12 @@
         }
     }
 
-    function syncChapterTocAvailability(documentObject, continuous, pdf, showOutline) {
-        var disabled = Boolean(continuous || pdf || showOutline === false);
-        var controls = [
-            documentObject.getElementById('tocToggle'),
-            documentObject.getElementById('mobileTocBtn')
-        ];
-        controls.forEach(function(control) {
-            setDisabled(control, disabled);
-            if (!control) return;
-            control.hidden = disabled;
-            control.setAttribute('aria-hidden', disabled ? 'true' : 'false');
-        });
-
-        if (disabled) {
-            var drawer = documentObject.getElementById('tocFloating');
-            if (drawer) {
-                drawer.classList.remove('active');
-                drawer.setAttribute('aria-hidden', 'true');
-            }
-        }
+    function syncChapterTocAvailability(documentObject, continuous, pdf) {
+        var disabled = Boolean(continuous || pdf);
+        var tab = documentObject.getElementById('chapterOutlineTab');
+        setDisabled(tab, disabled);
+        if (tab) { tab.hidden=disabled;tab.setAttribute('aria-hidden',String(disabled)); }
+        return !disabled;
     }
 
     // Native list + disclosure buttons: links keep their navigation semantics.

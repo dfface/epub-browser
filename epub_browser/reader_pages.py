@@ -1091,6 +1091,7 @@ def _kindle_i18n_messages(language, tools=None):
         "nextPage": "reader.nextPage",
         "pdfBadge": "pdf.formatBadge",
         "pdfUnsupported": "kindle.pdfUnsupported",
+        "bookmarkHelp": "bookmarks.kindleHelp",
         "zoomIn": "pdf.zoomIn",
         "zoomOut": "pdf.zoomOut",
         "fitWidth": "pdf.fitWidth",
@@ -1498,7 +1499,7 @@ class ReaderPageRenderer:
     <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
         <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
         <div class="app-nav-links">
-            <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
+            <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-layer-group" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
             <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
             {render_vocabulary_navigation(self.book_hash) if self.deployment_mode == "server" else ""}
             {reading_insights_navigation}
@@ -1546,7 +1547,7 @@ class ReaderPageRenderer:
                         </div>
                     </div>
                     {ai_book_chat_button}
-                    <button type="button" class="css-btn secondary" id="toggleShelfBtn" aria-pressed="false"><i class="fas fa-bookmark" aria-hidden="true"></i><span id="toggleShelfBtnText" aria-live="polite" data-i18n="book.addToShelf">Add to Shelf</span></button>
+                    <button type="button" class="css-btn secondary" id="toggleShelfBtn" aria-pressed="false"><i class="fas fa-layer-group" aria-hidden="true"></i><span id="toggleShelfBtnText" aria-live="polite" data-i18n="book.addToShelf">Add to Shelf</span></button>
                     {book_search_trigger}
                     {book_review_trigger}
                 </div>
@@ -2421,6 +2422,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                data-i18n-aria-label="goToPage" aria-label="{go_to_page}">
         <button class="k-control" type="submit" data-i18n="jump">{jump}</button>
     </form>
+    <p data-i18n="bookmarkHelp">{html.escape(kindle_labels["bookmarkHelp"])}</p>
     <a class="k-control" href="#" onclick="kPdfToggleSettings();return false;" data-i18n="done">{done}</a>
 </div>
 <script>
@@ -2519,6 +2521,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
         <button class="k-control" type="button" id="kClickScroll" onclick="kToggleClickScroll()" aria-pressed="true"
                 data-i18n="tapTurn">{html.escape(kindle_labels["tapTurn"])}</button>
     </div>
+    <p data-i18n="bookmarkHelp">{html.escape(kindle_labels["bookmarkHelp"])}</p>
     <div class="k-settings-links">
         {prev_link.replace('id="kPrev" class="prev"', 'class="k-control"')}
         {next_link.replace('id="kNext" class="next"', 'class="k-control"')}
@@ -2690,18 +2693,6 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                             <span>100%</span>
                             <span>200%</span>
                             <span>400%</span>'''
-        chapter_outline_control = "" if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT else """
-                    <div class="settings-option-with-tip">
-                        <label class="settings-switch chapter-outline-setting">
-                            <input type="checkbox" id="showChapterOutlineToggle" checked aria-describedby="chapterOutlineHelpText">
-                            <span class="switch-slider" aria-hidden="true"></span>
-                            <span class="switch-text" data-i18n="settings.showChapterOutline">Show chapter outline button</span>
-                        </label>
-                        <button type="button" class="settings-info-tip" data-settings-tip data-tip="Show the “This chapter” outline generated from chapter headings. Turning this off hides its button and closes the outline, without affecting the book contents. Saved in this browser for all EPUB books on this site; unavailable in continuous scroll and PDF pages." data-i18n-data-tip="settings.chapterOutlineHelp" aria-label="Show the “This chapter” outline generated from chapter headings. Turning this off hides its button and closes the outline, without affecting the book contents. Saved in this browser for all EPUB books on this site; unavailable in continuous scroll and PDF pages." data-i18n-aria-label="settings.chapterOutlineHelp">
-                            <i class="fas fa-info-circle" aria-hidden="true"></i>
-                        </button>
-                        <span id="chapterOutlineHelpText" class="sr-only" data-i18n="settings.chapterOutlineHelp">Show the “This chapter” outline generated from chapter headings. Turning this off hides its button and closes the outline, without affecting the book contents. Saved in this browser for all EPUB books on this site; unavailable in continuous scroll and PDF pages.</span>
-                    </div>"""
         text_alignment_control = "" if getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT else """
                 <div class="settings-group">
                     <label class="settings-label" for="textAlignmentSelect" data-i18n="settings.textAlignment">Text alignment</label>
@@ -2849,6 +2840,23 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                     </button>
                     <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if self.deployment_mode == "ssg" else ""
 
+        bookmark_config = html.escape(json.dumps({
+            'book': str(self.book_hash),
+            'format': self.source_format,
+            'chapters': [{'path': c.get('path', ''), 'title': metadata_text(c['title'])}
+                         for c in self.chapters],
+        }, ensure_ascii=False), quote=False)
+        # JSON in a template element is text, never executable script.
+        bookmark_adapter = ('<script src="/assets/bookmarks-server.js" defer></script>'
+                            if self.deployment_mode == 'server' else '')
+        bookmark_help_key = ('bookmarks.accountHelp' if self.deployment_mode == 'server'
+                             else 'bookmarks.localHelp')
+        bookmark_button = ('<button class="control-btn" type="button" data-bookmark-toggle '
+                           'aria-pressed="false" aria-label="Add bookmark" '
+                           'data-i18n-aria-label="bookmarks.add" disabled>'
+                           '<i class="far fa-bookmark" aria-hidden="true"></i>'
+                           '<span class="control-name" data-i18n="bookmarks.title">Bookmarks</span></button>')
+
         highlight_assets = ""
         if pdf_page is None:
             highlight_assets = " " + " ".join(
@@ -2883,6 +2891,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=18">
+    <link rel="stylesheet" href="/assets/bookmarks.css">
     <link rel="stylesheet" href="/assets/toc-tree.css">
     {book_search_stylesheet}
     {pdf_stylesheet}
@@ -2910,42 +2919,46 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
         <div class="progress-bar" id="progressBar"></div>
     </div>
 
-    <nav class="toc-floating reader-drawer" id="bookHomeFloating" aria-label="Book chapters" data-i18n-aria-label="reader.bookChapters" aria-hidden="true"{ai_reading_indicators}>
+    <nav class="toc-floating reader-drawer" id="bookHomeFloating" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation" aria-hidden="true"{ai_reading_indicators}>
         <div class="toc-header">
-            <h3 data-i18n="reader.bookChapters">Chapters</h3>
+            <h3 data-i18n="bookmarks.navigationTitle">Navigation</h3>
             <div class="toc-header-actions">
                 <button class="toc-current-chapter" id="bookHomeLocateCurrent" type="button" aria-label="Locate current chapter" data-i18n-aria-label="reader.locateCurrentChapter">
                     <i class="fas fa-crosshairs" aria-hidden="true"></i>
                 </button>
-                <a class="toc-book-home" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome">
-                    <i class="fas fa-book" aria-hidden="true"></i><span data-i18n="reader.openBookHome">Open book home</span>
-                </a>
                 <button class="toc-close" id="bookHomeClose" type="button" aria-label="Close book home" data-i18n-aria-label="reader.closeBookHome">
                     <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
-        <ul class="toc-list" id="bookHomeTocList">
-            <!-- 动态生成的书籍目录将放在这里 -->
-        </ul>
-    </nav>
-
-    <nav class="toc-floating reader-drawer" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true"{ai_reading_indicators}>
-        <div class="toc-header">
-            <h3 data-i18n="reader.thisChapterContents">This chapter</h3>
-            <div class="toc-header-actions">
-                <button class="toc-current-chapter" id="tocLocateCurrent" type="button" aria-label="Locate current section" data-i18n-aria-label="reader.locateCurrentSection">
-                    <i class="fas fa-crosshairs" aria-hidden="true"></i>
-                </button>
-                <button class="toc-close" id="tocClose" aria-label="Close table of contents" data-i18n-aria-label="reader.closeTableOfContents">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
+        <div class="bookmark-tabs" role="group" aria-label="Navigation lists" data-i18n-aria-label="bookmarks.navigation">
+            <button type="button" id="bookmarkTocTab" aria-pressed="true" aria-controls="bookHomeTocList" data-i18n="bookmarks.contents">Contents</button>
+            <button type="button" id="chapterOutlineTab" aria-pressed="false" aria-controls="tocFloating" data-i18n="bookmarks.outline">Outline</button>
+            <button type="button" id="bookmarkTab" aria-pressed="false" aria-controls="bookmarkPanel" data-i18n="bookmarks.title">Bookmarks</button>
         </div>
+    <section class="chapter-outline-panel" id="tocFloating" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-hidden="true" hidden{ai_reading_indicators}>
         <ul class="toc-list" id="tocList">
             <!-- 动态生成的目录将放在这里 -->
         </ul>
+    </section>
+        <section id="bookmarkPanel" aria-labelledby="bookmarkTab" hidden>
+            <div id="bookmarkStatus" role="status" aria-live="polite" hidden></div>
+            <ul id="bookmarkList"></ul>
+            <details class="bookmark-storage">
+                <summary data-i18n="{'bookmarks.localShort' if self.deployment_mode == 'ssg' else 'bookmarks.storage'}">Storage</summary>
+                <p data-i18n="{bookmark_help_key}"></p>
+            </details>
+        </section>
+        <ul class="toc-list" id="bookHomeTocList">
+            <!-- 动态生成的书籍目录将放在这里 -->
+        </ul>
+        <div class="reader-navigation-footer">
+                <a class="reader-book-details" href="index.html" title="Book details" data-i18n-title="reader.openBookHome" aria-label="Book details" data-i18n-aria-label="reader.openBookHome">
+                    <i class="fas fa-circle-info" aria-hidden="true"></i><span data-i18n="reader.openBookHome">Book details</span><i class="fas fa-chevron-right" aria-hidden="true"></i>
+                </a>
+        </div>
     </nav>
+
     {pdf_search_drawer}
     {book_search_drawer}
 
@@ -2955,7 +2968,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
         <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
             <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
             <div class="app-nav-links">
-                <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-bookmark" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
+                <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-layer-group" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
                 <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
                 {render_vocabulary_navigation(self.book_hash) if self.deployment_mode == "server" else ""}
                 {reading_insights_navigation}
@@ -2970,8 +2983,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     </header>
     <div class="container">
         <div class="reader-toolbar top-controls chapter-tools" role="toolbar" aria-label="Reading tools" data-i18n-aria-label="reader.navigation">
-            <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Open book chapters" data-i18n-aria-label="reader.openBookChapters" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-book"></i><span class="control-name" data-i18n="reader.bookChapters">Chapters</span></button>
-            <button class="control-btn" id="tocToggle" type="button" aria-label="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false"><i class="fas fa-list"></i><span class="control-name" data-i18n="reader.thisChapterContents">This chapter</span></button>
+            <button class="control-btn" id="bookHomeToggle" type="button" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation" aria-controls="bookHomeFloating" aria-expanded="false"><i class="fas fa-compass" aria-hidden="true"></i><span class="control-name" data-i18n="bookmarks.navigationTitle">Navigation</span></button>
+            {bookmark_button}
             <button class="control-btn" id="settingsControlBtn" type="button" aria-label="Settings" data-i18n-aria-label="reader.settings" aria-controls="settingsModal" aria-expanded="false"><i class="fas fa-cog"></i><span class="control-name" data-i18n="reader.settings">Settings</span></button>
             <div class="pagination-toolbar-controls" id="paginationInfo" role="group" aria-label="Page navigation" data-i18n-aria-label="reader.navigation">
                 {prev_link}
@@ -3137,12 +3150,26 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                 </fieldset>
                 <fieldset class="settings-group reading-settings-section display-options-settings">
                     <legend class="settings-section-title" data-i18n="settings.displayOptions">Display options</legend>
+                    <div class="settings-group notification-position-settings">
+                        <label class="settings-label" for="notificationPosition" data-i18n="bookmarks.notificationPosition">Notification position</label>
+                        <select aria-describedby="notificationPlacementHelp" id="notificationPosition" class="settings-select">
+                            <option value="auto" data-i18n="bookmarks.positionAuto">Automatic</option>
+                            <option value="top-left" data-i18n="bookmarks.positionTopLeft">Top left</option>
+                            <option value="top" data-i18n="bookmarks.positionTop">Top center</option>
+                            <option value="top-right" data-i18n="bookmarks.positionTopRight">Top right</option>
+                            <option value="bottom-left" data-i18n="bookmarks.positionBottomLeft">Bottom left</option>
+                            <option value="bottom" data-i18n="bookmarks.positionBottom">Bottom center</option>
+                            <option value="bottom-right" data-i18n="bookmarks.positionBottomRight">Bottom right</option>
+                        </select>
+                        <button type="button" class="css-btn secondary" id="notificationPreview" data-i18n="bookmarks.notificationPreview">Preview notification</button>
+                        <p class="reader-setting-help" id="notificationPlacementHelp" data-i18n="bookmarks.notificationPlacementHelp">On narrow screens, notifications are centered. This preference is saved only in this browser.</p>
+                    </div>
+
                     <label class="settings-switch">
                         <input type="checkbox" id="showReadingProgressBarToggle" checked>
                         <span class="switch-slider"></span>
                         <span class="switch-text" data-i18n="settings.showReadingProgressBar">Show reading progress bar</span>
                     </label>
-                    {chapter_outline_control}
                     <div class="settings-option-with-tip">
                         <label class="settings-switch">
                             <input type="checkbox" id="imageNoteEntrancesToggle" aria-describedby="imageNoteEntrancesHelp">
@@ -3238,21 +3265,18 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
             <i class="fas fa-arrow-up"></i>
             <span class="control-name" data-i18n="reader.top">Top</span>
         </button>
-        <a class="control-btn" id="bookHomeShortcut" href="index.html" aria-label="Open book home" data-i18n-aria-label="reader.openBookHome" title="Open book home" data-i18n-title="reader.openBookHome">
-            <i class="fas fa-book-open"></i>
-            <span class="control-name" data-i18n="reader.openBookHome">Book home</span>
+        <a class="control-btn" id="bookHomeShortcut" href="index.html" aria-label="Book details" data-i18n-aria-label="reader.openBookHome" title="Book details" data-i18n-title="reader.openBookHome">
+            <i class="fas fa-circle-info"></i>
+            <span class="control-name" data-i18n="reader.openBookHome">Book details</span>
         </a>
     </div>
 
     <!-- 移动端控件 -->
     <div class="mobile-controls" data-id="mobile-controls">
-        <button class="control-btn" id="mobileTocBtn" type="button" aria-label="This chapter contents" title="This chapter contents" data-i18n-aria-label="reader.thisChapterContents" data-i18n-title="reader.thisChapterContents" aria-controls="tocFloating" aria-expanded="false">
-            <i class="fas fa-list"></i>
-            <span data-i18n="reader.thisChapterContents">This chapter</span>
-        </button>
-        <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Open book chapters" title="Open book chapters" data-i18n-aria-label="reader.openBookChapters" data-i18n-title="reader.openBookChapters">
-            <i class="fas fa-book"></i>
-            <span data-i18n="reader.bookChapters">Chapters</span>
+        {bookmark_button.replace('data-bookmark-toggle', 'id="mobileBookmarkBtn" data-bookmark-toggle')}
+        <button class="control-btn" id="mobileBookHomeBtn" type="button" aria-label="Reading navigation" title="Reading navigation" data-i18n-aria-label="reader.navigation" data-i18n-title="reader.navigation">
+            <i class="fas fa-compass" aria-hidden="true"></i>
+            <span data-i18n="bookmarks.navigationTitle">Navigation</span>
         </button>
         {pdf_mobile_controls}
         {book_search_mobile_controls}
@@ -3274,9 +3298,9 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
             <i class="fas fa-cog"></i>
             <span data-i18n="reader.settings">Settings</span>
         </button>
-        <a class="control-btn" id="mobileBookHomeShortcut" href="index.html" aria-label="Open book home" title="Open book home" data-i18n-aria-label="reader.openBookHome" data-i18n-title="reader.openBookHome">
-            <i class="fas fa-book-open"></i>
-            <span data-i18n="reader.openBookHome">Book home</span>
+        <a class="control-btn" id="mobileBookHomeShortcut" href="index.html" aria-label="Book details" title="Book details" data-i18n-aria-label="reader.openBookHome" data-i18n-title="reader.openBookHome">
+            <i class="fas fa-circle-info"></i>
+            <span data-i18n="reader.openBookHome">Book details</span>
         </a>
         <button class="control-btn" id="mobileTopBtn" type="button" aria-label="Top" title="Top" data-i18n-aria-label="reader.top" data-i18n-title="reader.top">
             <i class="fas fa-arrow-up"></i>
@@ -3406,6 +3430,9 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     {pdf_chapter_script}
     {book_search_script}
     <script src="/assets/mobile-toolbar.js" defer></script>
+    <template id="bookmarkConfig">{bookmark_config}</template>
+    {bookmark_adapter}
+    <script src="/assets/bookmarks.js" defer></script>
     <script src="/assets/chapter.js?v=18" defer></script>
     <script src="/assets/annotation-position.js" defer></script>
     <script src="/assets/annotation.js" defer></script>

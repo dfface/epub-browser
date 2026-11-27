@@ -163,12 +163,9 @@ class FakeElement {
 
 function fakeDocument() {
   const elements = {
-    tocToggle: new FakeElement(),
-    mobileTocBtn: new FakeElement(),
+    chapterOutlineTab: new FakeElement(),
     tocFloating: new FakeElement(),
   };
-  elements.tocToggle.classList.add('active');
-  elements.mobileTocBtn.classList.add('active');
   elements.tocFloating.classList.add('active');
   return {
     elements,
@@ -235,44 +232,14 @@ test('pagination refreshes only when the canvas width has materially settled', (
   assert.equal(paginationWidthChanged(787.1953125, 787.2), false);
 });
 
-test('continuous reading hides and closes both chapter-local TOC controls', () => {
-  const document = fakeDocument();
-
-  syncChapterTocAvailability(document, true);
-
-  for (const id of ['tocToggle', 'mobileTocBtn']) {
-    assert.equal(document.elements[id].disabled, true);
-    assert.equal(document.elements[id].hidden, true);
-    assert.equal(document.elements[id].getAttribute('aria-disabled'), 'true');
-    assert.equal(document.elements[id].getAttribute('aria-expanded'), 'false');
-    assert.equal(document.elements[id].classList.contains('active'), false);
-  }
-  assert.equal(document.elements.tocFloating.classList.contains('active'), false);
-  assert.equal(document.elements.tocFloating.getAttribute('aria-hidden'), 'true');
-
-  syncChapterTocAvailability(document, false);
-  for (const id of ['tocToggle', 'mobileTocBtn']) {
-    assert.equal(document.elements[id].disabled, false);
-    assert.equal(document.elements[id].hidden, false);
-    assert.equal(document.elements[id].getAttribute('aria-disabled'), 'false');
-  }
-});
-
-test('PDF pages hide the empty chapter-local TOC in every reading mode without changing EPUB ordinary mode', () => {
-  const pdfDocument = fakeDocument();
-  syncChapterTocAvailability(pdfDocument, false, true);
-  for (const id of ['tocToggle', 'mobileTocBtn']) {
-    assert.equal(pdfDocument.elements[id].disabled, true);
-    assert.equal(pdfDocument.elements[id].hidden, true);
-    assert.equal(pdfDocument.elements[id].getAttribute('aria-disabled'), 'true');
-    assert.equal(pdfDocument.elements[id].getAttribute('aria-hidden'), 'true');
-  }
-
-  const epubDocument = fakeDocument();
-  syncChapterTocAvailability(epubDocument, false, false);
-  for (const id of ['tocToggle', 'mobileTocBtn']) {
-    assert.equal(epubDocument.elements[id].disabled, false);
-    assert.equal(epubDocument.elements[id].getAttribute('aria-disabled'), 'false');
+test('outline tab is available only for ordinary EPUB layouts', () => {
+  const document=fakeDocument();
+  for(const [continuous,pdf,hidden] of [[false,false,false],[true,false,true],[false,true,true],[false,false,false]]) {
+    syncChapterTocAvailability(document,continuous,pdf);
+    const tab=document.elements.chapterOutlineTab;
+    assert.equal(tab.hidden,hidden);
+    assert.equal(tab.disabled,hidden);
+    assert.equal(tab.getAttribute('aria-hidden'),String(hidden));
   }
 });
 
@@ -585,23 +552,6 @@ test('reading appearance restores preferences, persists choices and restores boo
   assert.equal(imageNotes.checked, true);
 });
 
-
-test('outline preference hides and closes chapter outline and survives mode changes', () => {
-  const document = fakeDocument();
-  for (const continuous of [false, true, false]) {
-    syncChapterTocAvailability(document, continuous, false, false);
-    for (const id of ['tocToggle', 'mobileTocBtn']) {
-      assert.equal(document.elements[id].hidden, true);
-      assert.equal(document.elements[id].disabled, true);
-    }
-    assert.equal(document.elements.tocFloating.classList.contains('active'), false);
-    assert.equal(document.elements.tocFloating.getAttribute('aria-hidden'), 'true');
-  }
-  syncChapterTocAvailability(document, false, false, true);
-  assert.equal(document.elements.tocToggle.hidden, false);
-  syncChapterTocAvailability(document, false, true, true);
-  assert.equal(document.elements.tocToggle.hidden, true);
-});
 
 test('mobile toolbar can remain visible and resume directional hiding without a scroll jump', () => {
   const { createMobileToolbarController } = require('../epub_browser/assets/reader-layout.js');

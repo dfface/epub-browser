@@ -183,15 +183,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
                     self.assertEqual(button.get('aria-pressed'), 'false')
                     self.assertEqual(page.get_element_by_id('toggleShelfBtnText').get('aria-live'), 'polite')
                 epub_page = parser.fromstring(epub.create_chapter_template('<p>Text</p>', '', 0, 'One'))
-                outline = epub_page.get_element_by_id('showChapterOutlineToggle')
-                self.assertIn('checked', outline.attrib)
-                help_text = epub_page.get_element_by_id(outline.get('aria-describedby'))
-                self.assertEqual(help_text.get('data-i18n'), 'settings.chapterOutlineHelp')
-                tip = outline.getparent().getparent().xpath('.//button[@data-settings-tip]')[0]
-                self.assertEqual(tip.get('data-i18n-data-tip'), 'settings.chapterOutlineHelp')
-                self.assertEqual(tip.get('data-i18n-aria-label'), 'settings.chapterOutlineHelp')
-                self.assertEqual(outline.getparent().xpath('.//span[@data-i18n]')[0].get('data-i18n'),
-                                 'settings.showChapterOutline')
+                self.assertFalse(epub_page.xpath('//*[@id="showChapterOutlineToggle" or @id="tocToggle" or @id="mobileTocBtn"]'))
                 pdf_page = parser.fromstring(pdf.create_pdf_chapter_template(0, '/book/pdf-book/document.pdf'))
                 self.assertFalse(pdf_page.xpath('//*[@id="showChapterOutlineToggle"]'))
                 for page in (epub_page, pdf_page):
@@ -212,15 +204,21 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
                         ('paginationModeToggle', 'settings.readingMode'),
                         ('showReadingProgressBarToggle', 'settings.displayOptions'),
                         ('imageNoteEntrancesToggle', 'settings.displayOptions'),
+                        ('notificationPosition', 'settings.displayOptions'),
                     ):
                         fieldset = page.get_element_by_id(control).xpath('ancestor::fieldset')[0]
                         self.assertEqual(fieldset.find('legend').get('data-i18n'), group)
-                self.assertEqual(outline.xpath('ancestor::fieldset')[0].find('legend').get('data-i18n'),
-                                 'settings.displayOptions')
                 alignment = epub_page.get_element_by_id('textAlignmentSelect')
                 self.assertEqual([o.get('value') for o in alignment],
                                  ['default', 'left', 'right', 'center', 'justify'])
                 self.assertEqual(alignment.getparent().getparent().get('id'), 'font-tab')
+                for page in (epub_page,pdf_page):
+                    self.assertIn('fa-layer-group',page.get_element_by_id('bookshelfBtn').xpath('.//i')[0].get('class'))
+                    self.assertIn('fa-bookmark',page.xpath('//*[@data-bookmark-toggle]')[0].xpath('.//i')[0].get('class'))
+                    preference=page.get_element_by_id('notificationPosition')
+                    self.assertEqual({option.get('value') for option in preference},{'auto','top','bottom','top-left','top-right','bottom-left','bottom-right'})
+                    self.assertIsNotNone(page.get_element_by_id('notificationPreview'))
+
                 pdf_page = parser.fromstring(pdf.create_pdf_chapter_template(0, 'document.pdf'))
                 self.assertFalse(pdf_page.xpath('//*[@id="textAlignmentSelect"]'))
                 for page in (epub_page, pdf_page):
@@ -372,9 +370,9 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
             self.assertIn('chapterPrefetch.take(', chapter_js)
 
             for markup in (epub_html, pdf_html):
-                self.assertIn('id="tocLocateCurrent"', markup)
+                self.assertIn('id="bookHomeLocateCurrent"', markup)
                 self.assertIn(
-                    'data-i18n-aria-label="reader.locateCurrentSection"', markup,
+                    'data-i18n-aria-label="reader.locateCurrentChapter"', markup,
                 )
                 self.assertIn('id="bookHomeShortcut"', markup)
                 self.assertIn('id="mobileBookHomeShortcut"', markup)
@@ -2713,13 +2711,11 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         toc_start = script.index('function generateToc() {')
         toc_end = script.index('\n    function updateTocHighlight(', toc_start)
         toc = script[toc_start:toc_end]
-        pagination_start = toc.index('if (isPaginationMode) {')
-        pagination_end = toc.index('\n                } else {', pagination_start)
-        pagination_jump = toc[pagination_start:pagination_end]
-
-        self.assertIn('var page = Math.floor(t.offsetLeft / pageWidth);', pagination_jump)
-        self.assertIn('showPage(page, true);', pagination_jump)
-        self.assertNotIn('scrollIntoView', pagination_jump)
+        self.assertIn('revealOutlineHeading(t);',toc)
+        helper=script[script.index('function revealOutlineHeading('):toc_start]
+        self.assertIn('showPage(outlinePageFor(heading),true)',helper)
+        self.assertNotIn('scrollIntoView',helper)
+        self.assertIn('content.scrollLeft)/pageWidth',script)
 
     def test_partial_chapter_swap_refreshes_ai_canvas_without_stale_results(self):
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
@@ -3595,7 +3591,6 @@ assert.deepEqual(
         mobile_controls = html[mobile_start:mobile_end]
 
         ordered_controls = (
-            'id="mobileTocBtn"',
             'id="mobileBookHomeBtn"',
             'data-i18n-aria-label="reader.previous"',
             '<i class="fas fa-home">',
@@ -3738,8 +3733,13 @@ assert.deepEqual(
         html = self._chapter_html()
         css = Path("epub_browser/assets/chapter.css").read_text(encoding="utf-8")
 
-        self.assertRegex(html, r'<a\b[^>]*\bclass="toc-book-home"[^>]*\bhref="index\.html"')
+        self.assertRegex(html, r'<a\b[^>]*\bclass="reader-book-details"[^>]*\bhref="index\.html"')
         self.assertIn('data-i18n-aria-label="reader.openBookHome"', html)
+        from lxml import html as parser
+        page=parser.fromstring(html)
+        link=page.xpath('//a[@class="reader-book-details"]')[0]
+        self.assertEqual(link.getparent().get('class'),'reader-navigation-footer')
+        self.assertFalse(link.xpath('ancestor::*[contains(@class,"toc-header-actions")]'))
         self.assertIn('id="bookHomeClose"', html)
         self.assertIn('.toc-header-actions', css)
         self.assertIn('min-width: 44px;', css)
@@ -3750,7 +3750,7 @@ assert.deepEqual(
 
         self.assertIn('id="bookHomeLocateCurrent"', html)
         self.assertIn('data-i18n-aria-label="reader.locateCurrentChapter"', html)
-        self.assertLess(html.index('id="bookHomeLocateCurrent"'), html.index('class="toc-book-home"'))
+        self.assertLess(html.index('id="bookHomeLocateCurrent"'), html.index('class="reader-book-details"'))
         self.assertIn('setBookTocActiveChapter(visibleChapterIndex, true, true)', script)
 
     def test_image_notes_reuse_annotations_without_a_region_selector(self):
@@ -4004,7 +4004,7 @@ assert.deepEqual(
         self.assertIn('reader-toolbar top-controls chapter-tools', chapter)
         toolbar = chapter[chapter.index('reader-toolbar top-controls chapter-tools'):]
         toolbar = toolbar[:toolbar.index('</div>')]
-        for control_id in ('bookHomeToggle', 'tocToggle', 'settingsControlBtn'):
+        for control_id in ('bookHomeToggle', 'settingsControlBtn'):
             self.assertIn(control_id, toolbar)
         self.assertNotIn('togglePagination', toolbar)
 
@@ -4050,7 +4050,7 @@ assert.deepEqual(
         chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
 
-        for panel_id in ('bookHomeFloating', 'tocFloating'):
+        for panel_id in ('bookHomeFloating',):
             panel = re.search(
                 rf'<nav\b[^>]*\bid=(?:["\'])?{panel_id}(?:["\' >])[^>]*>',
                 chapter,
@@ -4059,9 +4059,16 @@ assert.deepEqual(
             self.assertRegex(panel.group(0), r'\bclass=(?:["\'])?[^"\']*\breader-drawer\b')
             self.assertRegex(panel.group(0), r'\baria-hidden=(?:["\'])?true(?:["\' >])')
 
+        from lxml import html as parser
+        tree=parser.fromstring(chapter)
+        outline=tree.get_element_by_id('tocFloating')
+        self.assertEqual(outline.tag,'section')
+        self.assertEqual(outline.xpath('ancestor::nav')[0].get('id'),'bookHomeFloating')
+        self.assertIn('hidden',outline.attrib)
+
         self.assertRegex(chapter, r'\bid=(?:["\'])?readerDrawerBackdrop(?:["\' >])')
         self.assertRegex(chapter, r'\bid=(?:["\'])?bookHomeToggle[^>]*\baria-controls=(?:["\'])?bookHomeFloating')
-        self.assertRegex(chapter, r'\bid=(?:["\'])?tocToggle[^>]*\baria-controls=(?:["\'])?tocFloating')
+        self.assertNotIn('id="tocToggle"',chapter)
         self.assertIn('function openReaderDrawer(', chapter_js)
         self.assertIn('function closeReaderDrawers(', chapter_js)
         self.assertIn("readerDrawerBackdrop.addEventListener('click'", chapter_js)
@@ -4114,15 +4121,8 @@ assert.deepEqual(
         chapter_js = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
         chapter_css = Path('epub_browser/assets/chapter.css').read_text(encoding='utf-8')
 
-        mobile_toc = re.search(
-            r'<button\b[^>]*\bid=(?:["\'])?mobileTocBtn(?:["\' >])[^>]*>',
-            chapter,
-        )
-        self.assertIsNotNone(mobile_toc)
-        self.assertIn(
-            'document, isContinuousScroll, Boolean(window.EpubPDFConfig), showChapterOutline',
-            chapter_js,
-        )
+        self.assertNotIn('id="mobileTocBtn"', chapter)
+        self.assertIn('document,isContinuousScroll,Boolean(window.EpubPDFConfig)',chapter_js)
         self.assertIn('.reader-toolbar.top-controls .control-btn[hidden]', chapter_css)
         self.assertIn('display: none !important;', chapter_css)
         self.assertRegex(chapter, r'/assets/immutable/reader-layout\.[0-9a-f]{12}\.js')
@@ -4668,7 +4668,7 @@ assert.deepEqual(
             )
             self.assertIn(f'data-i18n="{key}"', reading)
         self.assertEqual(reading.count('class="settings-switch keyboard-navigation-option"'), 2)
-        self.assertEqual(reading.count('class="switch-slider"'), 12)
+        self.assertNotIn('id="showChapterOutlineToggle"', reading)
 
         chapter_script = Path('epub_browser/assets/chapter.js').read_text(
             encoding='utf-8'
@@ -4699,7 +4699,7 @@ assert.deepEqual(
         html = self._chapter_html()
 
         for key in (
-            'reader.thisChapterContents', 'reader.previous', 'reader.next',
+            'bookmarks.outline', 'reader.previous', 'reader.next',
             'settings.appearance', 'settings.readingMode', 'settings.paginationMode',
             'settings.customStyles',
         ):
