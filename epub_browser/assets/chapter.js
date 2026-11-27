@@ -336,6 +336,7 @@ function initScript() {
     
     var isPaginationMode = false;
     var isContinuousScroll = false;
+    var loadPreviousOnScroll = localStorage.getItem('continuousScrollLoadPrevious') !== 'false';
     var currentPage = 0;
     var totalPages = 0;
     var contentWidth = 0;
@@ -3032,6 +3033,7 @@ function initScript() {
     }
     
     function loadPrevChapter() {
+        if (!loadPreviousOnScroll) return;
         var currentIdx = parseInt(chapter_index, 10);
         
         // 找到最先已加载章节的前一章
@@ -3302,6 +3304,15 @@ function initScript() {
             applyDesktopToolbarPreference();
         });
     }
+    var continuousDirectionSelect = document.getElementById('continuousScrollDirection');
+    if (continuousDirectionSelect) {
+        continuousDirectionSelect.value = loadPreviousOnScroll ? 'both' : 'down';
+        continuousDirectionSelect.disabled = !isContinuousScroll || isPaginationMode;
+        continuousDirectionSelect.addEventListener('change', function() {
+            loadPreviousOnScroll = this.value !== 'down';
+            localStorage.setItem('continuousScrollLoadPrevious', loadPreviousOnScroll ? 'true' : 'false');
+        });
+    }
     if (continuousScrollToggle) {
         // 翻页模式下禁用该开关
         if (isPaginationMode) {
@@ -3329,6 +3340,7 @@ function initScript() {
             }
             
             isContinuousScroll = this.checked;
+            if (continuousDirectionSelect) continuousDirectionSelect.disabled = !isContinuousScroll;
             if (window.EpubReaderLayout) {
                 syncChapterOutlineVisibility();
             }

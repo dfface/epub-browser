@@ -2470,6 +2470,44 @@ html[data-reader-text-alignment="justify"] :is(#eb-content, .eb-content) :is(p, 
     line-height: 1.5;
 }
 
+.continuous-scroll-direction {
+    margin-inline-start: 48px;
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+}
+
+.continuous-scroll-direction select {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 12px;
+    font: inherit;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.continuous-scroll-direction select:focus-visible {
+    outline: 2px solid var(--text);
+    outline-offset: 2px;
+}
+
+.continuous-scroll-direction:has(select:disabled) label,
+.continuous-scroll-direction select:disabled {
+    opacity: .5;
+    cursor: not-allowed;
+}
+
+.continuous-scroll-direction p {
+    margin: 0;
+    color: var(--text-secondary);
+    font-size: .875rem;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
 #chapterOutlineHelpText,
 .reader-setting-help {
     position: absolute;

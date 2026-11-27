@@ -403,6 +403,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
                 'data-tab="reading"',
                 'id="reading-tab"',
                 'id="continuousScrollToggle"',
+                'id="continuousScrollDirection"',
                 'data-annotation-hub',
                 'data-reading-insights',
             )
@@ -4057,6 +4058,15 @@ assert.deepEqual(
         self.assertIn('if (restoreFocus && readerDrawerOpener) readerDrawerOpener.focus();', closing)
         self.assertIn("if (event.key === 'Escape' && document.body.classList.contains('reader-drawer-open'))", chapter_js)
         self.assertIn('closeReaderDrawers(true);', chapter_js)
+
+    def test_continuous_scroll_previous_loading_is_a_persistent_user_choice(self):
+        chapter = self._chapter_html()
+        self.assertIn('id="continuousScrollDirection"', chapter)
+        self.assertIn('data-i18n="settings.continuousScrollDirection"', chapter)
+        script = Path('epub_browser/assets/chapter.js').read_text(encoding='utf-8')
+        self.assertIn("localStorage.getItem('continuousScrollLoadPrevious') !== 'false'", script)
+        self.assertIn("localStorage.setItem('continuousScrollLoadPrevious', loadPreviousOnScroll ? 'true' : 'false')", script)
+        self.assertIn('continuousDirectionSelect.disabled = !isContinuousScroll || isPaginationMode', script)
 
     def test_continuous_reader_disables_the_chapter_local_toc(self):
         chapter = self._chapter_html()

@@ -3120,6 +3120,14 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
                             <i class="fas fa-info-circle" aria-hidden="true"></i>
                         </span>
                     </label>
+                    <div class="continuous-scroll-direction pagination-incompatible-setting">
+                        <label for="continuousScrollDirection" data-i18n="settings.continuousScrollDirection">Automatic loading direction</label>
+                        <select id="continuousScrollDirection" aria-describedby="continuousScrollDirectionHelp" disabled>
+                            <option value="both" data-i18n="settings.continuousScrollBoth">Both directions</option>
+                            <option value="down" data-i18n="settings.continuousScrollDown">Down only</option>
+                        </select>
+                        <p id="continuousScrollDirectionHelp" data-i18n="settings.continuousScrollDirectionHelp">Down only: automatically loads the next chapter; scrolling up only shows content already loaded.</p>
+                    </div>
                 </fieldset>
                 <fieldset class="settings-group reading-settings-section display-options-settings">
                     <legend class="settings-section-title" data-i18n="settings.displayOptions">Display options</legend>
