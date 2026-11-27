@@ -4126,7 +4126,8 @@ assert.deepEqual(
         )
         self.assertRegex(
             chapter_css,
-            r'body\.desktop-chapter-sidebar:not\(\.ai-chat-open\)\s+\.container\s*\{[^}]*'
+            r'body\.desktop-chapter-sidebar:not\(\.ai-chat-open\)'
+            r':not\(\.desktop-chapter-sidebar-auto-hide\)\s+\.container\s*\{[^}]*'
             r'left:\s*calc\(\(var\(--chapter-sidebar-offset\)\s*\+\s*'
             r'var\(--chapter-sidebar-width\)\)\s*/\s*2\)',
         )

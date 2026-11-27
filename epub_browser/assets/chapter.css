@@ -428,11 +428,10 @@ body.desktop-chapter-sidebar #bookHomeFloating .toc-item.active {
     box-shadow: none;
 }
 
-/* The sidebar is an overlay and never narrows the reading stage, so the page
-   stays centred on the viewport and the sidebar covers the left margin.
-   Shifting it by half the sidebar footprint makes the gap on both sides
-   (100vw - page - offset - sidebar) / 2, using the very same width variable. */
-body.desktop-chapter-sidebar:not(.ai-chat-open) .container {
+/* Balance the page in the space beside a persistent sidebar. Auto-hide uses
+   an edge overlay instead, so leave the page centred on the viewport even
+   while the sidebar is revealed by hover or focus. */
+body.desktop-chapter-sidebar:not(.ai-chat-open):not(.desktop-chapter-sidebar-auto-hide) .container {
     position: relative;
     left: calc((var(--chapter-sidebar-offset) + var(--chapter-sidebar-width)) / 2);
 }
