@@ -4,16 +4,32 @@
 :is(#bookHomeTocList, .chapter-list) .toc-branch-toggle {
     position: absolute;
     inset-inline-start: 0;
-    top: 0;
+    top: 50%;
+    height: 100%;
+    transform: translateY(-50%);
     width: 36px;
     min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 0;
     border: 0;
     border-radius: 8px;
     background: transparent;
     color: var(--text-secondary);
-    font-size: 1.1rem;
+    /* The visual marker is geometry rather than a font's baseline glyph. */
+    font-size: 0;
     cursor: pointer;
 }
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    background: currentColor;
+    clip-path: polygon(25% 0, 75% 50%, 25% 100%);
+    flex-shrink: 0;
+}
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle:dir(rtl)::before { transform: rotate(180deg); }
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle[aria-expanded="true"]::before { transform: rotate(90deg); }
 :is(#bookHomeTocList, .chapter-list) .toc-branch-toggle:hover { background: var(--bg-secondary); }
 :is(#bookHomeTocList, .chapter-list) .toc-branch-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }

@@ -42,6 +42,43 @@ class GeneratedReaderSurfaceTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0)
                 self.assertIn('DEPTH_PASS', result.stdout[-300:], stylesheet)
 
+    def test_toc_disclosure_buttons_stay_centered_in_both_surfaces(self):
+        chromium = shutil.which('chromium') or '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
+        if not Path(chromium).exists():
+            self.skipTest('Chromium is needed for disclosure geometry')
+        with tempfile.TemporaryDirectory() as directory:
+            for stylesheet, container in [('book.css', 'class="chapter-list"'),
+                                          ('chapter.css', 'id="bookHomeTocList"')]:
+                css = Path('epub_browser/assets', stylesheet).read_text()
+                css += Path('epub_browser/assets/toc-tree.css').read_text()
+                rows = ''.join(
+                    '<li class="toc-item" data-toc-level="0" style="--toc-depth:0">'
+                    f'<button class="toc-branch-toggle" aria-expanded="{expanded}">▸</button>'
+                    f'<a href="#">{title}</a></li>'
+                    for expanded in ('true', 'false')
+                    for title in ('Short title', 'Long chapter title ' * 8)
+                )
+                script = """
+                    const buttons = [...document.querySelectorAll('button')];
+                    const ok = buttons.every(button => {
+                        const b = button.getBoundingClientRect();
+                        const r = button.parentElement.getBoundingClientRect();
+                        const icon = getComputedStyle(button, '::before');
+                        return Math.abs((b.top+b.bottom-r.top-r.bottom)/2) < 1
+                            && b.height >= 44 && icon.content !== 'none'
+                            && getComputedStyle(button).display === 'flex';
+                    });
+                    document.body.textContent = ok ? 'CENTER_PASS' : 'CENTER_FAIL';
+                """
+                page = Path(directory, 'toc.html')
+                page.write_text('<style>' + css + '</style><ul style="width:260px" ' +
+                                container + '>' + rows + '</ul><script>' + script + '</script>')
+                result = subprocess.run([chromium, '--headless', '--no-sandbox', '--disable-gpu',
+                    '--user-data-dir=' + str(Path(directory, 'profile')), '--dump-dom', page.as_uri()],
+                    capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0)
+                self.assertIn('CENTER_PASS', result.stdout[-300:], stylesheet)
+
     def test_chapter_navigation_focus_does_not_frame_the_reading_surface(self):
         chromium = os.environ.get('EPUB_BROWSER_CHROMIUM') or shutil.which('chromium')
         if not chromium:
