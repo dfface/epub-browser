@@ -207,170 +207,53 @@ SETUP_NONCE_COOKIE_LIMIT = 8
 PUBLIC_WEB_MANIFESTS = frozenset(
     f'/assets/{name}' for name in WEB_MANIFEST_SOURCES
 )
-SETUP_COPY = {
-    'en': {
-        'page_title': 'Set up · EPUB Browser',
-        'title': 'Create a superuser account',
-        'description': (
-            'When you first access the web interface, you will be prompted '
-            'to create a superuser account.'
-        ),
-        'username': 'Username',
-        'password': 'Password',
-        'password_confirmation': 'Confirm password',
-        'submit': 'Create superuser',
-        'language': 'Language',
-        'invalid': 'Enter a username and password.',
-        'password_mismatch': 'Password and confirmation do not match.',
-        'username_unavailable': 'Username is unavailable.',
+# Authentication pages render before login and without JavaScript. Their copy
+# still comes from the same locale packs as the client; no separate translations.
+_AUTH_COPY_KEYS = {
+    'setup': {
+        'page_title': 'account.setupPageTitle', 'title': 'account.setupTitle',
+        'description': 'account.setupDescription', 'username': 'account.username',
+        'password': 'account.password', 'password_confirmation': 'account.confirmPassword',
+        'submit': 'account.createSuperuser', 'language': 'common.language',
+        'invalid': 'account.error.invalidSetup', 'password_mismatch': 'account.error.passwordMismatch',
+        'username_unavailable': 'account.error.username_unavailable',
     },
-    'zh-CN': {
-        'page_title': '设置 · EPUB Browser',
-        'title': '创建超级用户账户',
-        'description': '首次访问 Web 界面时，系统会提示你创建一个超级用户账户。',
-        'username': '用户名',
-        'password': '密码',
-        'password_confirmation': '确认密码',
-        'submit': '创建超级用户',
-        'language': '语言',
-        'invalid': '请输入用户名和密码。',
-        'password_mismatch': '密码与确认密码不一致。',
-        'username_unavailable': '用户名不可用。',
+    'login': {
+        'page_title': 'account.loginPageTitle', 'sign_in': 'account.signIn',
+        'description': 'account.loginDescription', 'username': 'account.username',
+        'password': 'account.password', 'invalid_credentials': 'account.error.invalid_credentials',
+        'language': 'common.language',
     },
-    'zh-TW': {
-        'page_title': '設定 · EPUB Browser',
-        'title': '建立超級使用者帳戶',
-        'description': '首次存取 Web 介面時，系統會提示你建立一個超級使用者帳戶。',
-        'username': '使用者名稱',
-        'password': '密碼',
-        'password_confirmation': '確認密碼',
-        'submit': '建立超級使用者',
-        'language': '語言',
-        'invalid': '請輸入使用者名稱和密碼。',
-        'password_mismatch': '密碼與確認密碼不一致。',
-        'username_unavailable': '此使用者名稱無法使用。',
-    },
-    'ko': {
-        'page_title': '설정 · EPUB Browser',
-        'title': '슈퍼유저 계정 만들기',
-        'description': '웹 인터페이스에 처음 접속하면 슈퍼유저 계정을 만들라는 안내가 표시됩니다.',
-        'username': '사용자 이름',
-        'password': '비밀번호',
-        'password_confirmation': '비밀번호 확인',
-        'submit': '슈퍼유저 만들기',
-        'language': '언어',
-        'invalid': '사용자 이름과 비밀번호를 입력하세요.',
-        'password_mismatch': '비밀번호가 서로 일치하지 않습니다.',
-        'username_unavailable': '사용할 수 없는 사용자 이름입니다.',
-    },
-    'ja': {
-        'page_title': 'セットアップ · EPUB Browser',
-        'title': 'スーパーユーザーアカウントを作成',
-        'description': 'Web インターフェースへ初めてアクセスすると、スーパーユーザーアカウントの作成を求められます。',
-        'username': 'ユーザー名',
-        'password': 'パスワード',
-        'password_confirmation': 'パスワードの確認',
-        'submit': 'スーパーユーザーを作成',
-        'language': '言語',
-        'invalid': 'ユーザー名とパスワードを入力してください。',
-        'password_mismatch': 'パスワードが一致しません。',
-        'username_unavailable': 'このユーザー名は使用できません。',
+    'oidc': {
+        'error_title': 'account.oidc.errorTitle', 'error_body': 'account.oidc.errorBody',
+        'back': 'account.oidc.backToLogin', 'associate_title': 'account.oidc.associateTitle',
+        'associate_body': 'account.oidc.associateBody', 'submit': 'account.oidc.associateSubmit',
     },
 }
-LOGIN_COPY = {
-    'en': {
-        'page_title': 'Sign in · EPUB Browser',
-        'sign_in': 'Sign in',
-        'description': 'Sign in to continue to your personal library.',
-        'username': 'Username',
-        'password': 'Password',
-        'invalid_credentials': 'Invalid username or password.',
-        'login_throttled': 'Too many sign-in attempts. Try again in {minutes} minutes.',
-        'language': 'Language',
-    },
-    'zh-CN': {
-        'page_title': '登录 · EPUB Browser',
-        'sign_in': '登录',
-        'description': '登录后继续进入你的个人书库。',
-        'username': '用户名',
-        'password': '密码',
-        'invalid_credentials': '用户名或密码不正确。',
-        'login_throttled': '登录尝试次数过多，请在 {minutes} 分钟后重试。',
-        'language': '语言',
-    },
-    'zh-TW': {
-        'page_title': '登入 · EPUB Browser',
-        'sign_in': '登入',
-        'description': '登入以繼續前往你的個人書庫。',
-        'username': '使用者名稱',
-        'password': '密碼',
-        'invalid_credentials': '使用者名稱或密碼不正確。',
-        'login_throttled': '登入嘗試次數過多，請在 {minutes} 分鐘後再試。',
-        'language': '語言',
-    },
-    'ko': {
-        'page_title': '로그인 · EPUB Browser',
-        'sign_in': '로그인',
-        'description': '개인 라이브러리를 계속 이용하려면 로그인하세요.',
-        'username': '사용자 이름',
-        'password': '비밀번호',
-        'invalid_credentials': '사용자 이름 또는 비밀번호가 올바르지 않습니다.',
-        'login_throttled': '로그인 시도가 너무 많습니다. {minutes}분 후 다시 시도하세요.',
-        'language': '언어',
-    },
-    'ja': {
-        'page_title': 'ログイン · EPUB Browser',
-        'sign_in': 'ログイン',
-        'description': '個人ライブラリを引き続き利用するにはログインしてください。',
-        'username': 'ユーザー名',
-        'password': 'パスワード',
-        'invalid_credentials': 'ユーザー名またはパスワードが正しくありません。',
-        'login_throttled': 'ログイン試行回数が多すぎます。{minutes} 分後にもう一度お試しください。',
-        'language': '言語',
-    },
-}
-OIDC_COPY = {
-    'en': {
-        'error_title': 'Sign-in could not be completed',
-        'error_body': 'Return to sign in and try again. If the problem continues, contact your administrator.',
-        'back': 'Return to sign in',
-        'associate_title': 'Connect your existing account',
-        'associate_body': 'Enter your existing EPUB Browser username and password once to connect this identity.',
-        'submit': 'Connect and sign in',
-    },
-    'zh-CN': {
-        'error_title': '无法完成登录',
-        'error_body': '请返回登录页重试。如果问题持续存在，请联系管理员。',
-        'back': '返回登录',
-        'associate_title': '绑定现有账户',
-        'associate_body': '请输入一次现有 EPUB Browser 用户名和密码，以绑定此身份。',
-        'submit': '绑定并登录',
-    },
-    'zh-TW': {
-        'error_title': '無法完成登入',
-        'error_body': '請返回登入頁重試。如果問題持續發生，請聯絡管理員。',
-        'back': '返回登入',
-        'associate_title': '連結現有帳戶',
-        'associate_body': '請輸入一次現有 EPUB Browser 使用者名稱和密碼，以連結此身分。',
-        'submit': '連結並登入',
-    },
-    'ko': {
-        'error_title': '로그인을 완료할 수 없습니다',
-        'error_body': '로그인 화면으로 돌아가 다시 시도하세요. 문제가 계속되면 관리자에게 문의하세요.',
-        'back': '로그인으로 돌아가기',
-        'associate_title': '기존 계정 연결',
-        'associate_body': '이 ID를 연결하려면 기존 EPUB Browser 사용자 이름과 비밀번호를 한 번 입력하세요.',
-        'submit': '연결하고 로그인',
-    },
-    'ja': {
-        'error_title': 'ログインを完了できませんでした',
-        'error_body': 'ログイン画面に戻って再試行してください。問題が続く場合は管理者に連絡してください。',
-        'back': 'ログインに戻る',
-        'associate_title': '既存のアカウントを接続',
-        'associate_body': 'この ID を接続するため、既存の EPUB Browser のユーザー名とパスワードを一度入力してください。',
-        'submit': '接続してログイン',
-    },
-}
+
+
+def auth_copy(section, locale):
+    bundle = get_bundle(normalize_locale(locale, 'en'))
+    return {field: bundle[key] for field, key in _AUTH_COPY_KEYS[section].items()}
+
+
+def login_throttled_message(locale, minutes):
+    """Match the locale pack's integer-minute plural forms, including RU/AR."""
+    locale = normalize_locale(locale, 'en')
+    message = get_bundle(locale)['account.error.login_throttled']
+    if isinstance(message, dict):
+        category = 'one' if minutes == 1 else 'other'
+        if locale in {'fr', 'hi', 'pt-BR'} and minutes == 0:
+            category = 'one'
+        elif locale == 'ru':
+            category = ('one' if minutes % 10 == 1 and minutes % 100 != 11 else
+                        'few' if 2 <= minutes % 10 <= 4 and not 12 <= minutes % 100 <= 14 else 'many')
+        elif locale == 'ar':
+            category = ('zero' if minutes == 0 else 'one' if minutes == 1 else 'two' if minutes == 2 else
+                        'few' if 3 <= minutes % 100 <= 10 else 'many' if 11 <= minutes % 100 <= 99 else 'other')
+        message = message.get(category, message['other'])
+    return message.format(count=minutes)
+
 
 def locale_options(locale):
     return '\n'.join(
@@ -1388,7 +1271,7 @@ def create_app(
     ):
         locale = normalize_login_locale(locale)
         nonce = secrets.token_urlsafe(32)
-        copy = SETUP_COPY.get(locale, SETUP_COPY['en'])
+        copy = auth_copy('setup', locale)
         error_key = {
             'invalid': 'account.error.invalidSetup',
             'password_mismatch': 'account.error.passwordMismatch',
@@ -1582,7 +1465,7 @@ if(localeField)localeField.value=localeSelect.value;
         safe_next = html.escape(_safe_relative_path(next_path), quote=True)
         locale = normalize_login_locale(locale)
         nonce = secrets.token_urlsafe(32)
-        copy = LOGIN_COPY.get(locale, LOGIN_COPY['en'])
+        copy = auth_copy('login', locale)
         error_markup = (
             '<p class="auth-alert" id="loginError" role="alert" data-i18n="account.error.invalid_credentials">'
             + copy['invalid_credentials']
@@ -1717,7 +1600,7 @@ window.location.assign(payload.redirect||'/');
             request.query_params.get('lang'),
             request.headers.get('accept-language', ''),
         )
-        copy = OIDC_COPY.get(locale, OIDC_COPY['en'])
+        copy = auth_copy('oidc', locale)
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
@@ -1751,8 +1634,8 @@ window.location.assign(payload.redirect||'/');
             request.query_params.get('lang'),
             request.headers.get('accept-language', ''),
         )
-        copy = OIDC_COPY.get(locale, OIDC_COPY['en'])
-        login_copy = LOGIN_COPY.get(locale, LOGIN_COPY['en'])
+        copy = auth_copy('oidc', locale)
+        login_copy = auth_copy('login', locale)
         nonce = secrets.token_urlsafe(32)
         error_markup = (
             '<p class="auth-alert" role="alert" '
@@ -2131,12 +2014,12 @@ window.location.assign(payload.redirect||'/');
 
         principal, retry_after_seconds, raw_session = await run_db(_authenticate_login)
         if principal is None:
+            locale = normalize_login_locale(data.get('locale') or requested_locale)
             if retry_after_seconds:
-                locale = normalize_login_locale(data.get('locale') or requested_locale)
                 minutes = max(1, math.ceil(retry_after_seconds / 60))
                 payload = error_payload(
                     'login_throttled',
-                    LOGIN_COPY.get(locale, LOGIN_COPY['en'])['login_throttled'].format(minutes=minutes),
+                    login_throttled_message(locale, minutes),
                 )
                 payload['retry_after_seconds'] = retry_after_seconds
                 throttled = response(payload, 429, cache_control='no-store')
@@ -2145,7 +2028,7 @@ window.location.assign(payload.redirect||'/');
             return response(
                 error_payload(
                     'invalid_credentials',
-                    'Invalid username or password',
+                    auth_copy('login', locale)['invalid_credentials'],
                 ),
                 401,
                 cache_control='no-store',

@@ -427,6 +427,7 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         return match.group(1)
 
     def test_pending_setup_exposes_only_setup_fixed_assets_and_minimal_status(self):
+        from epub_browser.i18n_bundles import get_bundle
         english = self.client.get("/setup?lang=en")
         chinese = self.client.get("/setup?lang=zh-CN")
 
@@ -437,7 +438,7 @@ class ServerSetupBoundaryTests(unittest.TestCase):
             "to create a superuser account.",
             english.text,
         )
-        self.assertIn("首次访问 Web 界面时，系统会提示你创建一个超级用户账户。", chinese.text)
+        self.assertIn(get_bundle("zh-CN")["account.setupDescription"], chinese.text)
         self.assertIn('id="setupForm"', english.text)
         self.assertIn('class="auth-page"', english.text)
         self.assertIn('class="auth-card setup-card"', english.text)
@@ -532,18 +533,20 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertEqual(self.client.get("/assets/reader.js").status_code, 503)
 
     def test_setup_supports_all_locale_aliases_and_native_language_choices(self):
+        from epub_browser.i18n_bundles import get_bundle
+
         cases = (
-            ('zh-HK', 'zh-TW', '建立超級使用者帳戶'),
-            ('zh-MO', 'zh-TW', '建立超級使用者帳戶'),
-            ('ko-KR', 'ko', '슈퍼유저 계정 만들기'),
-            ('ja-JP', 'ja', 'スーパーユーザーアカウントを作成'),
+            ('zh-HK', 'zh-TW'),
+            ('zh-MO', 'zh-TW'),
+            ('ko-KR', 'ko'),
+            ('ja-JP', 'ja'),
         )
-        for requested, normalized, title in cases:
+        for requested, normalized in cases:
             with self.subTest(requested=requested):
                 page = self.client.get('/setup?lang=' + requested)
                 self.assertEqual(page.status_code, 200)
                 self.assertIn(f'<html lang="{normalized}">', page.text)
-                self.assertIn(title, page.text)
+                self.assertIn(get_bundle(normalized)['account.setupTitle'], page.text)
                 self.assertIn(f'<option value="{normalized}" selected', page.text)
                 for code, native_name in (
                     ('en', 'English'), ('zh-CN', '简体中文'),
@@ -551,6 +554,26 @@ class ServerSetupBoundaryTests(unittest.TestCase):
                 ):
                     self.assertIn(f'<option value="{code}"', page.text)
                     self.assertIn(native_name, page.text)
+
+    def test_setup_initial_html_and_errors_use_every_supported_locale(self):
+        from lxml import html as parser
+        from epub_browser.i18n_bundles import get_bundle
+
+        for locale in SUPPORTED_LOCALES:
+            with self.subTest(locale=locale):
+                bundle = get_bundle(locale)
+                page = self.client.get('/setup?lang=' + locale)
+                tree = parser.fromstring(page.text)
+                self.assertEqual(tree.xpath('//h1')[0].text_content(), bundle['account.setupTitle'])
+                nonce = tree.xpath('//input[@name="setup_nonce"]')[0].get('value')
+                invalid = self.client.post('/setup', data={
+                    'locale': locale, 'setup_nonce': nonce,
+                    'username': 'reader', 'password': 'secret',
+                    'password_confirmation': 'different',
+                })
+                self.assertEqual(invalid.status_code, 400)
+                error = parser.fromstring(invalid.text).xpath('//*[@role="alert"]')[0]
+                self.assertEqual(error.text_content(), bundle['account.error.passwordMismatch'])
 
     def test_setup_head_matches_get_status_and_has_no_body(self):
         response = self.client.head("/setup")
@@ -588,6 +611,7 @@ class ServerSetupBoundaryTests(unittest.TestCase):
         self.assertEqual(self.client.get("/").text, "private library content")
 
     def test_setup_rejects_invalid_form_without_echoing_password(self):
+        from epub_browser.i18n_bundles import get_bundle
         nonce = self._setup_nonce(path="/setup?lang=zh-CN")
         response = self.client.post(
             "/setup",
@@ -602,7 +626,7 @@ class ServerSetupBoundaryTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertIn('<html lang="zh-CN">', response.text)
-        self.assertIn("密码与确认密码不一致。", response.text)
+        self.assertIn(get_bundle("zh-CN")["account.error.passwordMismatch"], response.text)
         self.assertNotIn("do-not-echo-this", response.text)
         self.assertFalse(self.store.has_administrator())
 
@@ -1419,6 +1443,65 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             favicon.headers['cache-control'],
             'private, max-age=31536000, immutable',
         )
+
+    def test_authentication_initial_html_uses_every_supported_locale(self):
+        from lxml import html as parser
+        from epub_browser.i18n_bundles import get_bundle
+
+        for locale in SUPPORTED_LOCALES:
+            with self.subTest(locale=locale):
+                bundle = get_bundle(locale)
+                tree = parser.fromstring(self.client.get('/login?lang=' + locale).text)
+                self.assertEqual(tree.xpath('//h1')[0].text_content(), bundle['account.signIn'])
+                self.assertEqual(
+                    tree.get_element_by_id('loginError').text_content(),
+                    bundle['account.error.invalid_credentials'],
+                )
+                oidc = self.client.get('/auth/oidc/callback?lang=' + locale)
+                self.assertEqual(
+                    parser.fromstring(oidc.text).xpath('//h1')[0].text_content(),
+                    bundle['account.oidc.errorTitle'],
+                )
+
+    def test_invalid_login_message_uses_every_supported_locale(self):
+        from epub_browser.i18n_bundles import get_bundle
+        for locale in SUPPORTED_LOCALES:
+            with self.subTest(locale=locale):
+                nonce = _anonymous_auth_nonce(self, self.client, '/login?lang=' + locale)
+                result = self.client.post(
+                    '/login',
+                    json={'username': 'missing-' + locale, 'password': 'wrong', 'locale': locale},
+                    headers={
+                        'X-EPUB-Browser-Auth-Nonce': nonce,
+                        'Origin': str(self.client.base_url).rstrip('/'),
+                        'Sec-Fetch-Site': 'same-origin',
+                    },
+                )
+                self.assertEqual(result.status_code, 401)
+                self.assertEqual(result.json()['message'], get_bundle(locale)['account.error.invalid_credentials'])
+
+    def test_throttled_login_message_uses_every_supported_locale(self):
+        from epub_browser.i18n_bundles import get_bundle
+
+        for _ in range(6):
+            _json_login(self, self.client, 'alice', 'wrong')
+        for locale in SUPPORTED_LOCALES:
+            with self.subTest(locale=locale):
+                nonce = _anonymous_auth_nonce(self, self.client, '/login?lang=' + locale)
+                result = self.client.post(
+                    '/login',
+                    json={'username': 'alice', 'password': 'wrong', 'locale': locale},
+                    headers={
+                        'X-EPUB-Browser-Auth-Nonce': nonce,
+                        'Origin': str(self.client.base_url).rstrip('/'),
+                        'Sec-Fetch-Site': 'same-origin',
+                    },
+                )
+                self.assertEqual(result.status_code, 429)
+                messages = get_bundle(locale)['account.error.login_throttled']
+                category = 'many' if locale == 'ru' else 'few' if locale == 'ar' else 'other'
+                message = messages.get(category, messages['other']) if isinstance(messages, dict) else messages
+                self.assertEqual(result.json()['message'], message.format(count=5))
 
     def test_public_login_supports_traditional_chinese_korean_and_japanese(self):
         cases = (
