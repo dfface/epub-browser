@@ -49,7 +49,6 @@
             title: bookTitle,
             titleKey: bookTitle ? null : 'bookCache.' + key,
             titleDirection: bookTitle ? 'auto' : null,
-            closeTextKey: 'bookCache.close',
             returnFocus: returnFocus,
             onClose: function() { generation++; }
         });

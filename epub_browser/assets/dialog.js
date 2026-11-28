@@ -102,9 +102,10 @@
         var close = document.createElement('button');
         close.type = 'button';
         close.className = 'app-dialog-button app-dialog-close';
-        if (options.closeTextKey) close.setAttribute('data-i18n-aria-label', options.closeTextKey);
-        close.setAttribute('aria-label', options.closeTextKey && root.EpubBrowserI18n
-            ? root.EpubBrowserI18n.t(options.closeTextKey) : options.closeText || 'Close');
+        var closeKey = options.closeTextKey || (options.closeText ? null : 'dialog.close');
+        if (closeKey) close.setAttribute('data-i18n-aria-label', closeKey);
+        close.setAttribute('aria-label', closeKey && root.EpubBrowserI18n
+            ? root.EpubBrowserI18n.t(closeKey) : options.closeText || closeKey);
         var icon = document.createElement('i');
         icon.className = 'fas fa-times';
         icon.setAttribute('aria-hidden', 'true');

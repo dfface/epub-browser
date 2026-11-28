@@ -17,6 +17,10 @@ test('does not load another chapter when two viewports of content are already bu
 const fs = require('node:fs');
 const vm = require('node:vm');
 const chapterScript = fs.readFileSync(require.resolve('../epub_browser/assets/chapter.js'), 'utf8');
+const requestBookContent = chapterScript.slice(
+  chapterScript.indexOf('    function requestBookContent('),
+  chapterScript.indexOf('    var chapterPrefetch =')
+);
 const previousLoader = chapterScript.match(/    function loadPrevChapter\(\) \{[\s\S]*?(?=\n    function )/)[0];
 
 test('continuous scroll can stop loading previous chapters and resume on user choice', () => {
@@ -28,13 +32,14 @@ test('continuous scroll can stop loading previous chapters and resume on user ch
     createContinuousLoader: () => ({}), setTimeout() {},
     content: {insertBefore() {}},
     getChapterUrl: index => 'chapter_' + index + '.html',
+    window: {},
     XMLHttpRequest: function() {
       this.open = (method, url) => requests.push(url);
       this.send = () => {};
     }
   };
   vm.createContext(context);
-  vm.runInContext(previousLoader + '\nloadPrevChapter();', context);
+  vm.runInContext(requestBookContent + previousLoader + '\nloadPrevChapter();', context);
   assert.deepEqual(requests, []);
   context.loadPreviousOnScroll = true;
   vm.runInContext('loadPrevChapter();', context);
@@ -130,6 +135,7 @@ test('chapter navigation waits before showing feedback and ignores superseded re
     activeReaderChapterRequest: 0, readerChapterXhr: null, readerChapterLoadingTimer: null, readerChapterBusyLink: null,
     setTimeout(task) { const id = Symbol(); timers.set(id, task); return id; },
     clearTimeout(id) { timers.delete(id); },
+    window: {},
     XMLHttpRequest: function() {
       requests.push(this);
       this.open = this.send = this.abort = () => {};
@@ -138,7 +144,7 @@ test('chapter navigation waits before showing feedback and ignores superseded re
   });
   const source = chapterScript.slice(chapterScript.indexOf('    function navigateReaderChapter('),
     chapterScript.indexOf('    function applyReaderChapterResponse('));
-  vm.runInContext(source + '\nnavigateReaderChapter(1);', context);
+  vm.runInContext(requestBookContent + source + '\nnavigateReaderChapter(1);', context);
   assert.equal(status.hidden, true);
   for (const task of timers.values()) task();
   assert.equal(status.hidden, false);
