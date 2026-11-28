@@ -1,0 +1,91 @@
+/* Flat source ordering remains intact; disclosure controls hide descendants. */
+:is(#bookHomeTocList, .chapter-list) > [data-toc-level] { position: relative; }
+:is(#bookHomeTocList, .chapter-list)[data-toc-collapsible="true"] > [data-toc-level] { padding-inline-start: 36px; }
+:is(#bookHomeTocList, .chapter-list) > [data-toc-level][hidden] { display: none !important; }
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 50%;
+    height: 100%;
+    transform: translateY(-50%);
+    width: 36px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-secondary);
+    /* The visual marker is geometry rather than a font's baseline glyph. */
+    font-size: 0;
+    cursor: pointer;
+}
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle::before {
+    content: '';
+    width: 10px;
+    height: 10px;
+    background: currentColor;
+    clip-path: polygon(25% 0, 75% 50%, 25% 100%);
+    flex-shrink: 0;
+}
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle:dir(rtl)::before { transform: rotate(180deg); }
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle[aria-expanded="true"]::before { transform: rotate(90deg); }
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle:hover { background: var(--bg-secondary); }
+:is(#bookHomeTocList, .chapter-list) .toc-branch-toggle:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.toc-toggle-all {
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 44px;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+.toc-toggle-all[hidden] { display: none; }
+.toc-toggle-all:hover { color: var(--button-bg); background: var(--hover); }
+.toc-toggle-all:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 2px; }
+.toc-action-icon { position: relative; width: 20px; height: 20px; }
+.toc-action-icon::before,
+.toc-action-icon::after {
+    content: '';
+    position: absolute;
+    left: 6px;
+    width: 6px;
+    height: 6px;
+    border: solid currentColor;
+    border-width: 0 2px 2px 0;
+}
+.toc-action-icon::before { top: -1px; transform: rotate(45deg); }
+.toc-action-icon::after { bottom: -1px; transform: rotate(225deg); }
+[data-toc-action="expand"] .toc-action-icon::before { top: 4px; transform: rotate(225deg); }
+[data-toc-action="expand"] .toc-action-icon::after { bottom: 4px; transform: rotate(45deg); }
+.book-toc-header-actions {
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 12px;
+    margin-inline-start: auto;
+}
+.toc-header:has(.toc-toggle-all) { gap: 12px; }
+.toc-header:has(.toc-toggle-all) > :is(h2, h3) { min-width: 0; }
+.toc-header-actions:has(.toc-toggle-all) { flex-shrink: 0; }
+
+#bookHomeFloating:has(#bookHomeTocList[hidden]) .toc-toggle-all { display: none; }
+
+.pdf-toc-page { margin-inline-start: auto; flex-shrink: 0; color: var(--text-secondary); font-size: .8em; }
+.pdf-toc-empty { padding: 18px 12px; color: var(--text-secondary); text-align: center; }
+.pdf-toc-jump { display: flex; justify-content: center; gap: 8px; margin-top: 12px; }
+.pdf-toc-jump input { min-width: 0; width: 8em; }
+.pdf-toc-jump input, .pdf-toc-jump button {
+    box-sizing: border-box; min-height: 44px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg); color: var(--text); font: inherit;
+}
+#bookHomeLocateCurrent:disabled { opacity: .4; cursor: default; }

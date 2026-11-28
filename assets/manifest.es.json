@@ -1,0 +1,48 @@
+{
+  "name": "EPUB Browser",
+  "short_name": "EPUB Browser",
+  "description": "Un lector EPUB personal y generador de sitios estáticos",
+  "start_url": "/index.html",
+  "display": "standalone",
+  "background_color": "#f4f0e6",
+  "theme_color": "#244548",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/immutable/icon-192.15435b416555.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/assets/immutable/icon-512.74615b597047.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/assets/immutable/screenshot-wide.561f1fb31ff3.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Vista de escritorio de EPUB Browser"
+    },
+    {
+      "src": "/assets/immutable/screenshot-narrow.b18b2c94a054.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Vista móvil de EPUB Browser"
+    }
+  ],
+  "categories": [
+    "books",
+    "education",
+    "productivity"
+  ],
+  "lang": "es",
+  "scope": "/",
+  "prefer_related_applications": false
+}

@@ -1,0 +1,129 @@
+.app-dialog-modal { position: fixed; z-index: 10100; inset: 0; display: grid; place-items: center; padding: 20px; color: var(--text); font-family: var(--font-family, system-ui, -apple-system, sans-serif); }
+.app-dialog-backdrop { position: absolute; inset: 0; background: rgba(15, 23, 42, .56); }
+.app-dialog { position: relative; width: min(100%, 440px); padding: 24px; border-radius: var(--border-radius-lg); background: var(--card-bg); box-shadow: var(--shadow-md); }
+.app-dialog-header h2 { margin: 0; font-size: 1.2rem; line-height: 1.35; }
+.app-dialog-message { margin: 12px 0 0; color: var(--text-secondary); line-height: 1.55; white-space: pre-line; }
+.app-dialog-details { display: grid; max-height: min(240px, 35vh); gap: 8px; margin: 14px 0 0; padding: 12px 12px 12px 32px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--background); color: var(--text); font-size: .9rem; line-height: 1.45; }
+.app-dialog-label { display: block; margin: 20px 0 8px; color: var(--text); font-size: .9rem; font-weight: 600; }
+.app-dialog-input { width: 100%; min-height: 44px; box-sizing: border-box; padding: 0 12px; border: 1px solid var(--border); border-radius: 8px; outline: 0; background: var(--background); color: var(--text); font: inherit; }
+.app-dialog-input:focus { border-color: var(--button-bg); box-shadow: 0 0 0 3px color-mix(in srgb, var(--button-bg) 24%, transparent); }
+.app-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 24px; }
+.app-dialog-button { min-height: 44px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--text); font: inherit; font-weight: 600; cursor: pointer; }
+.app-dialog-button:hover { background: var(--hover); }
+.app-dialog-confirm { background: var(--button-bg); color: var(--button-text); }
+.app-dialog-confirm:hover { background: var(--button-hover); }
+.app-dialog-destructive { background: var(--notification-error); color: #fff; }
+.app-dialog-destructive:hover { background: color-mix(in srgb, var(--notification-error) 86%, #000); }
+.app-dialog-button:disabled { opacity: .48; cursor: not-allowed; }
+.app-dialog-destructive:disabled:hover { background: var(--notification-error); }
+.app-dialog-button:focus-visible { outline: 3px solid var(--button-bg); outline-offset: 2px; }
+@media (max-width: 600px) { .app-dialog-modal { padding: 14px; align-items: end; }.app-dialog { width: 100%; padding: 20px; }.app-dialog-footer { flex-direction: column-reverse; }.app-dialog-button { width: 100%; } }
+@media (prefers-reduced-motion: reduce) { .app-dialog-button { transition: none; } }
+.app-dialog-help { margin:8px 0 0; color:var(--text-secondary); font-size:.85rem; line-height:1.55; }
+.app-dialog-error { margin:12px 0 0; color:var(--notification-error); font-size:.9rem; line-height:1.55; }
+.app-dialog-error[hidden] { display:none; }
+@media(max-width:480px) { .app-dialog { padding:20px; box-sizing:border-box; } }
+
+.app-dialog-panel {
+    box-sizing: border-box;
+    width: min(100%, 540px);
+    max-height: calc(100dvh - 40px);
+    min-height: 0;
+    overflow: auto;
+}
+
+.app-dialog-panel > .app-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.app-dialog-panel > .app-dialog-header h2 {
+    overflow-wrap: anywhere;
+}
+
+.app-dialog-panel > .app-dialog-header .app-dialog-close {
+    display: inline-grid;
+    flex: 0 0 44px;
+    width: 44px;
+    place-items: center;
+    padding: 0;
+}
+
+.app-dialog-body {
+    padding-top: 12px;
+}
+
+@media (max-width: 600px) {
+    .app-dialog-panel .app-dialog-button {
+        width: auto;
+    }
+}
+
+.app-dialog-fullscreen {
+    padding: 0;
+    display: block;
+}
+
+.app-dialog-fullscreen > .app-dialog-panel {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    padding: 0;
+    border-radius: 0;
+    background: var(--background);
+    overscroll-behavior: contain;
+}
+
+.app-dialog-fullscreen > .app-dialog-panel > .app-dialog-header {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    min-height: 60px;
+    padding: 0 clamp(10px, 3vw, 20px);
+    background: var(--card-bg);
+}
+
+.app-dialog-fullscreen > .app-dialog-panel > .app-dialog-header h2 {
+    grid-column: 2;
+    font-size: clamp(1.25rem, 2vw, 1.65rem);
+}
+
+.app-dialog-fullscreen > .app-dialog-panel > .app-dialog-header button {
+    grid-column: 3;
+    justify-self: end;
+}
+
+.app-dialog-fullscreen > .app-dialog-panel > .app-dialog-body {
+    width: min(100% - 28px, 920px);
+    margin: 24px auto 64px;
+    padding: 0;
+}
+
+body:has(> .app-dialog-fullscreen) {
+    overflow: hidden;
+}
+
+.app-dialog-danger-action {
+    border: 1px solid var(--border);
+    color: color-mix(in srgb, var(--notification-error) 64%, var(--text));
+}
+
+.app-dialog-danger-action:hover {
+    border-color: currentColor;
+    background: color-mix(in srgb, var(--notification-error) 10%, var(--card-bg));
+}
+
+.app-dialog-destructive {
+    background: color-mix(in srgb, var(--notification-error) 77%, #000);
+}
+
+.app-dialog-destructive:hover,
+.app-dialog-destructive:disabled:hover {
+    background: color-mix(in srgb, var(--notification-error) 64%, #000);
+}

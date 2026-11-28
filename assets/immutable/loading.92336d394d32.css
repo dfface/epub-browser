@@ -1,0 +1,71 @@
+.content-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Cover all reader overlays, including Server-mode AI paragraph triggers. */
+    z-index: 10090;
+    background: var(--card-bg);
+    background: color-mix(in srgb, var(--card-bg) 72%, transparent);
+    -webkit-backdrop-filter: blur(12px) saturate(1.05);
+    backdrop-filter: blur(12px) saturate(1.05);
+}
+
+.content-loading:not(.is-visible) { display: none; }
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid var(--border);
+    border-color: color-mix(in srgb, var(--text-secondary) 24%, transparent);
+    border-top-color: var(--loading-spinner, var(--button-bg));
+    border-radius: 50%;
+    animation: loading-spin 1s linear infinite;
+}
+
+@keyframes loading-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-spinner { animation: none; }
+}
+
+.chapter-navigation-status {
+    position: fixed;
+    z-index: 1100;
+    inset-inline-start: 50%;
+    translate: -50% 0;
+    inset-block-start: 4.5rem;
+    max-width: calc(100% - 2rem);
+    width: max-content;
+    padding: 0.5rem 0.85rem;
+    color: var(--text);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    box-shadow: 0 2px 8px var(--shadow);
+}
+
+[dir="rtl"] .chapter-navigation-status {
+    translate: 50% 0;
+}
+
+.chapter-navigation-status button {
+    margin-inline-start: 0.5rem;
+    color: var(--text);
+    background: var(--hover);
+    border: 1px solid var(--border);
+    border-radius: 0.25rem;
+    padding: 0.25rem 0.5rem;
+}
+
+a.chapter-link[aria-busy="true"],
+a.prev-chapter[aria-busy="true"],
+a.next-chapter[aria-busy="true"],
+.mobile-controls > a[aria-busy="true"],
+#continueReadingBtn[aria-busy="true"] {
+    opacity: 0.75;
+}
