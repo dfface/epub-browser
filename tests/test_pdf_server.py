@@ -104,6 +104,28 @@ class PDFDocumentDeliveryTests(unittest.TestCase):
         cls.manager.shutdown()
         cls.temporary.cleanup()
 
+    def test_browser_book_cache_descriptor_requires_session_and_book_access(self):
+        url = f"/api/books/{self.record.book_id}/browser-cache"
+        with TestClient(self.app, follow_redirects=False) as visitor:
+            self.assertEqual(visitor.get(url).status_code, 401)
+        self.assertEqual(self.reader.get(url).status_code, 404)
+        result = self.owner.get(url)
+        self.assertEqual(result.status_code, 200)
+        self.assertIn("no-store", result.headers["cache-control"])
+        self.assertTrue(result.json()["version"].endswith(self.record.source_fingerprint))
+        self.assertEqual(
+            result.json()["account"], self.owner.get("/api/session").json()["user"]["id"],
+        )
+        try:
+            self.store.set_book_visibility(self.record.book_id, "public")
+            member = self.reader.get(url)
+            self.assertEqual(member.status_code, 200)
+            self.assertNotEqual(member.json()["account"], result.json()["account"])
+            self.assertEqual(member.json()["version"], result.json()["version"])
+        finally:
+            self.store.set_book_visibility(self.record.book_id, "restricted")
+        self.assertEqual(self.reader.get(url).status_code, 404)
+
     def test_anonymous_public_range_and_revocation(self):
         with TestClient(self.app, follow_redirects=False) as visitor:
             try:

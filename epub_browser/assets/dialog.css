@@ -23,3 +23,107 @@
 .app-dialog-error { margin:12px 0 0; color:var(--notification-error); font-size:.9rem; line-height:1.55; }
 .app-dialog-error[hidden] { display:none; }
 @media(max-width:480px) { .app-dialog { padding:20px; box-sizing:border-box; } }
+
+.app-dialog-panel {
+    box-sizing: border-box;
+    width: min(100%, 540px);
+    max-height: calc(100dvh - 40px);
+    min-height: 0;
+    overflow: auto;
+}
+
+.app-dialog-panel > .app-dialog-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+.app-dialog-panel > .app-dialog-header h2 {
+    overflow-wrap: anywhere;
+}
+
+.app-dialog-panel > .app-dialog-header .app-dialog-close {
+    display: inline-grid;
+    flex: 0 0 44px;
+    width: 44px;
+    place-items: center;
+    padding: 0;
+}
+
+.app-dialog-body {
+    padding-top: 12px;
+}
+
+@media (max-width: 600px) {
+    .app-dialog-panel .app-dialog-button {
+        width: auto;
+    }
+}
+
+.app-dialog-fullscreen {
+    padding: 0;
+    display: block;
+}
+
+.app-dialog-fullscreen > .app-dialog-panel {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    padding: 0;
+    border-radius: 0;
+    background: var(--background);
+    overscroll-behavior: contain;
+}
+
+.app-dialog-fullscreen > .app-dialog-panel > .app-dialog-header {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    min-height: 60px;
+    padding: 0 clamp(10px, 3vw, 20px);
+    background: var(--card-bg);
+}
+
+.app-dialog-fullscreen > .app-dialog-panel > .app-dialog-header h2 {
+    grid-column: 2;
+    font-size: clamp(1.25rem, 2vw, 1.65rem);
+}
+
+.app-dialog-fullscreen > .app-dialog-panel > .app-dialog-header button {
+    grid-column: 3;
+    justify-self: end;
+}
+
+.app-dialog-fullscreen > .app-dialog-panel > .app-dialog-body {
+    width: min(100% - 28px, 920px);
+    margin: 24px auto 64px;
+    padding: 0;
+}
+
+body:has(> .app-dialog-fullscreen) {
+    overflow: hidden;
+}
+
+.app-dialog-danger-action {
+    border: 1px solid var(--border);
+    color: color-mix(in srgb, var(--notification-error) 64%, var(--text));
+}
+
+.app-dialog-danger-action:hover {
+    border-color: currentColor;
+    background: color-mix(in srgb, var(--notification-error) 10%, var(--card-bg));
+}
+
+.app-dialog-destructive {
+    background: color-mix(in srgb, var(--notification-error) 77%, #000);
+}
+
+.app-dialog-destructive:hover,
+.app-dialog-destructive:disabled:hover {
+    background: color-mix(in srgb, var(--notification-error) 64%, #000);
+}

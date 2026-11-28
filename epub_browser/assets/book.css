@@ -166,17 +166,31 @@ body {
     color: var(--text);
 }
 
-.clearReadingProgress {
+.book-action-bar,
+.book-secondary-actions {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: flex-start;
     gap: 10px;
-    margin-top: 16px;
 }
 
-.clearReadingProgress .css-btn {
-    min-height: 42px;
+.book-action-bar {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-block-start: 1px solid var(--border);
+}
+
+.book-secondary-actions {
+    flex: 1 1 20rem;
+    min-width: 0;
+}
+
+.book-action-bar .css-btn {
+    min-height: 44px;
+    max-width: 100%;
     margin-bottom: 0;
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 .book-reading-time {
@@ -662,17 +676,20 @@ body {
 }
 
 .book-info-card {
-    display: flex;
     background: var(--card-bg);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-md);
     padding: 25px;
     margin-bottom: 30px;
     margin-top: 30px;
-    gap: 25px;
     transition: var(--transition);
     /* Action menus must be able to extend beyond the card instead of being clipped. */
     overflow: visible;
+}
+
+.book-info-summary {
+    display: flex;
+    gap: 25px;
 }
 
 .book-info-cover {
@@ -702,7 +719,8 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    justify-content: space-between;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .book-info-title {
@@ -729,7 +747,6 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    margin-bottom: 15px;
 }
 
 .book-tag {
@@ -991,52 +1008,59 @@ body {
 }
 
 
-/* 移动端：当简介或私密书评存在时，改为上下排列 */
+/* A long description needs the full text width once the page is flush. */
 @media (max-width: 768px) {
-    .book-info-card:has(.book-info-desc),
-    .book-info-card:has([data-book-reviews]) {
+    .book-info-card:has(.book-info-desc) {
+        padding: 20px;
+    }
+
+    .book-info-summary:has(.book-info-desc) {
         flex-direction: column;
         align-items: center;
+        gap: 20px;
         text-align: center;
     }
-    
-    .book-info-card:has(.book-info-desc) .book-info-cover-wrap,
-    .book-info-card:has([data-book-reviews]) .book-info-cover-wrap {
+
+    .book-info-summary:has(.book-info-desc) .book-info-cover-wrap {
         flex: 0 0 auto;
         align-self: center;
-        margin-bottom: 20px;
     }
-    
-    .book-info-card:has(.book-info-desc) .book-info-content,
-    .book-info-card:has([data-book-reviews]) .book-info-content {
-        flex: 1;
+
+    .book-info-summary:has(.book-info-desc) .book-info-content {
         width: 100%;
     }
-    
-    /* 确保 tags 和 controls 也居中 */
-    .book-info-card:has(.book-info-desc) .book-info-tags,
-    .book-info-card:has([data-book-reviews]) .book-info-tags {
+
+    .book-info-summary:has(.book-info-desc) .book-info-tags {
         justify-content: center;
     }
-    
-    .book-info-card:has(.book-info-desc) .css-controls,
-    .book-info-card:has([data-book-reviews]) .css-controls {
-        display: flex;
-        flex-wrap: wrap;
+
+    /* Give both action groups their own row once the page is full-width. */
+    .book-action-bar {
+        display: grid;
+        justify-items: center;
+    }
+
+    .book-action-bar .continue-reading-control {
+        width: min(100%, 16rem);
+    }
+
+    .book-action-bar #continueReadingBtn {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .book-secondary-actions {
+        display: grid;
+        width: min(100%, 36rem);
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 8.5rem));
         justify-content: center;
-        gap: 10px;
     }
-    
-    .book-info-card:has(.book-info-desc) .css-btn,
-    .book-info-card:has([data-book-reviews]) .css-btn {
-        flex: 0 0 auto;
-    }
-    
-    /* 调整内边距和间距 */
-    .book-info-card:has(.book-info-desc),
-    .book-info-card:has([data-book-reviews]) {
-        padding: 20px;
-        gap: 20px;
+}
+
+@media (max-width: 640px) {
+    .book-secondary-actions {
+        width: min(100%, 24rem);
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, max(8rem, 40%)), 1fr));
     }
 }
 
@@ -1044,9 +1068,12 @@ body {
    content must not determine whether the primary actions can reflow. */
 @media (max-width: 480px) {
     .book-info-card {
+        padding: 20px;
+    }
+
+    .book-info-summary {
         flex-direction: column;
         align-items: center;
-        padding: 20px;
         gap: 20px;
         text-align: center;
     }
@@ -1061,8 +1088,7 @@ body {
         min-width: 0;
     }
 
-    .book-info-tags,
-    .clearReadingProgress {
+    .book-info-tags {
         justify-content: center;
     }
 
@@ -1071,12 +1097,8 @@ body {
         white-space: normal;
     }
 
-    .continue-reading-control {
-        max-width: 100%;
-    }
-
-    .continue-reading-control #continueReadingBtn {
-        min-width: 0;
+    .book-action-bar .continue-reading-control {
+        width: 100%;
     }
 }
 

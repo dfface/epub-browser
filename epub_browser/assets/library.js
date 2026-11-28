@@ -933,52 +933,6 @@ function initScript() {
     window.addEventListener('scroll', updateScrollToTopVisibility);
     updateScrollToTopVisibility();
 
-    function pwaSupport() {
-        if (window.EpubBrowserMode === 'server') return;
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-                window.EpubBrowserCacheBoundary.registerWorker()
-                    .then(function(registration) {
-                        console.log('ServiceWorker registration successful');
-                    })
-                    .catch(function(error) {
-                        console.log('ServiceWorker registration failed');
-                    });
-            });
-        }
-        var deferredPrompt;
-        var installBtn = document.getElementById('pwa-install-btn');
-
-        window.addEventListener('beforeinstallprompt', function(e) {
-            e.preventDefault();
-            deferredPrompt = e;
-            if (installBtn) installBtn.style.display = '';
-        });
-
-        if (installBtn) {
-            installBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (deferredPrompt) {
-                    showNotification(t('library.installing'), 'info');
-                    installBtn.style.display = 'none';
-                    deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then(function(choiceResult) {
-                        if (choiceResult.outcome === 'accepted') {
-                            showNotification(t('library.installSucceeded'), 'success');
-                        } else {
-                            showNotification(t('library.installCancelled'), 'info');
-                        }
-                        deferredPrompt = null;
-                    });
-                }
-            });
-        }
-
-        window.addEventListener('appinstalled', function() {
-            if (installBtn) installBtn.style.display = 'none';
-        });
-    }
-
     function setDeferredFeatureLoading(button, loading, loadingKey) {
         var label = button.querySelector('[data-i18n]');
         var icon = button.querySelector('i');
@@ -1026,7 +980,6 @@ function initScript() {
         });
     }
 
-    pwaSupport();
     deferLibraryFeature('bookshelfBtn', 'bookshelf', function() {
         if (window.initBookShelf) window.initBookShelf();
     }, 'bookshelf.loading');

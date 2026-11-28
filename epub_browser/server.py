@@ -4624,6 +4624,27 @@ window.location.assign(payload.redirect||'/');
             },
         )
 
+    async def browser_book_cache(request):
+        principal = require_principal(request)
+        book_id = request.path_params['book_id']
+
+        def visible_book():
+            if store.can_read_book(principal.user_id, principal.role, book_id):
+                return store.book_by_id(book_id)
+            return None
+
+        book = await run_db(visible_book)
+        if book is None or not book.source_fingerprint:
+            return Response(status_code=404, headers={'Cache-Control': 'private, no-store'})
+        return response({
+            'account': principal.user_id,
+            'version': browser_cache_version(book),
+        }, cache_control='private, no-store')
+
+    def browser_cache_version(book):
+        revision = PDF_OUTPUT_REVISION if book.source_format == PDF_FORMAT else SERVER_OUTPUT_REVISION
+        return f'{revision}:{book.source_fingerprint}'
+
     async def book_search(request):
         principal = reading_principal(request)
         book_id = request.path_params['book_id']
@@ -4738,6 +4759,7 @@ window.location.assign(payload.redirect||'/');
             'Cache-Control': 'private, no-cache',
             'Content-Disposition': inline_pdf_disposition(source.name),
             'ETag': etag,
+            'X-Book-Content-Version': browser_cache_version(book),
             'X-Content-Type-Options': 'nosniff',
         }
         range_header = request.headers.get('range')
@@ -5142,7 +5164,9 @@ window.location.assign(payload.redirect||'/');
                             renderer.render_chapter,
                             int(chapter_match.group(1)),
                         )
-                        return await account_reader_page(markup, principal, request)
+                        page_response = await account_reader_page(markup, principal, request)
+                        page_response.headers['X-Book-Content-Version'] = browser_cache_version(book)
+                        return page_response
                     if kindle_page_allowed:
                         if book_relative_path == 'kindle.html':
                             if book.source_format == PDF_FORMAT:
@@ -5221,7 +5245,10 @@ window.location.assign(payload.redirect||'/');
                         return Response(
                             await run_render(renderer.toc_bytes),
                             media_type='application/json',
-                            headers={'Cache-Control': 'no-cache'},
+                            headers={
+                                'Cache-Control': 'no-cache',
+                                'X-Book-Content-Version': browser_cache_version(book),
+                            },
                         )
                 except ServerPageError:
                     return response(error_payload('not_found', 'Not Found'), 404)
@@ -6271,6 +6298,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/admin/webhooks/{webhook_id}', admin_webhook, methods=['GET', 'PUT', 'DELETE']),
         Route('/api/books/{book_id}/dictionaries', dictionary_choices, methods=['GET']),
         Route('/api/books/{book_id}/search', book_search, methods=['GET']),
+        Route('/api/books/{book_id}/browser-cache', browser_book_cache, methods=['GET']),
         Route(
             '/api/books/{book_id}/document',
             pdf_document,
