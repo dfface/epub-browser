@@ -56,7 +56,11 @@ from .ai_reading import (
     _public_ai_result,
     validate_reading_request,
 )
-from .asset_publisher import WEB_MANIFEST_SOURCES, PublishedAssets, rewrite_asset_urls
+from .asset_publisher import (
+    WEB_MANIFEST_SOURCES, AssetPublisher, PublishedAssets,
+    apply_manifest_branding, rewrite_asset_urls,
+)
+from .branding import Branding, MAX_BRAND_IMAGE_BYTES, normalize_brand_image, validate_site_name
 from .dictionary_service import (
     DictionaryService,
     DictionaryServiceError,
@@ -768,7 +772,29 @@ def create_app(
         except (KeyError, OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
             return '/assets/' + logical_name
 
+    brand_image_path = re.compile(r'/assets/immutable/branding/(?:logo|favicon)\.[0-9a-f]{12}\.png')
+
+    brand_publisher = AssetPublisher(Path(__file__).with_name('assets'), base_directory)
+
+    def current_branding():
+        values = store.get_site_branding()
+        for kind in ('logo', 'favicon'):
+            url = values[kind]
+            if not brand_image_path.fullmatch(url):
+                values[kind] = ''
+            elif not Path(base_directory, url.lstrip('/')).is_file():
+                contents = store.site_branding_image(kind, url)
+                try:
+                    restored = brand_publisher.publish_brand_image(kind, contents) if contents else ''
+                except OSError:
+                    restored = ''
+                if restored != url:
+                    values[kind] = ''
+        return Branding(**values)
+
     def is_public_unauthenticated_asset(path):
+        if brand_image_path.fullmatch(path):
+            return True
         if path == '/assets/i18n-manifest.json':
             return True
         # i18n locale packs and the runtime loader are non-sensitive UI text and
@@ -1233,13 +1259,13 @@ def create_app(
             cache_control='no-store',
         )
 
-    def auth_brand_markup():
-        return (
-            '<div class="auth-brand">'
-            '<img class="auth-brand-mark" src="/assets/logo-mark-color.png" '
-            'width="32" height="32" '
-            'alt="" aria-hidden="true"><span>EPUB Browser</span></div>'
-        )
+    def auth_brand_markup(branding):
+        return f'<div class="auth-brand">{branding.mark("auth-brand-mark")}{branding.brand_text}</div>'
+
+    def auth_favicon(branding, *, optional=False):
+        if branding.favicon or optional:
+            return branding.icon(optional=optional)
+        return f'<link rel="icon" type="image/png" href="{html.escape(current_asset_url("favicon.png"))}">'
 
     def public_json_error(error):
         if error == 'unsupported_media_type':
@@ -1287,12 +1313,14 @@ def create_app(
             else ''
         )
         language_options = locale_options(locale)
-        footer_markup = render_footer(datetime.now().year, release_api_url='/api/version')
-        brand_markup = auth_brand_markup()
+        branding = current_branding()
+        footer_markup = render_footer(datetime.now().year, release_api_url='/api/version', branding=branding)
+        brand_markup = auth_brand_markup(branding)
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title data-i18n="account.setupPageTitle">{copy['page_title']}</title>
+{branding.title(copy["title"], "account.setupTitle") if branding.name else branding.title(copy["page_title"], "account.setupPageTitle")}
+{auth_favicon(branding, optional=True)}
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/account.css">
 <script src="/assets/theme-bootstrap.js"></script>
@@ -1477,9 +1505,9 @@ if(localeField)localeField.value=localeSelect.value;
             + '</p>'
         )
         language_options = locale_options(locale)
-        footer_markup = render_footer(datetime.now().year, release_api_url='/api/version')
-        brand_markup = auth_brand_markup()
-        favicon_url = html.escape(current_asset_url('favicon.png'), quote=True)
+        branding = current_branding()
+        footer_markup = render_footer(datetime.now().year, release_api_url='/api/version', branding=branding)
+        brand_markup = auth_brand_markup(branding)
         oidc_settings = store.get_oidc_settings()
         oidc_markup = ''
         if oidc_settings.enabled:
@@ -1504,8 +1532,8 @@ if(localeField)localeField.value=localeSelect.value;
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <meta name="epub-browser-auth-nonce" content="{nonce}">
-<title data-i18n="account.loginPageTitle">{copy['page_title']}</title>
-<link rel="icon" type="image/png" href="{favicon_url}">
+{branding.title(copy["sign_in"], "account.signIn") if branding.name else branding.title(copy["page_title"], "account.loginPageTitle")}
+{auth_favicon(branding)}
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/account.css">
 <script src="/assets/theme-bootstrap.js"></script>
@@ -1602,17 +1630,19 @@ window.location.assign(payload.redirect||'/');
             request.headers.get('accept-language', ''),
         )
         copy = auth_copy('oidc', locale)
+        branding = current_branding()
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title data-i18n="account.oidc.errorTitle">{html.escape(copy['error_title'])} · EPUB Browser</title>
+{branding.title(html.escape(copy["error_title"]), "account.oidc.errorTitle")}
+{auth_favicon(branding, optional=True)}
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/account.css">
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 {render_i18n_bootstrap(locale, None, core_url=i18n_core_immutable_url())}</head>
 <body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
-<header class="auth-card-header">{auth_brand_markup()}</header>
+<header class="auth-card-header">{auth_brand_markup(branding)}</header>
 <div class="auth-intro">
 <h1 data-i18n="account.oidc.errorTitle">{html.escape(copy['error_title'])}</h1>
 <p class="auth-description" data-i18n="account.oidc.errorBody">{html.escape(copy['error_body'])}</p></div>
@@ -1645,17 +1675,19 @@ window.location.assign(payload.redirect||'/');
             )
             if error else ''
         )
+        branding = current_branding()
         markup = f'''<!doctype html><html lang="{locale}"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title data-i18n="account.oidc.associateTitle">{html.escape(copy['associate_title'])} · EPUB Browser</title>
+{branding.title(html.escape(copy["associate_title"]), "account.oidc.associateTitle")}
+{auth_favicon(branding, optional=True)}
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/account.css">
 <script src="/assets/theme-bootstrap.js"></script>
 <script>window.EpubBrowserBasePath="/";window.EpubBrowserDisableManifest=true;</script>
 {render_i18n_bootstrap(locale, None, core_url=i18n_core_immutable_url())}</head>
 <body class="auth-page"><main class="auth-shell"><div class="auth-stack"><section class="auth-card login-card">
-<header class="auth-card-header">{auth_brand_markup()}</header>
+<header class="auth-card-header">{auth_brand_markup(branding)}</header>
 <div class="auth-intro">
 <h1 data-i18n="account.oidc.associateTitle">{html.escape(copy['associate_title'])}</h1>
 <p class="auth-description" data-i18n="account.oidc.associateBody">{html.escape(copy['associate_body'])}</p></div>
@@ -2340,6 +2372,46 @@ window.location.assign(payload.redirect||'/');
         ):
             return response(error_payload('not_found', 'Personal access token not found'), 404)
         return Response(status_code=204)
+
+    async def admin_branding(request):
+        require_admin(request)
+        if request.method == 'PUT':
+            def invalid_branding():
+                bundle = get_bundle(resolve_request_locale(request))
+                return response(error_payload('invalid_branding', bundle['admin.branding.invalid']), 400)
+            data = await bounded_unique_json_object(request, maximum_size=3 * MAX_BRAND_IMAGE_BYTES)
+            if not data or not set(data) <= {'name', 'logo', 'favicon', 'hide_version_info'}:
+                return invalid_branding()
+
+            def save():
+                changes = {}
+                images = {}
+                if 'name' in data:
+                    changes['name'] = validate_site_name(data['name'])
+                if 'hide_version_info' in data:
+                    if not isinstance(data['hide_version_info'], bool):
+                        raise ValueError('Invalid footer visibility')
+                    changes['hide_version_info'] = data['hide_version_info']
+                for kind in ('logo', 'favicon'):
+                    if kind not in data:
+                        continue
+                    value = data[kind]
+                    if value is None:
+                        changes[kind] = ''
+                    elif isinstance(value, str):
+                        images[kind] = normalize_brand_image(base64.b64decode(value, validate=True), kind)
+                    else:
+                        raise ValueError('Invalid branding image')
+                for kind, contents in images.items():
+                    changes[kind] = brand_publisher.publish_brand_image(kind, contents)
+                store.update_site_branding(changes, images)
+
+            try:
+                await run_io(save)
+            except ValueError:
+                return invalid_branding()
+        branding = await run_db(current_branding)
+        return response({'branding': dict(vars(branding))}, cache_control='private, no-store')
 
     async def admin_oidc_settings(request):
         require_admin(request)
@@ -4343,7 +4415,7 @@ window.location.assign(payload.redirect||'/');
             ai_settings = await run_db(store.get_ai_settings)
             markup = await run_render(
                 render_library_shell,
-                (), current_published_assets(), SiteURLs(),
+                (), PublishedAssets(current_published_assets().assets, await run_db(current_branding)), SiteURLs(),
                 deployment_mode='server', kindle=kindle,
                 ai_reading_enabled=bool(request.scope.get(PRINCIPAL_SCOPE_KEY) and ai_settings["enabled"]),
             )
@@ -4464,7 +4536,7 @@ window.location.assign(payload.redirect||'/');
             render_kindle_library_page, books, SiteURLs(), shelf=shelf, recent=recent,
             locale=resolve_request_locale(request), dashboard=dashboard, show_dashboard=show_dashboard,
             catalog_page=page_number("catalog_page"), shelf_page=page_number("shelf_page"),
-            query=request.query_params.get("q", ""), sort=sort,
+            query=request.query_params.get("q", ""), sort=sort, branding=await run_db(current_branding),
         )
         if not principal.user_id:
             markup = anonymous_reader_markup(markup, _request_relative_path(request))
@@ -4951,6 +5023,15 @@ window.location.assign(payload.redirect||'/');
         if is_public_unauthenticated_asset('/' + path):
             return await public_files.get_response(path, request.scope)
         if '/' + path in PUBLIC_WEB_MANIFESTS:
+            branding = await run_db(current_branding)
+            if branding.name:
+                def load_manifest():
+                    return json.loads(Path(base_directory, path).read_text(encoding='utf-8'))
+                try:
+                    manifest = await run_io(load_manifest)
+                except (OSError, ValueError):
+                    return await public_files.get_response(path, request.scope)
+                return JSONResponse(apply_manifest_branding(manifest, branding), headers={'Cache-Control': 'no-cache'})
             return await public_files.get_response(path, request.scope)
         principal = reading_principal(request)
         book_id = extract_book_id_from_public_path(path)
@@ -5074,6 +5155,7 @@ window.location.assign(payload.redirect||'/');
                 metadata_overrides=await run_db(_renderer_metadata),
                 kindle=kindle,
                 ai_reading_enabled=ai_reading_enabled,
+                branding=await run_db(current_branding) if reader_page else Branding(),
             )
             # Retain a narrow compatibility path for manually-created test
             # fixtures and legacy caches that still have an accepted marker.
@@ -6255,6 +6337,7 @@ window.location.assign(payload.redirect||'/');
         Route('/api/account/pats/{token_id}', revoke_own_personal_access_token, methods=['DELETE']),
         Route('/api/account/oidc/link', account_oidc_link, methods=['POST']),
         Route('/api/account/oidc/identity', account_oidc_identity, methods=['DELETE']),
+        Route('/api/admin/branding', admin_branding, methods=['GET', 'PUT']),
         Route('/api/admin/oidc/settings', admin_oidc_settings, methods=['GET', 'PUT']),
         Route('/api/admin/users', admin_users, methods=['GET', 'POST']),
         Route(

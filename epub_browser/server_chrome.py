@@ -219,6 +219,7 @@ SERVER_ACCOUNT_PANEL = '''
         <button type="button" class="admin-section-tab" id="adminSectionUploadTab" role="tab" aria-selected="false" aria-controls="adminUploadSection" data-admin-section="upload"><i class="fas fa-upload" aria-hidden="true"></i><span data-i18n="admin.books.uploadTitle">Upload book</span></button>
         <button type="button" class="admin-section-tab" id="adminSectionBooksTab" role="tab" aria-selected="false" aria-controls="adminBooksSection" data-admin-section="books"><i class="fas fa-book-open" aria-hidden="true"></i><span data-i18n="admin.books">Book management</span></button>
         <button type="button" class="admin-section-tab" id="adminSectionWebhooksTab" role="tab" aria-selected="false" aria-controls="adminWebhooksSection" data-admin-section="webhooks"><i class="fas fa-link" aria-hidden="true"></i><span data-i18n="admin.webhooks.title">WebHooks</span></button>
+        <button type="button" class="admin-section-tab" id="adminSectionBrandingTab" role="tab" aria-selected="false" aria-controls="adminBrandingSection" data-admin-section="branding"><i class="fas fa-palette" aria-hidden="true"></i><span data-i18n="admin.branding.title">Site branding</span></button>
     </nav>
     <div class="account-modal-body"><div class="account-layout account-admin-grid">
     <section class="account-admin-section account-card-wide admin-overview-section" id="adminOverviewSection" role="tabpanel" aria-labelledby="adminSectionOverviewTab" data-admin-panel="overview">
@@ -302,6 +303,46 @@ SERVER_ACCOUNT_PANEL = '''
             </div>
         </form>
     </section>
+    <section class="account-admin-section account-card-wide admin-branding" id="adminBrandingSection" role="tabpanel" aria-labelledby="adminSectionBrandingTab" data-admin-panel="branding" hidden>
+        <h4 data-i18n="admin.branding.title">Site branding</h4>
+        <form id="siteBrandingForm" class="account-form">
+            <fieldset disabled class="admin-branding-fields">
+                <legend class="sr-only visually-hidden" data-i18n="admin.branding.title">Site branding</legend>
+                <label><span data-i18n="admin.branding.name">Site name</span>
+                    <input name="siteName" maxlength="80" aria-describedby="siteBrandingHelp">
+                </label>
+                <label><span data-i18n="admin.branding.logo">Logo</span>
+                    {logo_picker}
+                </label>
+                <label class="admin-branding-check">
+                    <input type="checkbox" name="defaultLogo"><span data-i18n="admin.branding.defaultLogo">Use default logo</span>
+                </label>
+                <label><span data-i18n="admin.branding.favicon">Favicon</span>
+                    {favicon_picker}
+                </label>
+                <label class="admin-branding-check">
+                    <input type="checkbox" name="defaultFavicon"><span data-i18n="admin.branding.defaultFavicon">Use default favicon</span>
+                </label>
+                <p class="admin-setting-help" id="siteBrandingHelp" data-i18n="admin.branding.help">Leave the name blank to use the default. Use PNG, JPEG or WebP up to 1 MB and 2048 pixels per side.</p>
+                <label class="admin-branding-check">
+                    <input type="checkbox" name="hideVersionInfo"><span data-i18n="admin.branding.hideVersionInfo">Hide footer credits, version and update notices</span>
+                </label>
+                <div class="admin-branding-preview">
+                    <span data-i18n="admin.branding.preview">Preview</span>
+                    <div>
+                        <img width="32" height="32" alt="" data-brand-preview="logo" src="/assets/logo-mark-color.png">
+                        <b id="siteBrandingPreviewName" data-i18n="common.brand">EPUB Browser</b>
+                        <img width="16" height="16" data-brand-preview="favicon" data-i18n-alt="admin.branding.favicon" alt="Favicon" src="/assets/favicon.png">
+                    </div>
+                </div>
+                <div class="admin-branding-actions">
+                    <button type="button" class="bookshelf-action-btn" id="siteBrandingDefaults" data-i18n="admin.branding.reset">Restore defaults</button>
+                    <button type="submit" class="bookshelf-action-btn account-primary-action" data-i18n="admin.branding.save">Save branding</button>
+                </div>
+            </fieldset>
+            <p id="siteBrandingMessage" class="account-form-message" role="status" aria-live="polite"></p>
+        </form>
+    </section>
     <section class="account-admin-section account-card-wide account-users-section" id="adminUsersSection" role="tabpanel" aria-labelledby="adminSectionUsersTab" data-admin-panel="users" hidden>
         <h4 id="adminUsersTitle" data-i18n="admin.users">Users</h4>
         <p class="account-section-copy" data-i18n="admin.usersDescription">Create local accounts and manage their access, role, password, and sessions.</p>
@@ -346,8 +387,8 @@ SERVER_ACCOUNT_PANEL = '''
         <p class="account-section-copy" data-i18n="admin.dictionariesDescription">Install a local MDict or StarDict dictionary. You can choose it when looking up a word.</p>
         <form class="account-form dictionary-install-form" id="adminDictionaryForm">
             <fieldset class="dictionary-format-chooser"><legend data-i18n="admin.dictionaryFormat">Dictionary format</legend><label class="dictionary-format-option is-selected"><input name="dictionary_format" type="radio" value="mdict" checked><span><strong data-i18n="admin.dictionaryFormatMdictName">MDict</strong><small data-i18n="admin.dictionaryFormatMdict">Upload one ZIP containing the MDict and its local resources.</small></span></label><label class="dictionary-format-option"><input name="dictionary_format" type="radio" value="stardict"><span><strong data-i18n="admin.dictionaryFormatStardictName">StarDict</strong><small data-i18n="admin.dictionaryFormatStardict">Upload one downloaded archive containing the dictionary files.</small></span></label></fieldset>
-            <div class="dictionary-upload-fields" data-dictionary-upload="mdict"><label><span data-i18n="admin.dictionaryMdictPackage">MDict package</span><span class="dictionary-file-control"><input class="dictionary-file-input" name="mdict_archive" type="file" accept=".zip,application/zip,application/octet-stream" required aria-describedby="adminDictionaryMdictPackageHelp"><span class="dictionary-file-button" aria-hidden="true" data-i18n="admin.chooseDictionaryFile">Choose file</span><span class="dictionary-file-name" data-dictionary-file-name="mdict_archive" data-i18n="admin.noDictionaryFile">No file selected</span></span><small id="adminDictionaryMdictPackageHelp" data-i18n="admin.dictionaryMdictPackageHelp">ZIP with one MDX and any matching MDD, CSS, image, or audio resources.</small></label></div>
-            <div class="dictionary-upload-fields" data-dictionary-upload="stardict" hidden><label><span data-i18n="admin.dictionaryPackage">Dictionary package</span><span class="dictionary-file-control"><input class="dictionary-file-input" name="stardict_archive" type="file" accept=".zip,.tar.gz,.tgz,.tar.bz2,.tbz2,.gz,.bz2,application/zip,application/gzip,application/x-bzip2,application/octet-stream" disabled aria-describedby="adminDictionaryPackageHelp"><span class="dictionary-file-button" aria-hidden="true" data-i18n="admin.chooseDictionaryFile">Choose file</span><span class="dictionary-file-name" data-dictionary-file-name="stardict_archive" data-i18n="admin.noDictionaryFile">No file selected</span></span><small id="adminDictionaryPackageHelp" data-i18n="admin.dictionaryPackageHelp">Choose a ZIP, .tar.gz/.tgz, or .tar.bz2/.tbz2 download containing matching .ifo, .idx, and .dict files.</small></label></div>
+            <div class="dictionary-upload-fields" data-dictionary-upload="mdict"><label><span data-i18n="admin.dictionaryMdictPackage">MDict package</span>{mdict_picker}<small id="adminDictionaryMdictPackageHelp" data-i18n="admin.dictionaryMdictPackageHelp">ZIP with one MDX and any matching MDD, CSS, image, or audio resources.</small></label></div>
+            <div class="dictionary-upload-fields" data-dictionary-upload="stardict" hidden><label><span data-i18n="admin.dictionaryPackage">Dictionary package</span>{stardict_picker}<small id="adminDictionaryPackageHelp" data-i18n="admin.dictionaryPackageHelp">Choose a ZIP, .tar.gz/.tgz, or .tar.bz2/.tbz2 download containing matching .ifo, .idx, and .dict files.</small></label></div>
             <label><span data-i18n="admin.dictionaryName">Display name (optional)</span><input name="display_name" type="text" autocomplete="off" aria-describedby="adminDictionaryNameHelp"><small id="adminDictionaryNameHelp" data-i18n="admin.dictionaryNameHelp">Pre-filled from the file name. You can change it.</small></label>
             <button type="submit" class="bookshelf-action-btn account-primary-action" id="adminDictionarySubmit" data-i18n="admin.installDictionary">Install dictionary</button>
             <p id="adminDictionaryMessage" class="auth-alert" role="alert" hidden></p>
@@ -575,7 +616,7 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
   <section class="reading-insights-sessions" aria-labelledby="readingInsightsSelectedDay"><h2 id="readingInsightsSelectedDay" data-reading-insights-selected-day data-i18n="readingInsights.selectedDay">Selected day</h2><ol data-reading-insights-sessions></ol></section>
 </main>
 {render_account_panel()}
-{render_footer(datetime.now().year, release_api_url='/api/version')}
+{render_footer(datetime.now().year, release_api_url='/api/version', branding=assets.branding)}
 <script src="/assets/cache-boundary.js" defer></script>
 <script src="/assets/notification.js" defer></script>
 {SERVER_AUTH_SCRIPT}
@@ -589,10 +630,33 @@ def render_reading_insights_document(assets: PublishedAssets, urls: SiteURLs) ->
 </html>'''
 
 
+def _render_file_picker(name, accept, help_id, *, required=False, disabled=False):
+    state = (' required' if required else '') + (' disabled' if disabled else '')
+    return (
+        '<span class="account-file-control">'
+        f'<input class="account-file-input" name="{name}" type="file" accept="{accept}"'
+        f'{state} aria-describedby="{help_id}">'
+        '<span class="account-file-button" aria-hidden="true" data-i18n="admin.chooseDictionaryFile">Choose file</span>'
+        f'<span class="account-file-name" data-account-file-name="{name}" aria-hidden="true" '
+        'data-i18n="admin.noDictionaryFile">No file selected</span></span>'
+    )
+
+
 def render_account_panel(kindle=False):
     panel = SERVER_ACCOUNT_PANEL.replace("{book_sort_label}", BOOK_SORT_LABEL).replace(
         "{book_sort_options}", book_sort_options(BOOK_SORT_OPTIONS, "title_asc"),
     )
+    image_types = "image/png,image/jpeg,image/webp"
+    for kind in ("logo", "favicon"):
+        panel = panel.replace("{" + kind + "_picker}", _render_file_picker(kind, image_types, "siteBrandingHelp"))
+    panel = panel.replace("{mdict_picker}", _render_file_picker(
+        "mdict_archive", ".zip,application/zip,application/octet-stream",
+        "adminDictionaryMdictPackageHelp", required=True,
+    )).replace("{stardict_picker}", _render_file_picker(
+        "stardict_archive",
+        ".zip,.tar.gz,.tgz,.tar.bz2,.tbz2,.gz,.bz2,application/zip,application/gzip,application/x-bzip2,application/octet-stream",
+        "adminDictionaryPackageHelp", disabled=True,
+    ))
     if not kindle:
         return panel.replace("{kindle_settings_tab}", "").replace("{kindle_settings_panel}", "")
     tab = """<button type="button" class="admin-section-tab" id="accountKindleTab" role="tab" aria-selected="false" aria-controls="accountKindlePanel" data-account-section="kindle"><i class="fas fa-tablet-screen-button" aria-hidden="true"></i><span data-i18n="account.kindle.screensaver">Kindle screensaver</span></button>"""

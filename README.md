@@ -616,12 +616,28 @@ The loopback published port in the examples keeps the container behind the host 
 
 ### Command reference
 
+#### Site branding
+
+In Server mode, open **Administration → Site branding** to preview
+and save a custom site name, logo, and favicon. Choose **Restore defaults**
+and save to reset them. The footer uses the site name and can hide its credits,
+version and update notices. Changes apply when pages load, using the existing book
+conversions.
+
+In SSG mode, pass the options below on each build. Omit an option to use its
+default. Both modes accept still PNG, JPEG, and WebP images up to 1 MB and
+2048 pixels per side.
+
 #### `epub-browser ssg SOURCE [SOURCE ...]`
 
 | Option | Meaning |
 | --- | --- |
 | `--output-dir DIR`, `-o DIR` | Required destination for the atomic static snapshot. |
 | `--base-path PATH` | Public URL prefix; default `/`. It must begin and end with `/`. |
+| `--site-name NAME` | Custom site name, up to 80 characters. |
+| `--site-logo FILE` | Local logo image. |
+| `--site-favicon FILE` | Local browser-tab icon image. |
+| `--hide-version-info` | Hide footer credits, version and update notices. |
 | `--book-id-storage sidecar\|embedded` | Stable identity carrier for every selected source; default `sidecar`. |
 | `--kindle` | Generate dependency-free minimal pages for legacy e-Ink Kindles and redirect Kindle WebKit browsers to them; off by default. |
 | `--log` | Compatibility alias for `--log-level info`. |

@@ -1183,7 +1183,7 @@ body.auth-page {
     gap: 14px;
 }
 
-.dictionary-file-control {
+.account-file-control {
     position: relative;
     display: flex;
     min-height: 48px;
@@ -1196,12 +1196,12 @@ body.auth-page {
     background: var(--account-card);
 }
 
-.dictionary-file-control:focus-within {
+.account-file-control:focus-within {
     border-color: var(--account-primary);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--account-primary) 22%, transparent);
 }
 
-.dictionary-file-input {
+.account-file-input {
     position: absolute;
     inset: 0;
     width: 100%;
@@ -1211,7 +1211,7 @@ body.auth-page {
     cursor: pointer;
 }
 
-.dictionary-file-button {
+.account-file-button {
     flex: 0 0 auto;
     padding: 7px 11px;
     border: 1px solid var(--account-border);
@@ -1222,7 +1222,7 @@ body.auth-page {
     font-weight: 700;
 }
 
-.dictionary-file-name {
+.account-file-name {
     min-width: 0;
     overflow: hidden;
     color: var(--account-muted);
@@ -1232,7 +1232,7 @@ body.auth-page {
     white-space: nowrap;
 }
 
-.dictionary-file-control.has-file .dictionary-file-name {
+.account-file-control.has-file .account-file-name {
     color: var(--account-text);
 }
 
@@ -3959,4 +3959,93 @@ body.auth-page {
 
     .settings-nav .admin-section-tab { white-space: nowrap; }
     .account-modal .bookshelf-header { gap: 8px; padding-inline: 10px; }
+}
+
+.admin-branding .account-form {
+    max-width: 720px;
+}
+
+.admin-branding-fields {
+    display: grid;
+    gap: 12px;
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.admin-branding-fields input[name="siteName"] {
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 44px;
+}
+
+.admin-branding-fields .admin-branding-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+}
+
+.admin-branding-preview {
+    padding: 12px;
+    border: 1px solid var(--account-border);
+    border-radius: 8px;
+}
+
+.admin-branding-preview > div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 6px;
+}
+
+.admin-branding-preview img {
+    flex-shrink: 0;
+    object-fit: contain;
+}
+
+.admin-branding-preview b,
+.auth-brand span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.admin-branding-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.admin-branding-actions button {
+    min-height: 44px;
+}
+
+.admin-branding-check {
+    cursor: pointer;
+}
+
+.admin-branding-check input[type="checkbox"] {
+    flex: 0 0 18px;
+    width: 18px;
+    height: 18px;
+    min-height: 18px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--account-primary);
+}
+
+#siteBrandingForm .account-form-message.is-success {
+    color: var(--account-text);
+}
+
+@media (max-width: 420px) {
+    .auth-card-header {
+        flex-wrap: wrap;
+    }
+
+    .auth-language select {
+        min-height: 44px;
+    }
 }

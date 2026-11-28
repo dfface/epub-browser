@@ -25,6 +25,10 @@ class SSGConfig:
     log_level: str = "error"
     book_id_storage: str = BOOK_ID_STORAGE_SIDECAR
     kindle: bool = False
+    site_name: str = ""
+    site_logo: Optional[Path] = None
+    site_favicon: Optional[Path] = None
+    hide_version_info: bool = False
 
     def __post_init__(self) -> None:
         if self.log and self.log_level == "error":
@@ -111,6 +115,10 @@ def _new_parser() -> argparse.ArgumentParser:
     ssg.add_argument("sources", nargs="+", metavar="SOURCE")
     ssg.add_argument("--output-dir", "-o", required=True)
     ssg.add_argument("--base-path", default="/", type=_parse_base_path)
+    ssg.add_argument("--site-name", default="", help="Override the site name")
+    ssg.add_argument("--site-logo", type=Path, help="Local PNG, JPEG or WebP logo")
+    ssg.add_argument("--site-favicon", type=Path, help="Local PNG, JPEG or WebP favicon")
+    ssg.add_argument("--hide-version-info", action="store_true", help="Hide footer credits, version and update notices")
     _add_logging_options(ssg)
     _add_book_id_storage(ssg)
     ssg.add_argument(
@@ -204,6 +212,10 @@ def parse_cli(argv: Sequence[str]) -> CommandConfig:
                 log_level=_log_level(values),
                 book_id_storage=values.book_id_storage,
                 kindle=values.kindle,
+                site_name=values.site_name,
+                site_logo=values.site_logo,
+                site_favicon=values.site_favicon,
+                hide_version_info=values.hide_version_info,
             )
         try:
             auth = _server_auth_options(values)

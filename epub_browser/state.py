@@ -40,7 +40,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 36
+DB_SCHEMA_VERSION = 38
 APPEARANCE_DEFAULTS = {"automatic": False, "day": "light", "night": "dark", "manual": "light"}
 APPEARANCE_THEMES = frozenset({"light", "dark", "sepia", "forest", "ocean", "peach", "lavender"})
 
@@ -529,6 +529,25 @@ class StateStore:
                 connection.execute("PRAGMA user_version = 35")
             if version < 36:
                 self._migrate_schema_v36(connection)
+            if version < 37:
+                connection.execute("""
+                    CREATE TABLE IF NOT EXISTS site_branding (
+                        singleton INTEGER PRIMARY KEY CHECK(singleton = 1),
+                        name TEXT NOT NULL DEFAULT '',
+                        logo TEXT NOT NULL DEFAULT '',
+                        favicon TEXT NOT NULL DEFAULT '',
+                        logo_image BLOB,
+                        favicon_image BLOB
+                    )
+                """)
+                connection.execute("INSERT OR IGNORE INTO site_branding (singleton) VALUES (1)")
+                connection.execute("PRAGMA user_version = 37")
+            if version < 38:
+                self._add_column_if_missing(
+                    connection, "site_branding", "hide_version_info",
+                    "INTEGER NOT NULL DEFAULT 0 CHECK(hide_version_info IN (0, 1))",
+                )
+                connection.execute("PRAGMA user_version = 38")
             self._require_foreign_key_integrity(connection)
             connection.execute("COMMIT")
         except Exception:
@@ -5336,6 +5355,39 @@ class StateStore:
                 ),
             )
         return self.get_ai_settings()
+
+    def get_site_branding(self):
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT name, logo, favicon, hide_version_info FROM site_branding WHERE singleton = 1"
+            ).fetchone()
+        return {**dict(row), "hide_version_info": bool(row["hide_version_info"])}
+
+    def site_branding_image(self, kind, url):
+        if kind not in ('logo', 'favicon'):
+            raise ValueError('Invalid branding asset')
+        with self._connection() as connection:
+            row = connection.execute(
+                f"SELECT {kind}_image FROM site_branding WHERE singleton = 1 AND {kind} = ?",
+                (url,),
+            ).fetchone()
+        return row[0] if row else None
+
+    def update_site_branding(self, changes, images):
+        with self._connection() as connection:
+            if 'name' in changes:
+                connection.execute("UPDATE site_branding SET name = ? WHERE singleton = 1", (changes['name'],))
+            if 'hide_version_info' in changes:
+                connection.execute(
+                    "UPDATE site_branding SET hide_version_info = ? WHERE singleton = 1",
+                    (changes['hide_version_info'],),
+                )
+            for kind in ('logo', 'favicon'):
+                if kind in changes:
+                    connection.execute(
+                        f"UPDATE site_branding SET {kind} = ?, {kind}_image = ? WHERE singleton = 1",
+                        (changes[kind], images.get(kind)),
+                    )
 
     def get_general_settings(self) -> dict:
         """Return the public general server configuration."""

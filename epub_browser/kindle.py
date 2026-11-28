@@ -102,7 +102,7 @@ def kindle_locale_script(messages, *, use_initial_locale=False):
     for (var i = 0; i < elements.length; i++) {
       var element = elements[i];
       var message = kTranslate(element.getAttribute('data-i18n'));
-      if (typeof message === 'string') element.textContent = message;
+      if (typeof message === 'string') element.textContent = message + (element.getAttribute('data-i18n-title-suffix') || '');
       var attributes = ['aria-label', 'placeholder'];
       for (var j = 0; j < attributes.length; j++) {
         var text = kTranslate(element.getAttribute('data-i18n-' + attributes[j]));

@@ -40,6 +40,54 @@ class SSGPublicationTests(unittest.TestCase):
                 {path.name for path in discovered}, {"one.EPUB", "two.PDF"}
             )
 
+    def test_custom_branding_is_shared_by_epub_pdf_and_kindle_at_a_base_path(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            epub, pdf = root / "book.epub", root / "book.pdf"
+            self._write_minimal_epub(epub, identifier="urn:test:brand")
+            self._write_pdf(pdf, pages=1, metadata={"/Title": "PDF"})
+            image = root / "brand.png"
+            Image.new("RGBA", (96, 48), (50, 100, 150, 255)).save(image)
+            output = root / "dist"
+            SSGPublisher(SSGConfig(
+                (epub, pdf), output, "/reader/", kindle=True,
+                site_name="North & South", site_logo=image, site_favicon=image,
+            ), show_progress=False).build()
+
+            pages = [output / "index.html", output / "kindle-library.html"]
+            for book in (output / "book").iterdir():
+                pages.extend(book / name for name in (
+                    "index.html", "chapter_0.html", "kindle.html",
+                ))
+            self.assertEqual(len(pages), 8)
+            for page in pages:
+                markup = page.read_text()
+                self.assertRegex(markup, r'<title[^>]*>[^<]+ · North &amp; South</title>')
+                icon = re.search(r'href="/reader/(assets/immutable/branding/favicon\.[0-9a-f]+\.png)"', markup)
+                self.assertIsNotNone(icon, page)
+                self.assertTrue((output / icon[1]).is_file())
+            markup = pages[0].read_text()
+            self.assertIn('aria-label="North &amp; South"', markup)
+            self.assertNotIn('data-i18n="common.brand"', markup)
+            self.assertNotIn('/api/admin/branding', markup)
+            manifest = json.loads((output / "assets/manifest.zh-CN.json").read_text())
+            self.assertEqual(manifest["name"], "North & South")
+            first_worker = (output / "sw.js").read_text()
+            self.assertIn("/reader/assets/immutable/branding/favicon.", first_worker)
+            SSGPublisher(SSGConfig(
+                (epub, pdf), output, "/reader/", kindle=True,
+                site_name="North & South", site_logo=image, site_favicon=image, hide_version_info=True,
+            ), show_progress=False).build()
+            next_worker = (output / "sw.js").read_text()
+            self.assertNotEqual(first_worker.splitlines()[0], next_worker.splitlines()[0])
+            for page in (path for path in pages if not path.name.startswith("kindle")):
+                markup = page.read_text()
+                self.assertIn('<p><span>North &amp; South</span> &copy;', markup)
+                self.assertNotIn('data-version-check', markup)
+                self.assertNotIn('data-version-update', markup)
+                self.assertNotIn('data-i18n="footer.poweredBy"', markup)
+
+
     def test_embedded_pdf_migrates_sidecar_id_and_survives_rename(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -2413,6 +2413,43 @@ class AdminAccountTests(unittest.TestCase):
             403,
         )
 
+    def test_site_branding_updates_public_login_and_can_be_reset(self):
+        url = "/api/admin/branding"
+        anonymous = TestClient(self.app, base_url="http://testserver")
+        self.assertEqual(anonymous.get(url).status_code, 401)
+        self.assertEqual(self.member_client.put(url, json={"name": "Other"}).status_code, 403)
+
+        image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aC9kAAAAASUVORK5CYII="
+        saved = self.admin_client.put(url, json={"name": "North & South", "logo": image, "favicon": image, "hide_version_info": True})
+        self.assertEqual(saved.status_code, 200)
+        logo = saved.json()["branding"]["logo"]
+        self.assertIn("/assets/immutable/branding/", logo)
+        asset = anonymous.get(logo)
+        self.assertEqual(asset.status_code, 200)
+        self.assertEqual(asset.headers["content-type"], "image/png")
+        login = anonymous.get("/login").text
+        self.assertIn('<p><span>North &amp; South</span> &copy;', login)
+        self.assertNotIn('data-i18n="footer.product"', login)
+        self.assertNotIn('data-version-check', login)
+        self.assertNotIn('data-i18n="footer.poweredBy"', login)
+        self.assertNotIn('data-version-update', login)
+
+        # Published assets are a cache, while the brand belongs to server data.
+        (Path(self.directory.name) / logo.lstrip('/')).unlink()
+        self.assertIn(logo, anonymous.get("/login").text)
+        self.assertEqual(anonymous.get(logo).content, asset.content)
+
+        invalid = self.admin_client.put(url, json={"name": "Invalid", "logo": "aGVsbG8="})
+        self.assertEqual(invalid.status_code, 400)
+        self.assertEqual(self.admin_client.get(url).json()["branding"]["name"], "North & South")
+
+        reset = self.admin_client.put(url, json={"name": "", "logo": None, "favicon": None, "hide_version_info": False})
+        self.assertEqual(reset.status_code, 200)
+        login = anonymous.get("/login").text
+        self.assertNotIn("North &amp; South", login)
+        self.assertIn('data-i18n="footer.product"', login)
+        self.assertIn('data-version-check', login)
+
     def test_admin_manages_general_settings_and_member_is_denied(self):
         initial = self.admin_client.get("/api/admin/general-settings")
         saved = self.admin_client.put(

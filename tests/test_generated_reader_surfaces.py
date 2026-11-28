@@ -1110,8 +1110,8 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         account_css = Path('epub_browser/assets/account.css').read_text(encoding='utf-8')
         auth_js = Path('epub_browser/assets/auth.js').read_text(encoding='utf-8')
 
-        self.assertRegex(server_html, r'<input\b(?=[^>]*name=(?:["\'])?mdict_archive)(?=[^>]*class=(?:["\'])?dictionary-file-input)')
-        self.assertRegex(server_html, r'\bdata-dictionary-file-name=(?:["\'])?mdict_archive(?:["\' >])')
+        self.assertRegex(server_html, r'<input\b(?=[^>]*name=(?:["\'])?mdict_archive)(?=[^>]*class=(?:["\'])?account-file-input)')
+        self.assertRegex(server_html, r'\bdata-account-file-name=(?:["\'])?mdict_archive(?:["\' >])')
         self.assertRegex(
             server_html,
             r'\baccept=(?:["\'])?\.zip,application/zip,application/octet-stream(?:["\' >])',
@@ -4900,11 +4900,13 @@ assert.deepEqual(
         # per-book processor above. It must not show the AI readings entry point
         # (or load the AI feature script) when AI reading is disabled.
         # Guards issue #24.
+        from epub_browser.branding import Branding
         from epub_browser.urls import SiteURLs
         import types
         assets = types.SimpleNamespace(
             url_for=lambda name: "/assets/" + name,
             assets={},
+            branding=Branding(),
         )
         enabled = render_library_shell(
             [], assets, SiteURLs(), deployment_mode="server", ai_reading_enabled=True

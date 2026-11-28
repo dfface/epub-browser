@@ -253,7 +253,7 @@
       var nodes;
       scope = scope || root.document;
       if (!scope || !scope.querySelectorAll) return;
-      nodes = scope.querySelectorAll('[data-i18n], [data-i18n-placeholder], [data-i18n-title], [data-i18n-aria-label], [data-i18n-content], [data-i18n-data-tip]');
+      nodes = scope.querySelectorAll('[data-i18n], [data-i18n-placeholder],[data-i18n-alt], [data-i18n-title], [data-i18n-aria-label], [data-i18n-content], [data-i18n-data-tip]');
       Array.prototype.forEach.call(nodes, function (node) {
         var params = {};
         try {
@@ -286,13 +286,13 @@
                 node.appendChild(emphasis);
                 if (parts[1]) node.appendChild(ownerDocument.createTextNode(parts[1]));
               } else {
-                node.textContent = t(node.getAttribute('data-i18n'), params);
+                node.textContent = t(node.getAttribute('data-i18n'), params) + (node.getAttribute('data-i18n-title-suffix') || '');
               }
             } else {
-              node.textContent = t(node.getAttribute('data-i18n'), params);
+              node.textContent = t(node.getAttribute('data-i18n'), params) + (node.getAttribute('data-i18n-title-suffix') || '');
             }
           }
-          ['placeholder', 'title', 'aria-label', 'content', 'data-tip'].forEach(function (attribute) {
+          ['placeholder', 'title', 'aria-label', 'content', 'data-tip', 'alt'].forEach(function (attribute) {
             var key = node.getAttribute('data-i18n-' + attribute);
             if (key) node.setAttribute(attribute, t(key, params));
           });
