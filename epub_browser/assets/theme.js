@@ -12,7 +12,7 @@ function initTheme() {
     ];
 
     var bootstrap = window.EpubBrowserThemeBootstrap;
-    var serverMode = window.EpubBrowserMode === 'server';
+    var serverMode = window.EpubBrowserMode === 'server' && !window.EpubBrowserAnonymous;
 
     function getCurrentTheme() {
         return bootstrap.storedTheme(window);

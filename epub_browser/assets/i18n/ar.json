@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "أسفل اليمين",
   "bookmarks.notificationPreview": "معاينة الإشعار",
   "bookmarks.notificationPreviewMessage": "ستظهر الإشعارات هنا.",
-  "bookmarks.notificationPlacementHelp": "في الشاشات الضيقة تظهر الإشعارات في الوسط. يُحفظ هذا التفضيل في هذا المتصفح فقط."
+  "bookmarks.notificationPlacementHelp": "في الشاشات الضيقة تظهر الإشعارات في الوسط. يُحفظ هذا التفضيل في هذا المتصفح فقط.",
+  "admin.visibility.public": "عام",
+  "admin.general.allowAnonymousReading": "السماح بالقراءة دون تسجيل الدخول",
+  "admin.general.allowAnonymousReadingHelp": "يمكن للزوار العثور على الكتب العامة وقراءتها. تتطلب الميزات الشخصية تسجيل الدخول. معطل افتراضياً.",
+  "admin.general.defaultBookVisibility": "الرؤية الافتراضية للكتب الجديدة",
+  "admin.general.defaultBookVisibilityHelp": "للاستيراد الأول فقط. عام: للزوار عند تفعيل القراءة دون تسجيل. للمسجلين: يتطلب الدخول. مقيد: يتطلب إذناً صريحاً. يمكن للمسؤولين قراءة جميع الكتب. لا تتغير الكتب والأذونات الحالية.",
+  "admin.books.visibility.public": "عام"
 }

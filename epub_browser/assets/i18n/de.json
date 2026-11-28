@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "Unten rechts",
   "bookmarks.notificationPreview": "Benachrichtigung testen",
   "bookmarks.notificationPreviewMessage": "Hier erscheinen Benachrichtigungen.",
-  "bookmarks.notificationPlacementHelp": "Auf schmalen Bildschirmen erscheinen Hinweise mittig. Diese Einstellung wird nur in diesem Browser gespeichert."
+  "bookmarks.notificationPlacementHelp": "Auf schmalen Bildschirmen erscheinen Hinweise mittig. Diese Einstellung wird nur in diesem Browser gespeichert.",
+  "admin.visibility.public": "Öffentlich",
+  "admin.general.allowAnonymousReading": "Anonymes Lesen erlauben",
+  "admin.general.allowAnonymousReadingHelp": "Besucher können öffentliche Bücher finden und lesen. Persönliche Funktionen erfordern eine Anmeldung. Standardmäßig deaktiviert.",
+  "admin.general.defaultBookVisibility": "Standardsichtbarkeit neuer Bücher",
+  "admin.general.defaultBookVisibilityHelp": "Nur beim ersten Import. Öffentlich: Besucher bei aktiviertem anonymem Lesen. Angemeldet: Anmeldung erforderlich. Eingeschränkt: ausdrückliche Freigabe erforderlich. Administratoren können alle Bücher lesen. Bestehende Bücher und Freigaben bleiben unverändert.",
+  "admin.books.visibility.public": "Öffentlich"
 }

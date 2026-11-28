@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "右下角",
   "bookmarks.notificationPreview": "預覽通知",
   "bookmarks.notificationPreviewMessage": "通知將顯示在這裡。",
-  "bookmarks.notificationPlacementHelp": "窄螢幕時通知置中顯示，此設定僅儲存在目前瀏覽器。"
+  "bookmarks.notificationPlacementHelp": "窄螢幕時通知置中顯示，此設定僅儲存在目前瀏覽器。",
+  "admin.visibility.public": "公開",
+  "admin.general.allowAnonymousReading": "允許匿名閱讀",
+  "admin.general.allowAnonymousReadingHelp": "訪客可瀏覽並閱讀公開書籍；個人功能仍需登入。預設關閉。",
+  "admin.general.defaultBookVisibility": "新書預設可見性",
+  "admin.general.defaultBookVisibilityHelp": "僅影響首次匯入：公開書籍在啟用匿名閱讀後允許訪客閱讀；登入可讀要求登入；受限書籍需要個別授權。管理員可讀全部書籍。現有書籍與授權不變。",
+  "admin.books.visibility.public": "公開"
 }

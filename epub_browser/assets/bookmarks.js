@@ -104,7 +104,7 @@
         var content = document.getElementById('eb-content'), list = document.getElementById('bookmarkList');
         var panel = document.getElementById('bookmarkPanel'), toc = document.getElementById('bookHomeTocList');
         var buttons = Array.from(document.querySelectorAll('[data-bookmark-toggle]'));
-        var store = root.EpubBookmarkServerStore ? root.EpubBookmarkServerStore(config.book) : localStore({
+        var store = root.EpubBrowserAnonymous ? null : root.EpubBookmarkServerStore ? root.EpubBookmarkServerStore(config.book) : localStore({
             getItem:function(key){return root.localStorage.getItem(key);},
             setItem:function(key,value){root.localStorage.setItem(key,value);}
         }, config.book);
@@ -209,6 +209,11 @@
         outlineTab.addEventListener('click',function(){useTab('outline');});
         tab.addEventListener('click',function(){useTab(true);refresh();});
         tocTab.addEventListener('click',function(){useTab(false);});
+        if (root.EpubBrowserAnonymous) {
+            tab.hidden = true;
+            useTab('contents');
+            return;
+        }
         function render() {
             var expanded=list.querySelector('.bookmark-menu[open]');
             var expandedId=expanded && expanded.dataset.bookmarkId;

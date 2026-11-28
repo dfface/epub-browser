@@ -40,3 +40,32 @@ test('text context follows inserted text and refuses ambiguous or removed text',
   assert.equal(B.textOffset('the door opened; the door opened',{...p,offset:100}),-1);
   assert.equal(B.textOffset('the window opened',p),-1);
 });
+
+test('anonymous reader switches Contents and Outline without initializing bookmark storage', () => {
+  const vm = require('node:vm');
+  const fs = require('node:fs');
+  const nodes = {};
+  for (const id of ['bookmarkConfig','eb-content','bookmarkList','bookmarkPanel','bookHomeTocList',
+    'bookmarkStatus','bookmarkTab','bookmarkTocTab','chapterOutlineTab','tocFloating','bookHomeLocateCurrent']) {
+    nodes[id] = { hidden: false, dataset: {}, attributes: {}, listeners: {},
+      setAttribute(k,v) { this.attributes[k]=v; },
+      addEventListener(k,v) { this.listeners[k]=v; },
+      querySelector() { return {}; } };
+  }
+  nodes.bookmarkConfig.content = {textContent: JSON.stringify({book:'public',format:'epub',chapters:[]})};
+  const document = { getElementById: id => nodes[id], querySelectorAll: () => [],
+    body: {classList: {contains: () => false}}, addEventListener() {} };
+  const root = {document, EpubBrowserAnonymous:true, EpubReaderBookmarkBridge:{},
+    EpubBrowserI18n:{t:k=>k}, addEventListener() {},
+    EpubBookmarkServerStore() { assert.fail('anonymous reader must not initialize bookmark storage'); } };
+  vm.runInNewContext(fs.readFileSync(require.resolve('../epub_browser/assets/bookmarks.js'),'utf8'),
+    {window:root,document,setTimeout});
+  root.EpubBookmarks.init();
+  assert.equal(nodes.bookmarkTab.hidden,true);
+  nodes.chapterOutlineTab.listeners.click();
+  assert.equal(nodes.tocFloating.hidden,false);
+  assert.equal(nodes.bookHomeTocList.hidden,true);
+  nodes.bookmarkTocTab.listeners.click();
+  assert.equal(nodes.tocFloating.hidden,true);
+  assert.equal(nodes.bookHomeTocList.hidden,false);
+});

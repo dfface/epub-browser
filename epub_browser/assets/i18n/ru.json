@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "Справа снизу",
   "bookmarks.notificationPreview": "Предпросмотр уведомления",
   "bookmarks.notificationPreviewMessage": "Уведомления будут появляться здесь.",
-  "bookmarks.notificationPlacementHelp": "На узких экранах уведомления показываются по центру. Настройка сохраняется только в этом браузере."
+  "bookmarks.notificationPlacementHelp": "На узких экранах уведомления показываются по центру. Настройка сохраняется только в этом браузере.",
+  "admin.visibility.public": "Публичная",
+  "admin.general.allowAnonymousReading": "Разрешить анонимное чтение",
+  "admin.general.allowAnonymousReadingHelp": "Посетители могут находить и читать публичные книги. Личные функции требуют входа. По умолчанию выключено.",
+  "admin.general.defaultBookVisibility": "Видимость новых книг по умолчанию",
+  "admin.general.defaultBookVisibilityHelp": "Только при первом импорте. Публичная: доступна посетителям при включённом анонимном чтении. Для вошедших: требуется вход. Ограниченная: требуется разрешение. Администраторы читают все книги. Существующие книги и разрешения не меняются.",
+  "admin.books.visibility.public": "Публичная"
 }

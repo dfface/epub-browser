@@ -104,6 +104,40 @@ class PDFDocumentDeliveryTests(unittest.TestCase):
         cls.manager.shutdown()
         cls.temporary.cleanup()
 
+    def test_anonymous_public_range_and_revocation(self):
+        with TestClient(self.app, follow_redirects=False) as visitor:
+            try:
+                self.store.set_book_visibility(self.record.book_id, "public")
+                self.assertEqual(visitor.get(self.url).status_code, 401)
+                self.store.set_general_settings(allow_anonymous_reading=True)
+                partial = visitor.get(self.url, headers={"Range": "bytes=0-9"})
+                self.assertEqual(partial.status_code, 206)
+                self.assertEqual(partial.content, self.original_bytes[:10])
+                self.assertIn("no-store", partial.headers["cache-control"])
+                etag = partial.headers["etag"]
+                self.assertEqual(visitor.head(self.url).status_code, 200)
+                for path in ("index.html", "chapter_0.html", "toc.json"):
+                    page = visitor.get(f"/book/{self.record.book_id}/{path}")
+                    self.assertEqual(page.status_code, 200, path)
+                    if path.endswith("html"):
+                        self.assertIn("window.EpubBrowserAnonymous=true", page.text)
+                kindle_app = create_app(self.manager.public_dir, state_store=self.store,
+                    auth_service=AuthService(self.store, AuthConfig.from_values([])), kindle=True)
+                with TestClient(kindle_app) as kindle:
+                    toc = kindle.get(f"/book/{self.record.book_id}/kindle.html")
+                    self.assertEqual(toc.status_code, 200)
+                    self.assertIn("window.EpubBrowserAnonymous=true", toc.text)
+                    self.assertIn('data-anonymous-sign-in', toc.text)
+                self.store.set_book_visibility(self.record.book_id, "restricted")
+                denied = visitor.get(self.url, headers={"Range": "bytes=0-9", "If-None-Match": etag})
+                self.assertEqual(denied.status_code, 404)
+                self.store.set_book_visibility(self.record.book_id, "public")
+                self.store.set_general_settings(allow_anonymous_reading=False)
+                self.assertEqual(visitor.get(self.url, headers={"If-None-Match": etag}).status_code, 401)
+            finally:
+                self.store.set_general_settings(allow_anonymous_reading=False)
+                self.store.set_book_visibility(self.record.book_id, "restricted")
+
     def test_authenticated_get_returns_the_cached_pdf(self):
         response = self.owner.get(self.url)
 

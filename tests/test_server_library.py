@@ -101,6 +101,99 @@ class ServerLibraryManagerTests(unittest.TestCase):
         result = self.migration.prepare_data()
         self.store = StateStore(result.database_path)
 
+    def test_configured_visibility_for_administrator_uploads(self):
+        epub = self.source.read_bytes()
+        self.source.unlink()
+        pdf_source = self.source_dir / "upload.pdf"
+        self._write_pdf(pdf_source)
+        pdf = pdf_source.read_bytes()
+        pdf_source.unlink()
+        manager = ServerLibraryManager(server_dir=self.server_dir,
+            sources=(self.source_dir, self.server_dir / "data" / "sources"),
+            state_store=self.store, migration_manager=self.migration, max_workers=1)
+        self.addCleanup(manager.shutdown)
+        manager.reconcile()
+        with TestClient(create_app(manager.public_dir, state_store=self.store,
+                auth_service=AuthService(self.store, AuthConfig.from_values([])),
+                library_manager=manager), follow_redirects=False) as admin:
+            self.assertEqual(_json_login(admin, "admin", "secret").status_code, 200)
+            csrf = admin.get("/api/session").json()["csrf_token"]
+            for visibility in ("restricted", "public"):
+                changed = admin.put("/api/admin/general-settings", json={
+                    "allow_anonymous_reading": True, "default_book_visibility": visibility},
+                    headers={"X-CSRF-Token": csrf})
+                self.assertEqual(changed.status_code, 200)
+                for extension, content in (("epub", epub), ("pdf", pdf)):
+                    filename = visibility + "." + extension
+                    uploaded = admin.post("/api/admin/books/upload", content=content, headers={
+                        "X-CSRF-Token": csrf, "X-EPUB-Browser-Source-Filename": filename})
+                    self.assertEqual(uploaded.status_code, 201, uploaded.text)
+                    manager.reconcile()
+                    record = self.store.book_by_source(manager.managed_sources_dir / filename)
+                    self.assertIsNotNone(record)
+                    self.assertEqual(record.visibility, visibility)
+
+    def test_configured_visibility_on_watched_import_and_restore(self):
+        self._write_pdf(self.source_dir / "document.pdf")
+        self.store.set_general_settings(default_book_visibility="restricted")
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        first = manager.reconcile()
+        self.assertEqual(len(first.active_books), 2)
+        member = self.store.create_user("reader", hash_password("secret"))
+        for book in first.active_books:
+            self.assertEqual(book.visibility, "restricted")
+            self.store.grant_book_access(book.book_id, member.user_id)
+        self.store.set_general_settings(default_book_visibility="public")
+        for book in first.active_books:
+            path = Path(book.source_path)
+            away = path.with_suffix(path.suffix + ".away")
+            path.rename(away)
+            manager.reconcile("watch")
+            away.rename(path)
+            restored = manager.reconcile("watch")
+            current = next(row for row in restored.active_books if row.book_id == book.book_id)
+            self.assertEqual(current.visibility, "restricted")
+            self.assertEqual(self.store.book_grants(book.book_id), (member.user_id,))
+        self._write_epub(self.source_dir / "new.epub", "New")
+        self._write_pdf(self.source_dir / "new.pdf")
+        final = manager.reconcile("watch")
+        old_ids = {book.book_id for book in first.active_books}
+        self.assertEqual([book.visibility for book in final.active_books if book.book_id not in old_ids], ["public", "public"])
+
+    def test_anonymous_epub_pages_search_assets_and_kindle(self):
+        manager = self._manager()
+        self.addCleanup(manager.shutdown)
+        book = manager.reconcile().active_books[0]
+        self.store.set_book_visibility(book.book_id, "public")
+        self.store.set_general_settings(allow_anonymous_reading=True)
+        for kindle in (False, True):
+            with self.subTest(kindle=kindle), TestClient(create_app(manager.public_dir,
+                    state_store=self.store, auth_service=AuthService(self.store, AuthConfig.from_values([])),
+                    kindle=kindle), follow_redirects=False) as visitor:
+                paths = ["/", "/book-metadata.json", f"/book/{book.book_id}/index.html",
+                    f"/book/{book.book_id}/chapter_0.html", f"/book/{book.book_id}/toc.json",
+                    f"/api/books/{book.book_id}/search?q=Original",
+                    f"/api/books/{book.book_id}/metadata"]
+                if kindle:
+                    paths += ["/kindle-library.html", f"/book/{book.book_id}/kindle.html",
+                              f"/book/{book.book_id}/kindle_chapter_0.html"]
+                for path in paths:
+                    result = visitor.get(path)
+                    self.assertEqual(result.status_code, 200, (path, result.text[:300]))
+                    self.assertIn("no-store", result.headers["cache-control"])
+                    if path == "/" or path.endswith(".html"):
+                        self.assertIn("window.EpubBrowserAnonymous=true", result.text)
+                        from urllib.parse import quote
+                        self.assertIn('href="/login?next=' + quote(path, safe='') + '"', result.text)
+                        if path.endswith("kindle.html"):
+                            self.assertIn("if (window.EpubBrowserAnonymous) return;", result.text)
+                self.assertEqual(visitor.get(f"/book/{book.book_id}/content/metadata.json").status_code, 404)
+                self.store.set_book_visibility(book.book_id, "restricted")
+                for path in paths[2:7]:
+                    self.assertEqual(visitor.get(path).status_code, 404, path)
+                self.store.set_book_visibility(book.book_id, "public")
+
     def _manager(self, converter_factory=EPUBProcessor, **kwargs):
         return ServerLibraryManager(
             server_dir=self.server_dir,

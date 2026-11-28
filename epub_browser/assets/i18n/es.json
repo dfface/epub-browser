@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "Abajo, derecha",
   "bookmarks.notificationPreview": "Vista previa",
   "bookmarks.notificationPreviewMessage": "Las notificaciones aparecerán aquí.",
-  "bookmarks.notificationPlacementHelp": "En pantallas estrechas, los avisos se centran. Esta preferencia solo se guarda en este navegador."
+  "bookmarks.notificationPlacementHelp": "En pantallas estrechas, los avisos se centran. Esta preferencia solo se guarda en este navegador.",
+  "admin.visibility.public": "Público",
+  "admin.general.allowAnonymousReading": "Permitir lectura anónima",
+  "admin.general.allowAnonymousReadingHelp": "Los visitantes pueden encontrar y leer libros públicos. Las funciones personales requieren iniciar sesión. Desactivado por defecto.",
+  "admin.general.defaultBookVisibility": "Visibilidad predeterminada de libros nuevos",
+  "admin.general.defaultBookVisibilityHelp": "Solo para primeras importaciones. Público: visitantes si se permite lectura anónima. Autenticado: requiere iniciar sesión. Restringido: requiere permiso explícito. Los administradores pueden leer todos los libros. Los libros y permisos existentes no cambian.",
+  "admin.books.visibility.public": "Público"
 }

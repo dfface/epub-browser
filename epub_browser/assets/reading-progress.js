@@ -106,7 +106,7 @@
   function progressBarClass(visible) { return visible ? '' : 'is-progress-bar-hidden'; }
 
   function request(method, url, chapterIndex, keepalive, includeError) {
-    if (root.EpubBrowserMode !== 'server') return Promise.resolve(null);
+    if (root.EpubBrowserAnonymous || root.EpubBrowserMode !== 'server') return Promise.resolve(null);
     var options = { method: method };
     if (keepalive) options.keepalive = true;
     if (method === 'PUT') {

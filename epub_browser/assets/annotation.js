@@ -4,6 +4,7 @@
  */
 (function(global) {
     'use strict';
+    if (global.EpubBrowserAnonymous) return;
     
     // ========== Configuration & Constants ==========
     var CONFIG = {
@@ -84,6 +85,7 @@
     }
     
     function initHighlighter() {
+        if (window.EpubBrowserAnonymous) return;
         if (highlighter) return highlighter;
         
         // Wait for web-highlighter to be available

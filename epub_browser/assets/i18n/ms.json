@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "Kanan bawah",
   "bookmarks.notificationPreview": "Pratonton pemberitahuan",
   "bookmarks.notificationPreviewMessage": "Pemberitahuan akan dipaparkan di sini.",
-  "bookmarks.notificationPlacementHelp": "Pada skrin sempit, pemberitahuan dipusatkan. Keutamaan ini disimpan dalam pelayar ini sahaja."
+  "bookmarks.notificationPlacementHelp": "Pada skrin sempit, pemberitahuan dipusatkan. Keutamaan ini disimpan dalam pelayar ini sahaja.",
+  "admin.visibility.public": "Awam",
+  "admin.general.allowAnonymousReading": "Benarkan bacaan tanpa log masuk",
+  "admin.general.allowAnonymousReadingHelp": "Pelawat boleh mencari dan membaca buku awam. Ciri peribadi memerlukan log masuk. Dimatikan secara lalai.",
+  "admin.general.defaultBookVisibility": "Keterlihatan lalai buku baharu",
+  "admin.general.defaultBookVisibilityHelp": "Hanya untuk import pertama. Awam: pelawat apabila bacaan tanpa log masuk diaktifkan. Disahkan: perlu log masuk. Terhad: perlu kebenaran khusus. Pentadbir boleh membaca semua buku. Buku dan kebenaran sedia ada tidak berubah.",
+  "admin.books.visibility.public": "Awam"
 }

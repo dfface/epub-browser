@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "右下",
   "bookmarks.notificationPreview": "通知をプレビュー",
   "bookmarks.notificationPreviewMessage": "通知はここに表示されます。",
-  "bookmarks.notificationPlacementHelp": "狭い画面では通知を中央に表示します。設定はこのブラウザーにのみ保存されます。"
+  "bookmarks.notificationPlacementHelp": "狭い画面では通知を中央に表示します。設定はこのブラウザーにのみ保存されます。",
+  "admin.visibility.public": "公開",
+  "admin.general.allowAnonymousReading": "匿名閲覧を許可",
+  "admin.general.allowAnonymousReadingHelp": "訪問者は公開書籍を検索・閲覧できます。個人機能にはログインが必要です。初期設定は無効です。",
+  "admin.general.defaultBookVisibility": "新規書籍の既定の公開範囲",
+  "admin.general.defaultBookVisibilityHelp": "初回取り込みにのみ適用。公開：匿名閲覧が有効なら訪問者も閲覧可能。ログイン済み：ログインが必要。制限付き：個別の許可が必要。管理者はすべて閲覧可能。既存の書籍と許可は変更されません。",
+  "admin.books.visibility.public": "公開"
 }

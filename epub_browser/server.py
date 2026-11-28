@@ -103,6 +103,7 @@ from .public_api import (
     public_api_operations,
     public_api_routes,
 )
+from .server_chrome import anonymous_reader_markup
 from .server_api_docs import render_api_docs
 from .vocabulary import MASTERY_STATES, vocabulary_page_options
 from .server_concurrency import (
@@ -2116,8 +2117,26 @@ window.location.assign(payload.redirect||'/');
             settings = await run_db(store.update_account_appearance, principal.user_id, changes)
         return response(settings, cache_control='private, no-store')
 
-    async def account_reader_page(markup, principal):
-        preferences = await run_db(store.get_account_appearance, principal.user_id)
+    def reading_principal(request):
+        # A transient read context only; never placed in the session scope.
+        return request.scope.get(PRINCIPAL_SCOPE_KEY) or Principal('', '', 'anonymous')
+
+    def anonymous_read_route(path):
+        if path in {'/', '/index.html', '/book-metadata.json', '/api/library-metadata'}:
+            return True
+        if kindle and path in {'/kindle', '/kindle-library.html'}:
+            return True
+        if path.startswith('/assets/'):
+            # Only the published UI asset tree; book caches live outside it.
+            return True
+        if extract_book_id_from_public_path(path.lstrip('/')):
+            return True
+        return bool(re.fullmatch(r'/api/books/[^/]+/(?:search|document|metadata)', path))
+
+    async def account_reader_page(markup, principal, request):
+        preferences = await run_db(store.get_account_appearance, principal.user_id) if principal.user_id else {}
+        if not principal.user_id:
+            markup = anonymous_reader_markup(markup, _request_relative_path(request))
         # Values are restricted to the theme identifiers and a boolean.
         bootstrap = '<script>window.EpubBrowserAppearance=' + json.dumps(preferences) + ';</script>'
         markup = markup.replace('<head>', '<head>\n' + bootstrap, 1)
@@ -2838,7 +2857,7 @@ window.location.assign(payload.redirect||'/');
         if data is None:
             return response(error_payload('invalid_json', 'Invalid JSON data'), 400)
         visibility = data.get('visibility')
-        if visibility not in {'authenticated', 'restricted'}:
+        if not isinstance(visibility, str) or visibility not in {'public', 'authenticated', 'restricted'}:
             return response(
                 error_payload('invalid_visibility', 'Invalid book visibility'),
                 400,
@@ -2873,7 +2892,7 @@ window.location.assign(payload.redirect||'/');
         authors = data.get('authors')
         if (
             not isinstance(visibility, str)
-            or visibility not in {'authenticated', 'restricted'}
+            or visibility not in {'public', 'authenticated', 'restricted'}
             or not isinstance(user_ids, list)
             or any(
                 not isinstance(user_id, str) or not user_id
@@ -3132,6 +3151,8 @@ window.location.assign(payload.redirect||'/');
                 'reading_insights_rank_limit',
                 'book_cache_limit',
                 'search_index_cache_limit',
+                'allow_anonymous_reading',
+                'default_book_visibility',
             )
             if key in data
         }
@@ -3421,7 +3442,7 @@ window.location.assign(payload.redirect||'/');
         })
 
     async def book_effective_metadata(request):
-        principal = require_principal(request)
+        principal = reading_principal(request)
         book_id = request.path_params['book_id']
 
         def _effective_metadata():
@@ -3434,12 +3455,12 @@ window.location.assign(payload.redirect||'/');
                 'title': metadata['title'],
                 'authors': list(metadata['authors']),
                 'tags': list(metadata['tags']),
-                'ai_profile': store.get_book_ai_profile(book_id),
+                **({'ai_profile': store.get_book_ai_profile(book_id)} if principal.user_id else {}),
             }
 
         metadata = await run_db(_effective_metadata)
         if metadata is None:
-            return response(error_payload('forbidden', 'Forbidden'), 403)
+            return response(error_payload('not_found', 'Not Found'), 404) if not principal.user_id else response(error_payload('forbidden', 'Forbidden'), 403)
         return response(metadata)
 
     def book_language(book_id):
@@ -4274,12 +4295,12 @@ window.location.assign(payload.redirect||'/');
     def sort_visible_catalog(principal, records, sort):
         manual_order = (
             store.library_order(principal.user_id)
-            if sort in ("manual", "shelf_first", "shelf_order")
+            if principal.user_id and sort in ("manual", "shelf_first", "shelf_order")
             else ()
         )
         shelf_added = None
         shelf_order = None
-        if sort in ("shelf_first", "shelf_order"):
+        if principal.user_id and sort in ("shelf_first", "shelf_order"):
             _version, shelf = bookshelf_document(principal.user_id)
             shelf_order, shelf_added = bookshelf_sort_state(shelf)
         return sort_catalog(
@@ -4288,12 +4309,12 @@ window.location.assign(payload.redirect||'/');
         )
 
     async def filtered_library_metadata(request):
-        principal = require_principal(request)
+        principal = reading_principal(request)
         sort = library_sort(request.query_params.get("sort"))
 
         def _library_metadata():
             records = sort_visible_catalog(principal, store.visible_books(principal), sort)
-            return library_metadata(records, base_directory, state_store=store, owner_user_id=principal.user_id)
+            return library_metadata(records, base_directory, state_store=store, owner_user_id=principal.user_id or None)
 
         return response(await run_db(_library_metadata))
 
@@ -4324,13 +4345,15 @@ window.location.assign(payload.redirect||'/');
                 render_library_shell,
                 (), current_published_assets(), SiteURLs(),
                 deployment_mode='server', kindle=kindle,
-                ai_reading_enabled=ai_settings["enabled"],
+                ai_reading_enabled=bool(request.scope.get(PRINCIPAL_SCOPE_KEY) and ai_settings["enabled"]),
             )
         except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError):
             markup = None
         if markup is not None:
-            return await account_reader_page(markup, require_principal(request))
+            return await account_reader_page(markup, reading_principal(request), request)
 
+        if not request.scope.get(PRINCIPAL_SCOPE_KEY):
+            return response(error_payload('not_found', 'Library index not found'), 503)
         index_path = os.path.join(base_directory, 'index.html')
         if not os.path.isfile(index_path):
             return response(error_payload('not_found', 'Library index not found'), 404)
@@ -4393,7 +4416,7 @@ window.location.assign(payload.redirect||'/');
         return books
 
     async def kindle_library_page(request, *, show_dashboard=False):
-        principal = require_principal(request)
+        principal = reading_principal(request)
 
         def page_number(key):
             value = request.query_params.get(key, "")
@@ -4408,6 +4431,8 @@ window.location.assign(payload.redirect||'/');
                 for book in books
                 if book.source_format == EPUB_FORMAT or book.kindle_pdf
             }
+            if not principal.user_id:
+                return books, None, [], None
             limit = store.get_general_settings()["recent_reading_limit"]
             recent = []
             for row in store.list_reading_progress(principal.user_id):
@@ -4441,11 +4466,15 @@ window.location.assign(payload.redirect||'/');
             catalog_page=page_number("catalog_page"), shelf_page=page_number("shelf_page"),
             query=request.query_params.get("q", ""), sort=sort,
         )
+        if not principal.user_id:
+            markup = anonymous_reader_markup(markup, _request_relative_path(request))
         target = HTMLResponse(markup, headers={'Cache-Control': 'private, no-store'})
         return await apply_security_headers(target, markup=markup, inline_scripts=True)
 
     async def kindle_entry(request):
-        principal = require_principal(request)
+        principal = reading_principal(request)
+        if not principal.user_id:
+            return RedirectResponse("/kindle-library.html", status_code=303)
         settings = await run_db(store.get_kindle_screensaver, principal.user_id)
         target = '/kindle/screensaver' if settings['default'] else '/kindle-library.html'
         return RedirectResponse(target, status_code=303, headers={'Cache-Control': 'private, no-store'})
@@ -4596,7 +4625,7 @@ window.location.assign(payload.redirect||'/');
         )
 
     async def book_search(request):
-        principal = require_principal(request)
+        principal = reading_principal(request)
         book_id = request.path_params['book_id']
         if not await run_db(
             store.can_read_book, principal.user_id, principal.role, book_id
@@ -4649,7 +4678,7 @@ window.location.assign(payload.redirect||'/');
         return response(result, cache_control='private, no-store')
 
     async def pdf_document(request):
-        principal = require_principal(request)
+        principal = reading_principal(request)
         if request.method not in {'GET', 'HEAD'}:
             return Response(
                 status_code=405,
@@ -4901,7 +4930,7 @@ window.location.assign(payload.redirect||'/');
             return await public_files.get_response(path, request.scope)
         if '/' + path in PUBLIC_WEB_MANIFESTS:
             return await public_files.get_response(path, request.scope)
-        principal = require_principal(request)
+        principal = reading_principal(request)
         book_id = extract_book_id_from_public_path(path)
         book_relative_path = None
         if book_id:
@@ -4911,7 +4940,7 @@ window.location.assign(payload.redirect||'/');
                 principal.role,
                 book_id,
             ):
-                return response(error_payload('forbidden', 'Forbidden'), 403)
+                return response(error_payload('not_found', 'Not Found'), 404) if not principal.user_id else response(error_payload('forbidden', 'Forbidden'), 403)
             book = await run_db(store.book_by_id, book_id)
             if book is None:
                 return response(error_payload('not_found', 'Not Found'), 404)
@@ -5011,7 +5040,7 @@ window.location.assign(payload.redirect||'/');
             ):
                 return await public_files.get_response(path, request.scope)
             ai_settings = await run_db(store.get_ai_settings)
-            ai_reading_enabled = bool(ai_settings.get("enabled"))
+            ai_reading_enabled = bool(principal.user_id and ai_settings.get("enabled"))
 
             def _renderer_metadata():
                 return store.managed_book_metadata(book_id)
@@ -5040,6 +5069,8 @@ window.location.assign(payload.redirect||'/');
                 )
 
             has_dynamic_cache = await run_io(_has_dynamic_cache)
+            if reader_page and not has_dynamic_cache and not principal.user_id:
+                return response(error_payload('not_found', 'Not Found'), 404)
             if has_dynamic_cache:
                 try:
                     if kindle_pdf_image_match:
@@ -5095,12 +5126,12 @@ window.location.assign(payload.redirect||'/');
                             store.get_book_review,
                             book_id,
                             principal.user_id,
-                        )
+                        ) if principal.user_id else None
                         markup = await run_render(
                             renderer.render_index,
                             initial_book_review=review,
                         )
-                        return await account_reader_page(markup, principal)
+                        return await account_reader_page(markup, principal, request)
                     chapter_match = re.fullmatch(
                         r'chapter_([0-9]+)\.html',
                         book_relative_path,
@@ -5111,7 +5142,7 @@ window.location.assign(payload.redirect||'/');
                             renderer.render_chapter,
                             int(chapter_match.group(1)),
                         )
-                        return await account_reader_page(markup, principal)
+                        return await account_reader_page(markup, principal, request)
                     if kindle_page_allowed:
                         if book_relative_path == 'kindle.html':
                             if book.source_format == PDF_FORMAT:
@@ -5119,6 +5150,8 @@ window.location.assign(payload.redirect||'/');
                                     renderer.render_kindle_pdf_toc,
                                     locale=resolve_request_locale(request),
                                 )
+                                if not principal.user_id:
+                                    markup = anonymous_reader_markup(markup, _request_relative_path(request))
                                 dynamic_response = HTMLResponse(
                                     markup,
                                     headers={'Cache-Control': 'private, no-cache'},
@@ -5133,6 +5166,8 @@ window.location.assign(payload.redirect||'/');
                             markup = await run_render(
                                 renderer.render_kindle_index, locale=resolve_request_locale(request), tools=tools,
                             )
+                            if not principal.user_id:
+                                markup = anonymous_reader_markup(markup, _request_relative_path(request))
                             dynamic_response = HTMLResponse(
                                 markup,
                                 headers={'Cache-Control': 'private, no-cache'},
@@ -5149,6 +5184,8 @@ window.location.assign(payload.redirect||'/');
                                 renderer.render_kindle_pdf_index,
                                 locale=resolve_request_locale(request),
                             )
+                            if not principal.user_id:
+                                markup = anonymous_reader_markup(markup, _request_relative_path(request))
                             dynamic_response = HTMLResponse(
                                 markup,
                                 headers={'Cache-Control': 'private, no-cache'},
@@ -5169,6 +5206,8 @@ window.location.assign(payload.redirect||'/');
                                 int(kindle_chapter_match.group(1)),
                                 locale=resolve_request_locale(request),
                             )
+                            if not principal.user_id:
+                                markup = anonymous_reader_markup(markup, _request_relative_path(request))
                             dynamic_response = HTMLResponse(
                                 markup,
                                 headers={'Cache-Control': 'private, no-cache'},
@@ -6361,6 +6400,12 @@ window.location.assign(payload.redirect||'/');
         request.scope[PRINCIPAL_SCOPE_KEY] = principal
         request.scope[SESSION_TOKEN_SCOPE_KEY] = raw_session
         if principal is None:
+            if request.method in {'GET', 'HEAD'} and anonymous_read_route(path):
+                settings = await run_db(store.get_general_settings)
+                if settings['allow_anonymous_reading']:
+                    public_response = await call_next(request)
+                    public_response.headers['Cache-Control'] = 'private, no-store'
+                    return public_response
             if (
                 route_is_public_unauthenticated(path)
                 or is_public_unauthenticated_asset(path)

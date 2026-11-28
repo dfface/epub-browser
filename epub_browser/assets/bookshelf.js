@@ -151,6 +151,7 @@ function bookshelfSyncRequest(root, version, data) {
 }
 
 function initBookshelf() {
+    if (window.EpubBrowserAnonymous) return;
     var BOOKSHELF_KEY = 'bookshelf';
     var BOOKSHELF_VERSION_KEY = 'bookshelf_version';
     var isServerMode = window.EpubBookshelfStore && window.EpubBookshelfStore.isServerMode();

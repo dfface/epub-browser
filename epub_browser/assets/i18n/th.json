@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "มุมขวาล่าง",
   "bookmarks.notificationPreview": "ดูตัวอย่างการแจ้งเตือน",
   "bookmarks.notificationPreviewMessage": "การแจ้งเตือนจะแสดงที่นี่",
-  "bookmarks.notificationPlacementHelp": "บนหน้าจอแคบ การแจ้งเตือนจะแสดงตรงกลาง การตั้งค่านี้บันทึกเฉพาะในเบราว์เซอร์นี้"
+  "bookmarks.notificationPlacementHelp": "บนหน้าจอแคบ การแจ้งเตือนจะแสดงตรงกลาง การตั้งค่านี้บันทึกเฉพาะในเบราว์เซอร์นี้",
+  "admin.visibility.public": "สาธารณะ",
+  "admin.general.allowAnonymousReading": "อนุญาตให้อ่านโดยไม่ลงชื่อเข้าใช้",
+  "admin.general.allowAnonymousReadingHelp": "ผู้เยี่ยมชมค้นหาและอ่านหนังสือสาธารณะได้ ฟีเจอร์ส่วนตัวต้องลงชื่อเข้าใช้ ค่าเริ่มต้นปิดอยู่",
+  "admin.general.defaultBookVisibility": "การมองเห็นเริ่มต้นของหนังสือใหม่",
+  "admin.general.defaultBookVisibilityHelp": "ใช้กับการนำเข้าครั้งแรกเท่านั้น สาธารณะ: ผู้เยี่ยมชมอ่านได้เมื่อเปิดการอ่านแบบไม่ลงชื่อเข้าใช้ สมาชิก: ต้องลงชื่อเข้าใช้ จำกัด: ต้องได้รับอนุญาต ผู้ดูแลอ่านได้ทุกเล่ม หนังสือและสิทธิ์เดิมไม่เปลี่ยนแปลง",
+  "admin.books.visibility.public": "สาธารณะ"
 }

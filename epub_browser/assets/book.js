@@ -173,6 +173,7 @@ function initScript() {
     }
 
     function loadBookReadingTime() {
+        if (window.EpubBrowserAnonymous) return;
         if (window.EpubBrowserMode !== 'server' || !window.EpubBrowserAuth || !window.EpubBrowserAuth.fetch) return;
         if (!document.querySelector('[data-book-reading-time]')) return;
         window.EpubBrowserAuth.fetch('/api/reading-sessions/' + encodeURIComponent(book_hash) + '/summary')
@@ -479,6 +480,7 @@ function setClearReadingProgressAvailability(available) {
 }
 
 function hydrateBookShelfMembership(bookHash) {
+    if (window.EpubBrowserAnonymous) return;
     if (window.EpubBrowserMode !== 'server' || !window.EpubBrowserAuth || !window.EpubBrowserAuth.fetch) return;
 
     var button = document.getElementById('toggleShelfBtn');
@@ -525,6 +527,7 @@ function hydrateBookShelfMembership(bookHash) {
 }
 
 function initBookShelfButton(bookHash) {
+    if (window.EpubBrowserAnonymous) return;
     var BOOKSHELF_KEY = 'bookshelf';
     var BOOKSHELF_VERSION_KEY = 'bookshelf_version';
     var isServerMode = window.EpubBookshelfStore && window.EpubBookshelfStore.isServerMode();
