@@ -625,8 +625,15 @@ version and update notices. Changes apply when pages load, using the existing bo
 conversions.
 
 In SSG mode, pass the options below on each build. Omit an option to use its
-default. Both modes accept still PNG, JPEG, and WebP images up to 1 MB and
-2048 pixels per side.
+default. The logo and favicon options take local image file paths. You can use
+absolute paths or paths relative to the directory where you run the command.
+Both modes accept still PNG, JPEG, and WebP images up to 1 MB and 2048 pixels
+per side.
+
+```bash
+epub-browser ssg ./books --output-dir ./dist \
+  --site-logo ./branding/logo.png --site-favicon ./branding/favicon.png
+```
 
 #### `epub-browser ssg SOURCE [SOURCE ...]`
 
@@ -635,8 +642,8 @@ default. Both modes accept still PNG, JPEG, and WebP images up to 1 MB and
 | `--output-dir DIR`, `-o DIR` | Required destination for the atomic static snapshot. |
 | `--base-path PATH` | Public URL prefix; default `/`. It must begin and end with `/`. |
 | `--site-name NAME` | Custom site name, up to 80 characters. |
-| `--site-logo FILE` | Local logo image. |
-| `--site-favicon FILE` | Local browser-tab icon image. |
+| `--site-logo FILE` | Path to a local logo image file. |
+| `--site-favicon FILE` | Path to a local browser-tab icon image file. |
 | `--hide-version-info` | Hide footer credits, version and update notices. |
 | `--book-id-storage sidecar\|embedded` | Stable identity carrier for every selected source; default `sidecar`. |
 | `--kindle` | Generate dependency-free minimal pages for legacy e-Ink Kindles and redirect Kindle WebKit browsers to them; off by default. |
