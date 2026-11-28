@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "오른쪽 아래",
   "bookmarks.notificationPreview": "알림 미리 보기",
   "bookmarks.notificationPreviewMessage": "알림이 여기에 표시됩니다.",
-  "bookmarks.notificationPlacementHelp": "좁은 화면에서는 알림이 가운데 표시됩니다. 이 설정은 현재 브라우저에만 저장됩니다."
+  "bookmarks.notificationPlacementHelp": "좁은 화면에서는 알림이 가운데 표시됩니다. 이 설정은 현재 브라우저에만 저장됩니다.",
+  "admin.visibility.public": "공개",
+  "admin.general.allowAnonymousReading": "익명 읽기 허용",
+  "admin.general.allowAnonymousReadingHelp": "방문자는 공개 도서를 찾고 읽을 수 있습니다. 개인 기능은 로그인이 필요합니다. 기본값은 꺼짐입니다.",
+  "admin.general.defaultBookVisibility": "새 도서의 기본 공개 범위",
+  "admin.general.defaultBookVisibilityHelp": "최초 가져오기에만 적용됩니다. 공개: 익명 읽기를 켜면 방문자도 읽을 수 있습니다. 로그인: 로그인이 필요합니다. 제한: 별도 권한이 필요합니다. 관리자는 모든 도서를 읽을 수 있습니다. 기존 도서와 권한은 유지됩니다.",
+  "admin.books.visibility.public": "공개"
 }

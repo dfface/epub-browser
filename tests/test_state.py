@@ -74,6 +74,93 @@ class StateStoreTests(unittest.TestCase):
             authoritative_book_id=book_id,
         )
 
+    def test_public_visibility_migration_preserves_related_records(self):
+        reader = self.store.create_user("migration-reader", hash_password("secret"), role="member")
+        book = self._reading_book("migration-book")
+        self.store.set_book_visibility(book.book_id, "restricted")
+        self.store.grant_book_access(book.book_id, reader.user_id)
+        self.store.save_bookmark(book.book_id, reader.user_id,
+            {"format": "epub", "chapter": "chapter_0.html", "chapter_index": 0,
+             "element": "p:0", "text": "text:0", "offset": 0}, "Saved place")
+        # A populated v35 fixture: restore the old constraint in sqlite_master
+        # so the production migration must rebuild a table with dependents.
+        with sqlite3.connect(self.database) as connection:
+            sql = connection.execute("SELECT sql FROM sqlite_master WHERE name='books'").fetchone()[0]
+            connection.execute("PRAGMA writable_schema=ON")
+            connection.execute("UPDATE sqlite_master SET sql=? WHERE name='books'",
+                (sql.replace("'public', 'authenticated', 'restricted'", "'authenticated', 'restricted'"),))
+            connection.execute("PRAGMA writable_schema=OFF")
+            connection.execute("PRAGMA user_version=35")
+        reopened = StateStore(self.database)
+        reopened.initialize()
+        self.assertEqual(reopened.get_book(book.book_id).visibility, "restricted")
+        self.assertEqual(reopened.book_grants(book.book_id), (reader.user_id,))
+        self.assertEqual(len(reopened.list_bookmarks(book.book_id, reader.user_id)), 1)
+        reopened.set_book_visibility(book.book_id, "public")
+        self.assertTrue(reopened.can_read_book(reader.user_id, reader.role, book.book_id))
+        reopened.initialize()
+        self.assertEqual(reopened.get_book(book.book_id).visibility, "public")
+
+    def test_default_visibility_only_first_import_and_stable_restore(self):
+        reader = self.store.create_user("reader", "hash", role="member")
+        for source_format in ("epub", "pdf"):
+            with self.subTest(source_format=source_format):
+                self.store.set_general_settings(default_book_visibility="restricted")
+                path = Path(self.temporary.name, "new." + source_format)
+                book = self.store.resolve_book(path, None, source_format, {},
+                    authoritative_book_id=source_format, source_format=source_format)
+                self.assertEqual(book.visibility, "restricted")
+                self.store.grant_book_access(book.book_id, reader.user_id)
+                self.store.set_general_settings(default_book_visibility="public")
+                updated = self.store.resolve_book(path, None, "changed", {},
+                    authoritative_book_id=source_format, source_format=source_format)
+                self.assertEqual(updated.visibility, "restricted")
+                self.store.mark_missing(book.book_id)
+                restored = self.store.resolve_book(path.with_name("restored." + source_format),
+                    None, "changed", {}, authoritative_book_id=source_format, source_format=source_format)
+                self.assertEqual(restored.book_id, book.book_id)
+                self.assertEqual(restored.visibility, "restricted")
+                self.assertEqual(self.store.book_grants(book.book_id), (reader.user_id,))
+                new = self.store.resolve_book(path.with_name("another." + source_format),
+                    None, "another", {}, source_format=source_format)
+                self.assertEqual(new.visibility, "public")
+
+    def test_public_visibility_access_matrix_and_revocation(self):
+        member = self.store.create_user("reader", "hash", role="member")
+        books = {}
+        for visibility in ("public", "authenticated", "restricted"):
+            book = self._reading_book(visibility)
+            self.store.set_book_visibility(book.book_id, visibility)
+            books[visibility] = book.book_id
+        self.assertFalse(self.store.can_read_book(None, None, books["public"]))
+        self.store.set_general_settings(allow_anonymous_reading=True)
+        self.assertEqual([b.book_id for b in self.store.visible_books(None)], [books["public"]])
+        for visibility, book_id in books.items():
+            self.assertEqual(self.store.can_read_book(None, None, book_id), visibility == "public")
+            self.assertEqual(self.store.can_read_book(member.user_id, member.role, book_id), visibility != "restricted")
+            self.assertTrue(self.store.can_read_book(self.owner.user_id, "admin", book_id))
+        self.store.grant_book_access(books["restricted"], member.user_id)
+        self.assertTrue(self.store.can_read_book(member.user_id, member.role, books["restricted"]))
+        self.store.revoke_book_access(books["restricted"], member.user_id)
+        self.assertFalse(self.store.can_read_book(member.user_id, member.role, books["restricted"]))
+        self.store.set_general_settings(allow_anonymous_reading=False)
+        self.assertEqual(self.store.visible_books(None), ())
+        self.store.mark_missing(books["public"])
+        self.assertFalse(self.store.can_read_book(self.owner.user_id, "admin", books["public"]))
+
+    def test_public_reading_settings_default_private(self):
+        settings = self.store.get_general_settings()
+        self.assertIs(settings["allow_anonymous_reading"], False)
+        self.assertEqual(settings["default_book_visibility"], "authenticated")
+        self.store.set_general_settings(allow_anonymous_reading=True,
+                                        default_book_visibility="public")
+        self.assertIs(self.store.get_general_settings()["allow_anonymous_reading"], True)
+        for invalid in (1, "true", [], {}):
+            with self.assertRaises(ValueError):
+                self.store.set_general_settings(allow_anonymous_reading=invalid)
+        with self.assertRaises(ValueError):
+            self.store.set_general_settings(default_book_visibility="guest")
+
     def test_user_deletion_requires_typed_confirmation_and_cleans_owned_data(self):
         member = self.store.create_user("reader", "hash", role="member")
         book = self._reading_book()
@@ -1926,7 +2013,7 @@ class StateStoreTests(unittest.TestCase):
                 "profile": "fiction",
             },
             {
-                "visibility": "public",
+                "visibility": "unsupported",
                 "user_ids": [other.user_id],
                 "tag_ids": [replacement_tag["id"]],
                 "profile": "fiction",
@@ -3432,11 +3519,11 @@ class StateStoreTests(unittest.TestCase):
     def test_general_settings_default_and_validation(self):
         self.assertEqual(
             self.store.get_general_settings(),
-            {"recent_reading_limit": 10, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20},
+            {"recent_reading_limit": 10, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20, "allow_anonymous_reading": False, "default_book_visibility": "authenticated"},
         )
         self.assertEqual(
             self.store.set_general_settings(recent_reading_limit=18),
-            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20},
+            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20, "allow_anonymous_reading": False, "default_book_visibility": "authenticated"},
         )
         self.assertEqual(
             self.store.get_general_settings()["recent_reading_limit"], 18
@@ -3448,7 +3535,7 @@ class StateStoreTests(unittest.TestCase):
         # No upper cap: values above 24 are accepted.
         self.assertEqual(
             self.store.set_general_settings(recent_reading_limit=100),
-            {"recent_reading_limit": 100, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20},
+            {"recent_reading_limit": 100, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20, "allow_anonymous_reading": False, "default_book_visibility": "authenticated"},
         )
 
     def test_book_cache_limit_accepts_large_positive_integers(self):
@@ -3469,7 +3556,7 @@ class StateStoreTests(unittest.TestCase):
         self.store.initialize()
         self.assertEqual(
             self.store.get_general_settings(),
-            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20},
+            {"recent_reading_limit": 18, "reading_insights_rank_limit": 10, "book_cache_limit": 100, "search_index_cache_limit": 20, "allow_anonymous_reading": False, "default_book_visibility": "authenticated"},
         )
 
     def test_imported_and_administrator_tags_share_one_managed_collection(self):
@@ -4351,6 +4438,7 @@ class StateStoreTests(unittest.TestCase):
             Path(self.temporary.name, "retry-book.epub"),
             "urn:test:retry-book", "fingerprint", {"title": "Retry Book"},
         )
+        self.store.set_book_visibility(book.book_id, "public")
         request = {
             "book_id": book.book_id,
             "scope": "chapter",

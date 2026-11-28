@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "右下角",
   "bookmarks.notificationPreview": "预览通知",
   "bookmarks.notificationPreviewMessage": "通知将显示在这里。",
-  "bookmarks.notificationPlacementHelp": "窄屏时通知居中显示，此设置仅保存在当前浏览器。"
+  "bookmarks.notificationPlacementHelp": "窄屏时通知居中显示，此设置仅保存在当前浏览器。",
+  "admin.visibility.public": "公开",
+  "admin.general.allowAnonymousReading": "允许匿名阅读",
+  "admin.general.allowAnonymousReadingHelp": "访客可发现并阅读公开书籍；个人功能仍需登录。默认关闭。",
+  "admin.general.defaultBookVisibility": "新书默认可见性",
+  "admin.general.defaultBookVisibilityHelp": "仅影响首次入库：公开书籍在开启匿名阅读后允许访客阅读；登录可读要求登录；受限书籍需要单独授权。管理员可读全部书籍。已有书籍和授权不变。",
+  "admin.books.visibility.public": "公开"
 }

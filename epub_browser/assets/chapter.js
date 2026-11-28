@@ -2730,6 +2730,7 @@ function initScript() {
         });
     }
     function initAnnotationModule() {
+        if (window.EpubBrowserAnonymous) return;
         if (window.AnnotationModule) {
             window.AnnotationModule.init({
                 bookHash: book_hash,

@@ -749,6 +749,7 @@ _KINDLE_PDF_SERVER_REPORT_JS = """\
   var csrfToken = '';
   var lastBeat = new Date().getTime();
   function kXhr(method, url, body, onDone) {
+    if (window.EpubBrowserAnonymous) return;
     try {
       var xhr = new XMLHttpRequest();
       xhr.open(method, url, true);
@@ -981,6 +982,7 @@ _KINDLE_READER_SERVER_REPORT_JS = """\
   var sequence = 0;
   var csrfToken = '';
   function kXhr(method, url, body, onDone) {
+    if (window.EpubBrowserAnonymous) return;
     try {
       var xhr = new XMLHttpRequest();
       xhr.open(method, url, true);
@@ -1051,6 +1053,7 @@ _KINDLE_READER_SERVER_REPORT_JS = """\
 # on the local cookie, so progress follows the user across devices. Stays ES5.
 _KINDLE_READER_SERVER_RESUME_JS = """\
 (function () {
+  if (window.EpubBrowserAnonymous) return;
   var bookHash = %(book_hash)s;
   try {
     var xhr = new XMLHttpRequest();

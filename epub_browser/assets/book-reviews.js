@@ -167,6 +167,7 @@
       if (trigger) trigger.setAttribute('aria-expanded', 'true'); focusEditor();
     }
     function mount(rootElement, suppliedBookId, suppliedDisplayRoot) {
+      if (root.EpubBrowserAnonymous) return null;
       var target = rootElement;
       if (typeof rootElement === 'string' || !rootElement) { suppliedDisplayRoot = suppliedBookId; suppliedBookId = rootElement || suppliedBookId; target = documentTarget && documentTarget.querySelector('[data-book-reviews]'); }
       if (!target || !suppliedBookId) return Promise.resolve(null);

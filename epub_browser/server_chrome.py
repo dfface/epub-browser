@@ -2,12 +2,14 @@
 
 from datetime import datetime
 from html import escape
+import re
+from urllib.parse import quote
 
 from .asset_publisher import PublishedAssets
 from .book_sort import BOOK_SORT_LABEL, BOOK_SORT_OPTIONS, book_sort_options
 from .locales import LOCALE_NATIVE_NAMES
 from .urls import SiteURLs
-from .i18n_bundles import render_i18n_bootstrap
+from .i18n_bundles import get_bundle, render_i18n_bootstrap
 from .version import render_footer
 
 SERVER_ACCOUNT_STYLESHEET = '<link rel="stylesheet" href="/assets/account.css">'
@@ -252,6 +254,24 @@ SERVER_ACCOUNT_PANEL = '''
                     </div>
                     <p class="admin-setting-help" id="adminGeneralSearchIndexCacheHelp" data-i18n="admin.general.searchIndexCacheLimitHelp">The server keeps this many recently used search indexes. Removing one only means it is rebuilt the next time that book is searched.</p>
                 </div>
+                <div class="admin-setting-row admin-setting-policy-start">
+                    <label class="admin-setting-main admin-setting-toggle" for="adminAllowAnonymousReading">
+                        <span class="admin-setting-label" data-i18n="admin.general.allowAnonymousReading">Allow anonymous reading</span>
+                        <input type="checkbox" name="allow_anonymous_reading" id="adminAllowAnonymousReading" aria-describedby="adminAnonymousReadingHelp">
+                    </label>
+                    <p class="admin-setting-help" id="adminAnonymousReadingHelp" data-i18n="admin.general.allowAnonymousReadingHelp">Visitors can discover and read public books. Personal features require sign-in. Disabled by default.</p>
+                </div>
+                <div class="admin-setting-row">
+                    <div class="admin-setting-main">
+                        <label class="admin-setting-label" for="adminDefaultVisibility" data-i18n="admin.general.defaultBookVisibility">Default visibility for new books</label>
+                        <select class="admin-general-select" id="adminDefaultVisibility" name="default_book_visibility" aria-describedby="adminDefaultVisibilityHelp">
+                            <option value="public" data-i18n="admin.books.visibility.public">Public</option>
+                            <option value="authenticated" data-i18n="admin.books.visibility.authenticated">All signed-in users</option>
+                            <option value="restricted" data-i18n="admin.books.visibility.restricted">Restricted</option>
+                        </select>
+                    </div>
+                    <p class="admin-setting-help" id="adminDefaultVisibilityHelp" data-i18n="admin.general.defaultBookVisibilityHelp">Only affects first-time imports. Public books allow visitors when anonymous reading is enabled; authenticated requires sign-in; restricted requires an explicit grant. Administrators can read all books.</p>
+                </div>
                 <p class="admin-setting-error" id="adminGeneralError" role="alert" hidden></p>
             </div>
             <div class="admin-form-actions">
@@ -427,7 +447,7 @@ SERVER_ACCOUNT_PANEL = '''
         <div id="adminBookTableSurface" class="admin-books-workspace" hidden>
             <div class="account-form admin-books-controls" role="search" aria-labelledby="adminBooksTitle">
                 <label class="admin-book-search-control" for="adminBookSearch"><span data-i18n="admin.books.searchLabel">Search books</span><input id="adminBookSearch" type="search" autocomplete="off" data-i18n-placeholder="admin.books.searchPlaceholder" placeholder="Search by title, author, or tag"></label>
-                <label class="admin-book-filter-control" for="adminBookVisibilityFilter"><span data-i18n="admin.books.visibilityFilter">Visibility</span><select id="adminBookVisibilityFilter"><option value="" data-i18n="admin.books.visibility.all">All visibility</option><option value="authenticated" data-i18n="admin.books.visibility.authenticated">All signed-in users</option><option value="restricted" data-i18n="admin.books.visibility.restricted">Restricted</option></select></label>
+                <label class="admin-book-filter-control" for="adminBookVisibilityFilter"><span data-i18n="admin.books.visibilityFilter">Visibility</span><select id="adminBookVisibilityFilter"><option value="" data-i18n="admin.books.visibility.all">All visibility</option><option value="public" data-i18n="admin.books.visibility.public">Public</option><option value="authenticated" data-i18n="admin.books.visibility.authenticated">All signed-in users</option><option value="restricted" data-i18n="admin.books.visibility.restricted">Restricted</option></select></label>
                 <label class="admin-book-filter-control" for="adminBookTagFilter"><span data-i18n="admin.books.tagFilter">Tag</span><select id="adminBookTagFilter"><option value="" data-i18n="admin.books.tag.all">All tags</option></select></label>
                 <label class="admin-book-sort-control" for="adminBookSort"><span data-i18n="{book_sort_label}">Sort by</span><select id="adminBookSort">{book_sort_options}</select></label>
                 <label class="admin-book-page-size-control" for="adminBookPageSize"><span data-i18n="admin.books.pageSize">Books per page</span><select id="adminBookPageSize"><option value="10">10</option><option value="20" selected>20</option><option value="50">50</option><option value="100">100</option></select></label>
@@ -595,3 +615,33 @@ def render_account_panel(kindle=False):
 </section>
 """
     return panel.replace("{kindle_settings_tab}", tab).replace("{kindle_settings_panel}", settings)
+
+
+def anonymous_reader_markup(markup: str, next_path: str = "/") -> str:
+    """Apply Server-only anonymous capabilities without changing cached content."""
+    bootstrap = '<script>window.EpubBrowserAnonymous=true;</script>'
+    # Hide account-only entry points before first paint. The client modules also
+    # skip initialization; HTTP authorization remains the security boundary.
+    style = '''<style>
+#accountMenu,#adminMenu,#accountPanel,#adminPanel,#toggleShelfBtn,
+#bookshelfBtn,#exportShelfBtn,#importShelfBtn,#recentReading,#libraryProgress,
+#kBookshelf,[data-vocabulary],[data-ai-reading-hub],[data-ai-reading-indicators],
+[data-book-review-toggle],[data-book-review-display],[data-book-reviews],
+#clearReadingProgressBtn,#clearReadingProgressMenu,a[href="#kBookshelf"],
+[data-annotation-hub],[data-bookmark-toggle],[data-book-reading-time],[data-reading-insights],a[href="/reading-insights"],#bookmarksBtn,
+#annotationPanel,#annotationToolbar{display:none!important}
+</style>'''
+    language = re.search(r'<html\b[^>]*\blang="([^"]+)"', markup)
+    locale = language.group(1) if language else 'en'
+    label = escape(get_bundle(locale).get('account.signIn', 'Sign in'))
+    login_url = '/login?next=' + quote(next_path, safe='')
+    login = ('<a class="app-nav-link" href="' + escape(login_url, quote=True)
+             + '" data-anonymous-sign-in data-i18n="account.signIn">' + label + '</a>')
+    markup = markup.replace('<head>', '<head>' + bootstrap + style, 1)
+    markup, replaced = re.subn(
+        r'<button\b[^>]*\bid="accountMenu"[^>]*>.*?</button>',
+        lambda match: login, markup, count=1, flags=re.DOTALL,
+    )
+    if not replaced:
+        markup = re.sub(r'(<body\b[^>]*>)', lambda match: match[0] + login, markup, count=1)
+    return markup

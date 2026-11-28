@@ -836,6 +836,29 @@ class ServerAuthBoundaryTests(unittest.TestCase):
             "updated_at": "2026-01-01",
         }
 
+    def test_anonymous_public_catalog_and_private_api_boundary(self):
+        root = Path(self.directory.name) / "book" / "book"
+        root.mkdir()
+        (root / "index.html").write_text("book")
+        self.store.set_book_visibility("book", "public")
+        self.assertEqual(self.client.get("/book-metadata.json").status_code, 403)
+        self.store.set_general_settings(allow_anonymous_reading=True)
+        result = self.client.get("/book-metadata.json")
+        self.assertEqual(result.status_code, 200)
+        self.assertEqual([b["hash"] for b in result.json()], ["book"])
+        self.assertIn("no-store", result.headers["cache-control"])
+        for path in ("/api/bookshelf", "/api/reading-progress", "/api/session",
+                     "/api/admin/books", "/api/ai/status"):
+            self.assertEqual(self.client.get(path).status_code, 401, path)
+        self.store.set_book_visibility("book", "restricted")
+        self.assertEqual(self.client.get("/book-metadata.json").json(), [])
+        self.assertEqual(self.client.get("/book/book/chapter_0.html").status_code, 404)
+        self.assertEqual(self.client.get("/book/missing/chapter_0.html").status_code, 404)
+        self.assertEqual(self.client.get("/epub-browser.db").status_code, 403)
+        self.assertEqual(self.client.put("/api/library-order", json={"ids": []}).status_code, 401)
+        self.store.set_general_settings(allow_anonymous_reading=False)
+        self.assertEqual(self.client.get("/book-metadata.json").status_code, 403)
+
     def test_server_redirects_unauthenticated_html_and_rejects_api_static_and_sse(self):
         index = self.client.get("/?language=zh-CN")
 

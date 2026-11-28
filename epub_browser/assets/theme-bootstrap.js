@@ -39,7 +39,7 @@
     }
 
     function storedTheme(root) {
-        if (root.EpubBrowserMode === 'server') {
+        if (root.EpubBrowserMode === 'server' && !root.EpubBrowserAnonymous) {
             var saved = preferences(root);
             if (saved.automatic) {
                 var scheme = deviceScheme(root);

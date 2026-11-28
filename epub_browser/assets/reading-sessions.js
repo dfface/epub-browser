@@ -506,7 +506,7 @@
   function start(options) {
     options = options || {};
     var browser = options.root || root;
-    if (!browser || browser.EpubBrowserMode !== 'server' || !browser.EpubBrowserAuth ||
+    if (!browser || browser.EpubBrowserAnonymous || browser.EpubBrowserMode !== 'server' || !browser.EpubBrowserAuth ||
       typeof browser.EpubBrowserAuth.fetch !== 'function') return null;
     var documentTarget = browser.document;
     var content = options.content || (documentTarget && documentTarget.getElementById('eb-content'));

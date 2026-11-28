@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "नीचे दाएँ",
   "bookmarks.notificationPreview": "सूचना का पूर्वावलोकन",
   "bookmarks.notificationPreviewMessage": "सूचनाएँ यहाँ दिखाई देंगी।",
-  "bookmarks.notificationPlacementHelp": "छोटी स्क्रीन पर सूचनाएँ बीच में दिखाई देती हैं। यह सेटिंग केवल इस ब्राउज़र में सहेजी जाती है।"
+  "bookmarks.notificationPlacementHelp": "छोटी स्क्रीन पर सूचनाएँ बीच में दिखाई देती हैं। यह सेटिंग केवल इस ब्राउज़र में सहेजी जाती है।",
+  "admin.visibility.public": "सार्वजनिक",
+  "admin.general.allowAnonymousReading": "बिना लॉगिन पढ़ने की अनुमति दें",
+  "admin.general.allowAnonymousReadingHelp": "आगंतुक सार्वजनिक पुस्तकें खोज और पढ़ सकते हैं। व्यक्तिगत सुविधाओं के लिए लॉगिन आवश्यक है। डिफ़ॉल्ट रूप से बंद।",
+  "admin.general.defaultBookVisibility": "नई पुस्तकों की डिफ़ॉल्ट दृश्यता",
+  "admin.general.defaultBookVisibilityHelp": "केवल पहली बार आयात पर लागू। सार्वजनिक: अनाम पठन चालू होने पर आगंतुक पढ़ सकते हैं। प्रमाणित: लॉगिन आवश्यक। प्रतिबंधित: स्पष्ट अनुमति आवश्यक। व्यवस्थापक सभी पुस्तकें पढ़ सकते हैं। मौजूदा पुस्तकें और अनुमतियाँ नहीं बदलतीं।",
+  "admin.books.visibility.public": "सार्वजनिक"
 }

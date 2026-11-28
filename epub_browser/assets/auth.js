@@ -65,6 +65,7 @@
       general: 'admin.ai.profile.general'
     };
     var adminBookVisibilityTranslationKeys = {
+      public: 'admin.books.visibility.public',
       authenticated: 'admin.books.visibility.authenticated',
       restricted: 'admin.books.visibility.restricted'
     };
@@ -178,6 +179,7 @@
     }
 
     function loadSession(force) {
+      if (root.EpubBrowserAnonymous) return Promise.resolve(null);
       if (root.EpubBrowserMode !== 'server') return Promise.resolve(null);
       if (!force && sessionState) return Promise.resolve(sessionState);
       if (!force && sessionRequest) return sessionRequest;
@@ -192,6 +194,16 @@
     }
 
     function authenticatedFetch(url, options) {
+      if (root.EpubBrowserAnonymous) {
+        var path = new URL(url, root.location.href || 'http://localhost/').pathname;
+        var readable = /\/api\/books\/[^/]+\/(search|document|metadata)$/.test(path) ||
+          /\/(book-metadata\.json|api\/library-metadata)$/.test(path);
+        if (!readable || isUnsafe(options && options.method)) {
+          return Promise.resolve({ ok: false, status: 401,
+            json: function() { return Promise.resolve({ code: 'authentication_required' }); } });
+        }
+        return root.fetch(url, options);
+      }
       if (root.EpubBrowserMode !== 'server') return Promise.resolve(null);
       var unsafe = isUnsafe(options && options.method);
       var sameOrigin = isSameOrigin(url);
@@ -1311,6 +1323,7 @@
     }
 
     function visibilityLabel(visibility) {
+      if (visibility === 'public') return t('admin.visibility.public');
       if (visibility === 'restricted') return t('admin.visibility.restricted');
       return t('admin.visibility.authenticated');
     }
@@ -2168,6 +2181,8 @@
       fields.reading_insights_rank_limit.value = String(generalSettings.reading_insights_rank_limit || 10);
       fields.book_cache_limit.value = String(generalSettings.book_cache_limit || 100);
       fields.search_index_cache_limit.value = String(generalSettings.search_index_cache_limit || 20);
+      if (fields.allow_anonymous_reading) fields.allow_anonymous_reading.checked = !!generalSettings.allow_anonymous_reading;
+      if (fields.default_book_visibility) fields.default_book_visibility.value = generalSettings.default_book_visibility || 'authenticated';
       var errorEl = element('adminGeneralError');
       if (errorEl) errorEl.hidden = true;
     }
@@ -2194,7 +2209,9 @@
       return authenticatedFetch('/api/admin/general-settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ recent_reading_limit: limit, reading_insights_rank_limit: rankLimit, book_cache_limit: cacheLimit, search_index_cache_limit: searchIndexCacheLimit })
+        body: JSON.stringify({ recent_reading_limit: limit, reading_insights_rank_limit: rankLimit, book_cache_limit: cacheLimit, search_index_cache_limit: searchIndexCacheLimit,
+          allow_anonymous_reading: !!(fields.allow_anonymous_reading && fields.allow_anonymous_reading.checked),
+          default_book_visibility: fields.default_book_visibility ? fields.default_book_visibility.value : 'authenticated' })
       }).then(function(response) {
         if (!response.ok) {
           if (errorEl) {
@@ -2473,7 +2490,7 @@
         header.appendChild(title);
         header.appendChild(managedTags);
         item.appendChild(header);
-        ['authenticated', 'restricted'].forEach(function(value) {
+        ['public', 'authenticated', 'restricted'].forEach(function(value) {
           var option = root.document.createElement('option');
           option.value = value;
           option.textContent = visibilityLabel(value);
@@ -3079,7 +3096,7 @@
       visibilityField.className = 'admin-book-field';
       visibilityText.textContent = t('admin.books.visibilityLabel');
       visibilityField.appendChild(visibilityText);
-      ['authenticated', 'restricted'].forEach(function(value) {
+      ['public', 'authenticated', 'restricted'].forEach(function(value) {
         var option = root.document.createElement('option');
         option.value = value;
         option.textContent = t(adminBookVisibilityTranslationKeys[value]);
@@ -4610,6 +4627,10 @@
     }
 
     function bindLocaleSync() {
+      // Anonymous pages use the shared locale runtime, but have no account
+      // panels or session list to refresh. A rejected personal request here
+      // would otherwise report an expired session on every locale event.
+      if (root.EpubBrowserAnonymous) return;
       if (localeSyncBound) return;
       if (!i18n() || !i18n().onLocaleChange) return;
       localeSyncBound = true;
@@ -4629,6 +4650,7 @@
     }
 
     function init() {
+      if (root.EpubBrowserAnonymous) return Promise.resolve({ anonymous: true });
       if (root.EpubBrowserMode !== 'server') return Promise.resolve(null);
       if (!initialized) {
         initialized = true;

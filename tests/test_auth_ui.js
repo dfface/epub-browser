@@ -2305,3 +2305,38 @@ test('captured AI job poll callbacks are inert after panel close or visibility h
   await tick();
   assert.equal(jobsRequests, beforeHiddenCallback);
 });
+
+test('anonymous reading starts without session or personal API requests', async () => {
+  const requests = [];
+  const root = rootWithFetch((url) => { requests.push(url); return Promise.resolve(response(200, [])); });
+  root.EpubBrowserAnonymous = true;
+  root.location.href = 'http://localhost/';
+  const auth = AuthModule.create(root);
+  assert.deepEqual(await auth.init(), { anonymous: true });
+  assert.equal(await auth.session(), null);
+  assert.equal((await auth.fetch('/api/reading-progress/book')).status, 401);
+  assert.equal((await auth.fetch('/api/library-order', { method: 'PUT' })).status, 401);
+  assert.deepEqual(requests, []);
+  await auth.fetch('/api/library-metadata');
+  await auth.fetch('/api/books/book/search?q=chapter');
+  assert.deepEqual(requests, ['/api/library-metadata', '/api/books/book/search?q=chapter']);
+  assert.deepEqual(root.navigations, []);
+});
+
+test('anonymous locale initialization and changes never show expired-session notifications', async () => {
+  const requests = [], notifications = [], listeners = [];
+  const root = rootWithFetch(url => { requests.push(url); return Promise.resolve(response(200, [])); });
+  root.location.href = 'http://localhost/book/public/index.html';
+  root.EpubBrowserAnonymous = true;
+  root.EpubBrowserI18n = {t:key=>key,onLocaleChange:listener=>listeners.push(listener)};
+  root.EpubBrowserNotification = {show:(text)=>notifications.push(text)};
+  const auth = AuthModule.create(root);
+  await auth.init();
+  for (let change=0; change<3; change++) {
+    listeners.forEach(listener=>listener());
+    await new Promise(resolve=>setImmediate(resolve));
+  }
+  assert.deepEqual(notifications, []);
+  assert.deepEqual(requests, []);
+  assert.deepEqual(root.navigations, []);
+});

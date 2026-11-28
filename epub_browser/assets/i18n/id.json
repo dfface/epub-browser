@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "Kanan bawah",
   "bookmarks.notificationPreview": "Pratinjau notifikasi",
   "bookmarks.notificationPreviewMessage": "Notifikasi akan muncul di sini.",
-  "bookmarks.notificationPlacementHelp": "Pada layar sempit, notifikasi ditampilkan di tengah. Preferensi ini hanya disimpan di browser ini."
+  "bookmarks.notificationPlacementHelp": "Pada layar sempit, notifikasi ditampilkan di tengah. Preferensi ini hanya disimpan di browser ini.",
+  "admin.visibility.public": "Publik",
+  "admin.general.allowAnonymousReading": "Izinkan membaca anonim",
+  "admin.general.allowAnonymousReadingHelp": "Pengunjung dapat menemukan dan membaca buku publik. Fitur pribadi memerlukan masuk. Dinonaktifkan secara bawaan.",
+  "admin.general.defaultBookVisibility": "Visibilitas bawaan buku baru",
+  "admin.general.defaultBookVisibilityHelp": "Hanya untuk impor pertama. Publik: pengunjung saat membaca anonim aktif. Terautentikasi: perlu masuk. Terbatas: perlu izin khusus. Administrator dapat membaca semua buku. Buku dan izin yang ada tidak berubah.",
+  "admin.books.visibility.public": "Publik"
 }

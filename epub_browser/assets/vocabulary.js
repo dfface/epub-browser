@@ -1,5 +1,6 @@
 (function() {
   'use strict';
+  if (window.EpubBrowserAnonymous) return;
 
   const i18n = window.EpubBrowserI18n;
   const triggers = document.querySelectorAll('[data-vocabulary]');

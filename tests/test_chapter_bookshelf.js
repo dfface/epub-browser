@@ -40,3 +40,13 @@ test('chapter shelf support calls the bookshelf initializer exported by its asse
   assert.equal(initialized, 1);
   assert.deepEqual(timeouts, []);
 });
+
+test('anonymous chapter never waits for the account-only annotation module', () => {
+  const source=fs.readFileSync('epub_browser/assets/chapter.js','utf8');
+  const initializer=source.match(/function initAnnotationModule\(\) \{[\s\S]*?\n    \}/)[0];
+  let timers=0;
+  vm.runInNewContext(initializer+';initAnnotationModule();', {
+    window:{EpubBrowserAnonymous:true}, setTimeout(){timers++;}
+  });
+  assert.equal(timers,0);
+});

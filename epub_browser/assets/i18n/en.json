@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "Bottom right",
   "bookmarks.notificationPreview": "Preview notification",
   "bookmarks.notificationPreviewMessage": "This is where notifications will appear.",
-  "bookmarks.notificationPlacementHelp": "On narrow screens, notifications are centered. This preference is saved only in this browser."
+  "bookmarks.notificationPlacementHelp": "On narrow screens, notifications are centered. This preference is saved only in this browser.",
+  "admin.visibility.public": "Public",
+  "admin.general.allowAnonymousReading": "Allow anonymous reading",
+  "admin.general.allowAnonymousReadingHelp": "Visitors can discover and read public books. Personal features require sign-in. Disabled by default.",
+  "admin.general.defaultBookVisibility": "Default visibility for new books",
+  "admin.general.defaultBookVisibilityHelp": "Applies only to first-time imports. Public: visitors may read when anonymous reading is enabled. Signed-in: login required. Restricted: explicit access required. Administrators can read all books. Existing books and grants stay unchanged.",
+  "admin.books.visibility.public": "Public"
 }

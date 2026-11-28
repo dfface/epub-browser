@@ -235,7 +235,7 @@
 
   function start(context) {
     var root = context || (typeof window !== 'undefined' ? window : null);
-    if (!root || !root.document || root.EpubBrowserMode !== 'server') return null;
+    if (!root || root.EpubBrowserAnonymous || !root.document || root.EpubBrowserMode !== 'server') return null;
     var mount = root.document.getElementById(MOUNT_ID);
     if (!mount) return null;
 

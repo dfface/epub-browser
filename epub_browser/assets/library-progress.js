@@ -278,6 +278,7 @@
   }
 
   function start(root) {
+    if (root.EpubBrowserAnonymous) return null;
     var mount = root.document.getElementById('libraryProgress');
     if (root.EpubBrowserMode !== 'server' || !mount || !root.EventSource) return null;
     var controller = createController(createDomOptions(root, mount));

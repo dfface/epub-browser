@@ -1675,5 +1675,11 @@
   "bookmarks.positionBottomRight": "Dưới phải",
   "bookmarks.notificationPreview": "Xem trước thông báo",
   "bookmarks.notificationPreviewMessage": "Thông báo sẽ xuất hiện ở đây.",
-  "bookmarks.notificationPlacementHelp": "Trên màn hình hẹp, thông báo được căn giữa. Tùy chọn này chỉ được lưu trong trình duyệt hiện tại."
+  "bookmarks.notificationPlacementHelp": "Trên màn hình hẹp, thông báo được căn giữa. Tùy chọn này chỉ được lưu trong trình duyệt hiện tại.",
+  "admin.visibility.public": "Công khai",
+  "admin.general.allowAnonymousReading": "Cho phép đọc ẩn danh",
+  "admin.general.allowAnonymousReadingHelp": "Khách có thể tìm và đọc sách công khai. Tính năng cá nhân yêu cầu đăng nhập. Mặc định tắt.",
+  "admin.general.defaultBookVisibility": "Chế độ hiển thị mặc định của sách mới",
+  "admin.general.defaultBookVisibilityHelp": "Chỉ áp dụng khi nhập lần đầu. Công khai: khách đọc được khi bật đọc ẩn danh. Đã đăng nhập: yêu cầu đăng nhập. Hạn chế: cần cấp quyền riêng. Quản trị viên đọc được mọi sách. Sách và quyền hiện có không thay đổi.",
+  "admin.books.visibility.public": "Công khai"
 }

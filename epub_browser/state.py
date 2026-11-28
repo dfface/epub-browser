@@ -40,7 +40,7 @@ from .pat import (
 )
 
 
-DB_SCHEMA_VERSION = 35
+DB_SCHEMA_VERSION = 36
 APPEARANCE_DEFAULTS = {"automatic": False, "day": "light", "night": "dark", "manual": "light"}
 APPEARANCE_THEMES = frozenset({"light", "dark", "sepia", "forest", "ocean", "peach", "lavender"})
 
@@ -303,6 +303,8 @@ class StateStore:
         self.database_path.parent.mkdir(parents=True, exist_ok=True)
         connection = self._connect()
         connection.isolation_level = None
+        # Rebuilding books must not cascade into user-owned dependent records.
+        connection.execute("PRAGMA foreign_keys = OFF")
         administrator = None
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -525,6 +527,9 @@ class StateStore:
                     )
                 """)
                 connection.execute("PRAGMA user_version = 35")
+            if version < 36:
+                self._migrate_schema_v36(connection)
+            self._require_foreign_key_integrity(connection)
             connection.execute("COMMIT")
         except Exception:
             if connection.in_transaction:
@@ -2035,6 +2040,41 @@ class StateStore:
             )
         self._require_foreign_key_integrity(connection)
         connection.execute("PRAGMA user_version = 21")
+
+    def _migrate_schema_v36(self, connection) -> None:
+        """Expand visibility without changing child foreign keys or book identities."""
+        original = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='books'"
+        ).fetchone()[0]
+        if "'public'" not in original and re.search(r"CHECK\s*\(\s*visibility\s+IN", original, re.IGNORECASE):
+            self._reject_migration_table(connection, "books__v36")
+            objects = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE tbl_name='books' "
+                "AND type IN ('index', 'trigger') AND sql IS NOT NULL"
+            ).fetchall()
+            expanded = re.sub(
+                r"'authenticated'\s*,\s*'restricted'",
+                "'public', 'authenticated', 'restricted'", original,
+            )
+            if expanded == original:
+                raise sqlite3.IntegrityError("Unrecognized books visibility constraint")
+            connection.execute(re.sub(r'CREATE TABLE\s+["`\[]?books["`\]]?', "CREATE TABLE books__v36", expanded, count=1, flags=re.IGNORECASE))
+            connection.execute("INSERT INTO books__v36 SELECT * FROM books")
+            self._assert_matching_row_counts(connection, "books", "books__v36")
+            connection.execute("DROP TABLE books")
+            connection.execute("ALTER TABLE books__v36 RENAME TO books")
+            for row in objects:
+                connection.execute(row[0])
+        self._add_column_if_missing(
+            connection, "general_settings", "allow_anonymous_reading",
+            "INTEGER NOT NULL DEFAULT 0 CHECK(allow_anonymous_reading IN (0, 1))",
+        )
+        self._add_column_if_missing(
+            connection, "general_settings", "default_book_visibility",
+            "TEXT NOT NULL DEFAULT 'authenticated' "
+            "CHECK(default_book_visibility IN ('public', 'authenticated', 'restricted'))",
+        )
+        connection.execute("PRAGMA user_version = 36")
 
     def _migrate_schema_v22(self, connection, source_version) -> None:
         """Relax the upper bound on the recent reading limit."""
@@ -4136,7 +4176,7 @@ class StateStore:
 
     @staticmethod
     def _validate_book_visibility(visibility: str) -> None:
-        if visibility not in {"authenticated", "restricted"}:
+        if not isinstance(visibility, str) or visibility not in {"public", "authenticated", "restricted"}:
             raise ValueError(f"Unsupported book visibility: {visibility}")
 
     def set_book_visibility(self, book_id: str, visibility: str) -> BookRecord:
@@ -4288,25 +4328,40 @@ class StateStore:
                 (book_id, user_id),
             )
 
+    # Both list queries and direct access use this predicate and two bindings.
+    # Anonymous callers have no user ID; never treat authenticated visibility
+    # as sufficient without an actual authenticated identity.
     _READABLE_BOOK = """
-        books.active = 1 AND (
-            ? = 'admin' OR books.visibility = 'authenticated' OR EXISTS (
-                SELECT 1 FROM book_access
-                WHERE book_access.book_id = books.book_id AND book_access.user_id = ?
+        books.active = 1 AND EXISTS (
+            SELECT 1 FROM (SELECT ? AS role, ? AS user_id) AS reader
+            WHERE (
+                reader.user_id IS NOT NULL AND reader.user_id != '' AND (
+                    reader.role = 'admin' OR books.visibility IN ('public', 'authenticated')
+                    OR EXISTS (
+                        SELECT 1 FROM book_access WHERE book_access.book_id = books.book_id
+                        AND book_access.user_id = reader.user_id
+                    )
+                )
+            ) OR (
+                books.visibility = 'public' AND (
+                    SELECT allow_anonymous_reading FROM general_settings WHERE singleton = 1
+                ) = 1
             )
         )
     """
 
     def visible_books(
-        self, principal: Principal, *, source_format: str | None = None,
+        self, principal: Optional[Principal], *, source_format: str | None = None,
         limit: int = -1, offset: int = 0,
     ) -> tuple[BookRecord, ...]:
+        role = principal.role if principal else None
+        user_id = principal.user_id if principal else None
         with self._connection() as connection:
             rows = connection.execute(
                 f"""SELECT books.* FROM books WHERE {self._READABLE_BOOK}
                     AND (? IS NULL OR source_format = ?)
                     ORDER BY book_id LIMIT ? OFFSET ?""",
-                (principal.role, principal.user_id, source_format, source_format, limit, offset),
+                (role, user_id, source_format, source_format, limit, offset),
             ).fetchall()
         return tuple(self._book_record(row) for row in rows)
 
@@ -4477,24 +4532,12 @@ class StateStore:
                 """, (word_id, word_id))
             return True
 
-    def can_read_book(self, user_id: str, role: str, book_id: str) -> bool:
+    def can_read_book(self, user_id: Optional[str], role: Optional[str], book_id: str) -> bool:
         with self._connection() as connection:
-            book = connection.execute(
-                "SELECT visibility FROM books WHERE book_id = ? AND active = 1",
-                (book_id,),
-            ).fetchone()
-            if book is None:
-                return False
-            if role == "admin" or book["visibility"] == "authenticated":
-                return True
-            grant = connection.execute(
-                """
-                SELECT 1 FROM book_access
-                WHERE book_id = ? AND user_id = ?
-                """,
-                (book_id, user_id),
-            ).fetchone()
-        return grant is not None
+            return connection.execute(
+                f"SELECT 1 FROM books WHERE book_id = ? AND {self._READABLE_BOOK}",
+                (book_id, role if user_id else None, user_id),
+            ).fetchone() is not None
 
     @staticmethod
     def _oidc_scopes(value: Sequence[str]) -> tuple[str, ...]:
@@ -5299,10 +5342,11 @@ class StateStore:
         with self._connection() as connection:
             row = connection.execute(
                 "SELECT recent_reading_limit, reading_insights_rank_limit, "
-                "book_cache_limit, search_index_cache_limit "
+                "book_cache_limit, search_index_cache_limit, allow_anonymous_reading, default_book_visibility "
                 "FROM general_settings WHERE singleton = 1"
             ).fetchone()
         settings = dict(row)
+        settings["allow_anonymous_reading"] = bool(settings["allow_anonymous_reading"])
         settings["book_cache_limit"] = int(settings["book_cache_limit"])
         settings["search_index_cache_limit"] = int(
             settings["search_index_cache_limit"]
@@ -5314,7 +5358,13 @@ class StateStore:
         reading_insights_rank_limit: Optional[int] = None,
         book_cache_limit: Optional[int] = None,
         search_index_cache_limit: Optional[int] = None,
+        allow_anonymous_reading: Optional[bool] = None,
+        default_book_visibility: Optional[str] = None,
     ) -> dict:
+        if allow_anonymous_reading is not None and type(allow_anonymous_reading) is not bool:
+            raise ValueError("Anonymous reading must be a boolean")
+        if default_book_visibility is not None:
+            self._validate_book_visibility(default_book_visibility)
         if recent_reading_limit is not None:
             try:
                 recent_reading_limit = int(recent_reading_limit)
@@ -5344,10 +5394,13 @@ class StateStore:
                         reading_insights_rank_limit = COALESCE(?, reading_insights_rank_limit),
                         book_cache_limit = COALESCE(?, book_cache_limit),
                         search_index_cache_limit = COALESCE(?, search_index_cache_limit),
+                        allow_anonymous_reading = COALESCE(?, allow_anonymous_reading),
+                        default_book_visibility = COALESCE(?, default_book_visibility),
                         updated_at = CURRENT_TIMESTAMP
                     WHERE singleton = 1
                     RETURNING recent_reading_limit, reading_insights_rank_limit,
-                              book_cache_limit, search_index_cache_limit
+                              book_cache_limit, search_index_cache_limit,
+                              allow_anonymous_reading, default_book_visibility
                     """,
                     (
                         recent_reading_limit,
@@ -5357,11 +5410,14 @@ class StateStore:
                             str(search_index_cache_limit)
                             if search_index_cache_limit is not None else None
                         ),
+                        allow_anonymous_reading,
+                        default_book_visibility,
                     ),
                 ).fetchone()
         except OverflowError as exc:
             raise ValueError("Setting is outside the SQLite integer range") from exc
         settings = dict(row)
+        settings["allow_anonymous_reading"] = bool(settings["allow_anonymous_reading"])
         settings["book_cache_limit"] = int(settings["book_cache_limit"])
         settings["search_index_cache_limit"] = int(
             settings["search_index_cache_limit"]
@@ -6341,13 +6397,11 @@ class StateStore:
                     raise PermissionError("ai_not_authorized")
             if not book.active:
                 raise PermissionError("ai_not_authorized")
-            if owner.role != "admin" and book.visibility != "authenticated":
-                book_access = connection.execute(
-                    "SELECT 1 FROM book_access WHERE book_id = ? AND user_id = ?",
-                    (book_id, owner_user_id),
-                ).fetchone()
-                if book_access is None:
-                    raise PermissionError("ai_not_authorized")
+            if connection.execute(
+                f"SELECT 1 FROM books WHERE book_id = ? AND {self._READABLE_BOOK}",
+                (book_id, owner.role, owner_user_id),
+            ).fetchone() is None:
+                raise PermissionError("ai_not_authorized")
             profile_row = connection.execute(
                 "SELECT profile FROM book_ai_profiles WHERE book_id = ?",
                 (book_id,),
@@ -7478,8 +7532,9 @@ class StateStore:
                 INSERT INTO books (
                     book_id, source_path, epub_identifier, source_fingerprint,
                     source_size, source_mtime_ns, source_format, metadata_json, title,
-                    authors_json, active
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                    authors_json, visibility, active
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                    (SELECT default_book_visibility FROM general_settings WHERE singleton = 1), 1)
                 """,
                 (
                     book_id,
