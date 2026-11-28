@@ -989,6 +989,8 @@
   "settings.keyboardNavigation": "Navigasi papan ketik",
   "settings.arrowKeyNavigation": "Gunakan tombol panah kiri dan kanan untuk bernavigasi",
   "settings.spaceKeyNavigation": "Gunakan Spasi untuk halaman atau bab berikutnya",
+  "reader.expandAll": "Perluas semua",
+  "reader.collapseAll": "Ciutkan semua",
   "reader.toggleTocSection": "Perluas atau ciutkan bagian",
   "reader.locateCurrentChapter": "Temukan bab saat ini",
   "reader.locateCurrentSection": "Temukan bagian saat ini",

@@ -989,6 +989,8 @@
   "settings.keyboardNavigation": "Navigation au clavier",
   "settings.arrowKeyNavigation": "Utiliser les flèches gauche et droite pour naviguer",
   "settings.spaceKeyNavigation": "Utiliser Espace pour passer à la page ou au chapitre suivant",
+  "reader.expandAll": "Tout développer",
+  "reader.collapseAll": "Tout réduire",
   "reader.toggleTocSection": "Développer ou réduire la section",
   "reader.locateCurrentChapter": "Repérer le chapitre actuel",
   "reader.locateCurrentSection": "Repérer la section actuelle",

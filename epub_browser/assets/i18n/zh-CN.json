@@ -989,6 +989,8 @@
   "settings.keyboardNavigation": "键盘导航",
   "settings.arrowKeyNavigation": "使用左右方向键导航",
   "settings.spaceKeyNavigation": "使用空格键前往下一页或下一章",
+  "reader.expandAll": "全部展开",
+  "reader.collapseAll": "全部折叠",
   "reader.toggleTocSection": "展开或折叠分组",
   "reader.locateCurrentChapter": "定位当前章节",
   "reader.locateCurrentSection": "定位当前小节",

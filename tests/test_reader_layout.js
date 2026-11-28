@@ -7,6 +7,7 @@ const {
   applyPageWidth,
   allowsReaderNavigationEvent,
   chapterNavigationPresentation,
+  bookNavigationEntries,
   createNavigationBehaviorController,
   desktopChapterSidebarWidth,
   getPaginationPageWidth,
@@ -19,7 +20,7 @@ const {
   syncChapterTocAvailability,
 } = require('../epub_browser/assets/reader-layout.js');
 
-test('PDF chapter navigation localizes page labels and preserves outline markers', () => {
+test('PDF chapter navigation uses the same outline title as the book page', () => {
   const translate = (key, params) => key === 'pdf.page' ? `第 ${params.number} 页` : key;
   const presentation = chapterNavigationPresentation({
     title: 'Page 2',
@@ -29,8 +30,8 @@ test('PDF chapter navigation localizes page labels and preserves outline markers
   }, true, translate);
 
   assert.deepEqual(presentation, {
-    title: '第 2 页',
-    outlineLabels: ['Part I', 'Opening'],
+    title: 'Part I · Opening',
+    outlineLabels: [],
   });
 });
 
@@ -602,7 +603,7 @@ test('reader source TOC preserves groups, deep levels and distinct chapter fragm
   ];
   const context = {
     window: { location: { pathname: '/book/id/chapter_0.html' }, EpubBrowserURL: { publicPath: x => x },
-      EpubReaderLayout: { chapterNavigationPresentation, initBookTocTree: () => ({reveal() {}}) } },
+      EpubReaderLayout: { chapterNavigationPresentation, bookNavigationEntries, initBookTocTree: () => ({reveal() {}}) } },
     document: { getElementById: () => list, createElement: element, dispatchEvent() {} },
     requestBookContent(url, onSuccess) {
       assert.equal(url, '/book/id/toc.json');
@@ -619,4 +620,15 @@ test('reader source TOC preserves groups, deep levels and distinct chapter fragm
   assert.equal(list.children[0].children[0].textContent, 'Part');
   assert.equal(list.children[2].children[0].href, '/book/id/chapter_0.html#one');
   assert.equal(list.children[3].children[0].href, '/book/id/chapter_0.html#two');
+});
+
+test('PDF book navigation lists only outline entries while EPUB keeps all entries',()=>{
+  const entries=[
+    {chapter_index:0,page_label:'1',outline_labels:[]},
+    {chapter_index:2,page_label:'3',outline_labels:['Opening']},
+    {chapter_index:3,page_label:'4',outline_labels:['  ']},
+  ];
+  assert.deepEqual(bookNavigationEntries(entries,true),[entries[1]]);
+  assert.deepEqual(bookNavigationEntries(entries,false),entries);
+  assert.deepEqual(bookNavigationEntries([entries[0]],true),[]);
 });

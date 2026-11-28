@@ -989,6 +989,8 @@
   "settings.keyboardNavigation": "Navegación con el teclado",
   "settings.arrowKeyNavigation": "Usar las flechas izquierda y derecha para navegar",
   "settings.spaceKeyNavigation": "Usar Espacio para ir a la página o al capítulo siguiente",
+  "reader.expandAll": "Expandir todo",
+  "reader.collapseAll": "Contraer todo",
   "reader.toggleTocSection": "Expandir o contraer sección",
   "reader.locateCurrentChapter": "Localizar el capítulo actual",
   "reader.locateCurrentSection": "Localizar la sección actual",

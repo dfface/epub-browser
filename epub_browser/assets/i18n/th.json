@@ -989,6 +989,8 @@
   "settings.keyboardNavigation": "การนำทางด้วยแป้นพิมพ์",
   "settings.arrowKeyNavigation": "ใช้ปุ่มลูกศรซ้ายและขวาเพื่อนำทาง",
   "settings.spaceKeyNavigation": "ใช้ Space เพื่อไปหน้าหรือบทถัดไป",
+  "reader.expandAll": "ขยายทั้งหมด",
+  "reader.collapseAll": "ยุบทั้งหมด",
   "reader.toggleTocSection": "ขยายหรือยุบส่วน",
   "reader.locateCurrentChapter": "ค้นหาบทปัจจุบัน",
   "reader.locateCurrentSection": "ค้นหาส่วนปัจจุบัน",

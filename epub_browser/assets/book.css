@@ -183,6 +183,12 @@ body {
 .book-secondary-actions {
     flex: 1 1 20rem;
     min-width: 0;
+    align-items: stretch;
+}
+
+.book-action-bar .css-btn > i {
+    flex: 0 0 1.2em;
+    text-align: center;
 }
 
 .book-action-bar .css-btn {
@@ -855,11 +861,6 @@ body {
 #toggleShelfBtn {
     box-sizing: border-box;
     min-width: 44px;
-    min-height: 44px;
-    padding: 10px 16px;
-    font-size: 1rem;
-    line-height: 1.4;
-    font-weight: 600;
     white-space: normal;
     max-width: 100%;
 }
@@ -1034,14 +1035,17 @@ body {
         justify-content: center;
     }
 
-    /* Give both action groups their own row once the page is full-width. */
+    /* Keep the primary and secondary groups on the same responsive measure. */
     .book-action-bar {
         display: grid;
         justify-items: center;
+        align-items: stretch;
+        gap: 12px;
     }
 
-    .book-action-bar .continue-reading-control {
-        width: min(100%, 16rem);
+    .book-action-bar .continue-reading-control,
+    .book-secondary-actions {
+        width: min(100%, 32rem);
     }
 
     .book-action-bar #continueReadingBtn {
@@ -1050,17 +1054,23 @@ body {
     }
 
     .book-secondary-actions {
-        display: grid;
-        width: min(100%, 36rem);
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 8.5rem));
-        justify-content: center;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: stretch;
+        gap: 10px;
     }
-}
 
-@media (max-width: 640px) {
-    .book-secondary-actions {
-        width: min(100%, 24rem);
-        grid-template-columns: repeat(auto-fit, minmax(min(100%, max(8rem, 40%)), 1fr));
+    .book-secondary-actions .css-btn {
+        flex: 1 1 12rem;
+        min-width: 0;
+        justify-content: flex-start;
+        text-align: start;
+    }
+
+    .book-action-bar .css-btn {
+        min-height: 48px;
+        line-height: 1.4;
+        overflow-wrap: break-word;
     }
 }
 
@@ -1097,9 +1107,6 @@ body {
         white-space: normal;
     }
 
-    .book-action-bar .continue-reading-control {
-        width: 100%;
-    }
 }
 
 /* Desktop styles */
@@ -1112,9 +1119,6 @@ body {
 #toggleShelfBtn:focus-visible {
     outline: 3px solid var(--button-bg);
     outline-offset: 3px;
-}
-@media (max-width: 768px) {
-    #toggleShelfBtn { flex: 0 1 auto; }
 }
 
 /* Preserve the complete zero-based source TOC depth. */
