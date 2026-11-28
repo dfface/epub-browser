@@ -7,7 +7,6 @@ const {
   applyPageWidth,
   allowsReaderNavigationEvent,
   chapterNavigationPresentation,
-  continuousChapterPresentation,
   createNavigationBehaviorController,
   desktopChapterSidebarWidth,
   getPaginationPageWidth,
@@ -33,19 +32,6 @@ test('PDF chapter navigation localizes page labels and preserves outline markers
     title: '第 2 页',
     outlineLabels: ['Part I', 'Opening'],
   });
-});
-
-test('continuous PDF separators use page semantics while EPUB keeps chapter semantics', () => {
-  const translate = (key, params) => `${key}:${params.number}`;
-
-  assert.deepEqual(
-    continuousChapterPresentation('Page 3', 2, true, translate),
-    { title: 'pdf.page:3', index: 'pdf.page:3' },
-  );
-  assert.deepEqual(
-    continuousChapterPresentation('Chapter title', 2, false, translate),
-    { title: 'Chapter title', index: 'reader.chapterNumber:2' },
-  );
 });
 
 class FakeClassList {

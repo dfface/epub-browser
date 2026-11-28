@@ -183,18 +183,6 @@
         return { title: title, outlineLabels: outlineLabels };
     }
 
-    function continuousChapterPresentation(chapterTitle, chapterIndex, pdf, translate) {
-        var index = Number(chapterIndex) || 0;
-        if (pdf && typeof translate === 'function') {
-            var page = translate('pdf.page', { number: index + 1 });
-            return { title: page, index: page };
-        }
-        return {
-            title: chapterTitle || translate('reader.chapterNumber', { number: index }),
-            index: translate('reader.chapterNumber', { number: index })
-        };
-    }
-
     function isEditableNavigationNode(node) {
         if (!node || typeof node !== 'object') return false;
         var tagName = String(node.tagName || '').toUpperCase();
@@ -558,7 +546,6 @@
         applyDesktopToolbarAutoHide: applyDesktopToolbarAutoHide,
         applyPageWidth: applyPageWidth,
         chapterNavigationPresentation: chapterNavigationPresentation,
-        continuousChapterPresentation: continuousChapterPresentation,
         createNavigationBehaviorController: createNavigationBehaviorController,
         desktopChapterSidebarWidth: desktopChapterSidebarWidth,
         getPaginationPageWidth: getPaginationPageWidth,

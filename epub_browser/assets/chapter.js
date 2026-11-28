@@ -356,6 +356,8 @@ function initScript() {
     var visibleChapterIndex = parseInt(chapter_index, 10);
     var activeReaderChapterRequest = 0;
     var readerChapterXhr = null;
+    var readerChapterLoadingTimer = null;
+    var readerChapterBusyLink = null;
     var continuousChapterXhr = null;
     var activeContinuousChapterRequest = 0;
 
@@ -703,7 +705,7 @@ function initScript() {
     }
     
     function createPages(target) {
-        showLoading();
+        if (!target) showLoading();
         var hasPDFPage = !!content.querySelector('[data-pdf-page-number]');
         if (hasPDFPage) dispatchChapterContentLifecycle('removed', content);
         var original = content.innerHTML;
@@ -711,7 +713,7 @@ function initScript() {
         content.innerHTML = original;
         dispatchChapterContentLifecycle('added', content);
         
-        setTimeout(function() {
+        function layOutPages() {
             content.style.columnCount = 'auto';
             content.style.columnWidth = 'auto';
             content.style.columnFill = 'auto';
@@ -731,14 +733,11 @@ function initScript() {
                 if (target) scrollToPaginationTarget(target);
                 else if (window.location.hash && !hasSearchFragment()) scrollToPaginationTarget({ hash: window.location.hash });
                 if (hasSearchFragment()) scheduleSearchLocate();
-                setTimeout(function() {
-                    hideLoading();
-                    if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {
-                        // Your custom options
-                    });
-                }, 500);
+                hideLoading();
+                if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
             });
-        }, 200);
+        }
+        layOutPages();
     }
 
     function decodeChapterFragment(hash) {
@@ -1244,6 +1243,25 @@ function initScript() {
         options = options || {};
         var target = chapterTargetFromUrl(url);
         if (!target) return false;
+
+        var status = document.getElementById('chapterNavigationStatus');
+        var loading = document.getElementById('chapterNavigationLoading');
+        var error = document.getElementById('chapterNavigationError');
+        var retry = document.getElementById('chapterNavigationRetry');
+        function clearFeedback() {
+            clearTimeout(readerChapterLoadingTimer);
+            readerChapterLoadingTimer = null;
+            if (readerChapterBusyLink) readerChapterBusyLink.removeAttribute('aria-busy');
+            readerChapterBusyLink = null;
+            status.hidden = true;
+            retry.onclick = null;
+        }
+        activeReaderChapterRequest += 1;
+        var requestId = activeReaderChapterRequest;
+        if (readerChapterXhr) readerChapterXhr.abort();
+        readerChapterXhr = null;
+        clearFeedback();
+
         if (!isContinuousScroll && target.index === parseInt(chapter_index, 10)) {
             if (!target.hash) return false;
             closeReaderDrawers(false);
@@ -1259,11 +1277,9 @@ function initScript() {
                 '.continuous-chapter[data-chapter-index="' + target.index + '"]'
             );
             if (loadedChapter) {
-                activeReaderChapterRequest += 1;
-                if (readerChapterXhr) readerChapterXhr.abort();
-                readerChapterXhr = null;
                 updateReaderChapterHistory(target, options);
                 visibleChapterIndex = target.index;
+                syncContinuousNavigation(target.index);
                 selectReadingChapter(target.index);
                 setBookTocActiveChapter(target.index, true);
                 localStorage.setItem(book_hash, 'eb_ci_' + target.index + (hasSearchFragment() ? '' : (target.hash || '')));
@@ -1275,10 +1291,6 @@ function initScript() {
                 return true;
             }
         }
-        activeReaderChapterRequest += 1;
-        var requestId = activeReaderChapterRequest;
-        if (readerChapterXhr) readerChapterXhr.abort();
-
         // A prefetched page is only usable when it still passes the same
         // chapter/book checks as a network response; otherwise fall through.
         var cached = chapterPrefetch ? chapterPrefetch.take(target.index) : null;
@@ -1287,22 +1299,36 @@ function initScript() {
         var xhr = new XMLHttpRequest();
         readerChapterXhr = xhr;
         xhr.open('GET', url, true);
+        xhr.timeout = 15000;
+        if (options.link) {
+            readerChapterBusyLink = options.link;
+            readerChapterBusyLink.setAttribute('aria-busy', 'true');
+        }
+        readerChapterLoadingTimer = setTimeout(function() {
+            if (requestId !== activeReaderChapterRequest) return;
+            status.hidden = false;
+            loading.hidden = false;
+            error.hidden = true;
+            retry.hidden = true;
+        }, 150);
+
+        function finish(success) {
+            if (requestId !== activeReaderChapterRequest) return;
+            readerChapterXhr = null;
+            clearFeedback();
+            if (success) return;
+            status.hidden = false;
+            loading.hidden = true;
+            error.hidden = false;
+            retry.hidden = false;
+            retry.onclick = function() { navigateReaderChapter(url, options); };
+        }
         xhr.onload = function() {
             if (requestId !== activeReaderChapterRequest) return;
-            readerChapterXhr = null;
-            if (xhr.status < 200 || xhr.status >= 300) {
-                showNotification(i18n.t('reader.chapterLoadFailed'), 'warning');
-                return;
-            }
-            if (!applyReaderChapterResponse(xhr.responseText, target, options)) {
-                showNotification(i18n.t('reader.chapterLoadFailed'), 'warning');
-            }
+            finish(xhr.status >= 200 && xhr.status < 300 &&
+                applyReaderChapterResponse(xhr.responseText, target, options));
         };
-        xhr.onerror = function() {
-            if (requestId !== activeReaderChapterRequest) return;
-            readerChapterXhr = null;
-            showNotification(i18n.t('reader.chapterLoadFailed'), 'warning');
-        };
+        xhr.onerror = xhr.ontimeout = function() { finish(false); };
         xhr.send();
         return true;
     }
@@ -1337,9 +1363,10 @@ function initScript() {
         for (var i = 0; i < links.length; i++) {
             links[i].addEventListener('click', function(event) {
                 if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-                if (!isDifferentScrollingChapter(this.href)) return;
+                if (isContinuousScroll) updateContinuousReadingChapter();
+                if (!this.getAttribute('href') || !isDifferentScrollingChapter(this.href)) return;
                 event.preventDefault();
-                navigateReaderChapter(this.href, { history: true });
+                navigateReaderChapter(this.href, { history: true, link: this });
             });
         }
     }
@@ -1873,7 +1900,7 @@ function initScript() {
                     }
                     a.addEventListener('click', function(e) {
                         if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-                        var navigated = navigateReaderChapter(this.href, { history: true });
+                        var navigated = navigateReaderChapter(this.href, { history: true, link: this });
                         if (navigated) e.preventDefault();
                     });
                     li.appendChild(a);
@@ -2084,8 +2111,11 @@ function initScript() {
             }
         }
         updateTocHighlight();
-        if (isContinuousScroll) updateContinuousReadingChapter();
-        
+        if (isContinuousScroll) {
+            updateContinuousReadingChapter();
+            updateContinuousLoaders();
+        }
+
         // 连续滚动模式：检测是否滚动到底部或顶部
         if (isContinuousScroll && !isLoadingChapter && !isPaginationMode) {
             var contentBottom = content.getBoundingClientRect().bottom + window.scrollY;
@@ -2100,7 +2130,7 @@ function initScript() {
             }
             // 只有用户已经向下滚过至少 300px 后再回滚到顶部附近，才加载上一章
             // 避免刚进入页面时轻微滚动就触发 loadPrevChapter 导致位置跳变
-            if (st < 100 && maxScrollTopSoFar >= 300) {
+            if (!isLoadingChapter && st < 100 && maxScrollTopSoFar >= 300) {
                 loadPrevChapter();
             }
         }
@@ -2764,6 +2794,7 @@ function initScript() {
         content.appendChild(initialSection);
         loadedChapters[currentIdx] = true;
         continuousChapterWindow = new EpubChapterWindow(currentIdx, 5);
+        syncContinuousNavigation(currentIdx);
         loadNextChapter();
         setTimeout(function() {
             if (!isLoadingChapter && Object.keys(loadedChapters).length === 1) loadNextChapter();
@@ -2780,8 +2811,9 @@ function initScript() {
     }
 
     function scrollToContinuousChapterTarget(target, chapterSection) {
-        window.scrollTo(0, 0);
+        var requestId = activeReaderChapterRequest;
         window.requestAnimationFrame(function() {
+            if (requestId !== activeReaderChapterRequest || !chapterSection.isConnected) return;
             var destination = chapterSection;
             if (target.hash) {
                 var anchorId = decodeChapterFragment(target.hash);
@@ -2896,6 +2928,7 @@ function initScript() {
         if (isNaN(currentIdx)) return;
         if (currentIdx === visibleChapterIndex) return;
         visibleChapterIndex = currentIdx;
+        syncContinuousNavigation(currentIdx);
         var currentSection = content.querySelector(
             '.continuous-chapter[data-chapter-index="' + currentIdx + '"]'
         );
@@ -2909,45 +2942,97 @@ function initScript() {
         setBookTocActiveChapter(currentIdx, true);
     }
     
+    function syncContinuousNavigation(index) {
+        var total = Number(content.getAttribute('data-total-chapters'));
+        function update(id, target) {
+            var link = document.getElementById(id);
+            if (!link) return;
+            var available = target >= 0 && target < total;
+            if (available) link.setAttribute('href', getChapterUrl(target));
+            else link.removeAttribute('href');
+            link.setAttribute('aria-disabled', available ? 'false' : 'true');
+        }
+        update('readerPreviousChapter', index - 1);
+        update('mobilePrevChapter', index - 1);
+        update('readerNextChapter', index + 1);
+        update('mobileNextChapter', index + 1);
+    }
+
     function getChapterUrl(idx) {
         return window.EpubBrowserURL.publicPath('/book/' + book_hash + '/chapter_' + idx + '.html');
     }
     
+    function updateContinuousLoaders() {
+        var bounds = content.getBoundingClientRect();
+        var next = document.getElementById('scrollLoader');
+        var previous = document.getElementById('scrollLoaderTop');
+        if (next) next.hidden = bounds.bottom - next.offsetHeight > window.innerHeight + 1;
+        if (previous) previous.hidden = bounds.top < -1;
+    }
+
+    function createContinuousLoader(id, message, retryLoad) {
+        var loader = document.createElement('div');
+        loader.className = 'continuous-scroll-loader';
+        loader.id = id;
+        loader.hidden = true;
+        loader.innerHTML = '<span role="status"></span><button type="button" hidden></button>';
+        var label = loader.querySelector('span');
+        label.setAttribute('data-i18n', message);
+        label.textContent = i18n.t(message);
+        var retry = loader.querySelector('button');
+        retry.setAttribute('data-i18n', 'annotations.retry');
+        retry.textContent = i18n.t('annotations.retry');
+        retry.onclick = function() {
+            if (isLoadingChapter) return;
+            loader.remove();
+            retryLoad();
+        };
+        return loader;
+    }
+
+    function failContinuousLoad(loader) {
+        isLoadingChapter = false;
+        var label = loader.querySelector('span');
+        label.setAttribute('data-i18n', 'reader.chapterLoadFailed');
+        label.textContent = i18n.t('reader.chapterLoadFailed');
+        loader.querySelector('button').hidden = false;
+        updateContinuousLoaders();
+    }
+
     function loadNextChapter() {
-        var currentIdx = parseInt(chapter_index, 10);
         var totalChapters = parseInt(content.getAttribute('data-total-chapters'), 10) || 999;
-        var nextIdx = currentIdx + 1;
         
         // 找到最后已加载章节的下一章
-        var maxLoaded = currentIdx;
+        var maxLoaded = -1;
         for (var key in loadedChapters) {
             if (loadedChapters.hasOwnProperty(key)) {
                 var k = parseInt(key, 10);
                 if (k > maxLoaded) maxLoaded = k;
             }
         }
-        nextIdx = maxLoaded + 1;
+        var nextIdx = maxLoaded + 1;
         
         if (nextIdx >= totalChapters || loadedChapters[nextIdx]) return;
+        if (isLoadingChapter || document.getElementById('scrollLoader')) return;
         
         isLoadingChapter = true;
         
-        // 在内容末尾插入加载指示器
-        var loader = document.createElement('div');
-        loader.className = 'continuous-scroll-loader';
-        loader.id = 'scrollLoader';
-        loader.innerHTML = '<span class="chapter-loading-label"></span><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
-        loader.querySelector('.chapter-loading-label').textContent = i18n.t('reader.loadingNextChapter');
+        var loader = createContinuousLoader('scrollLoader', 'reader.loadingNextChapter', loadNextChapter);
         content.appendChild(loader);
-        
+        var revealTimer = setTimeout(function() {
+            if (loader.isConnected) updateContinuousLoaders();
+        }, 150);
+
         var xhr = new XMLHttpRequest();
         activeContinuousChapterRequest += 1;
         var requestId = activeContinuousChapterRequest;
         continuousChapterXhr = xhr;
         xhr.open('GET', getChapterUrl(nextIdx), true);
+        xhr.timeout = 15000;
         xhr.onload = function() {
             if (requestId !== activeContinuousChapterRequest) return;
             continuousChapterXhr = null;
+            clearTimeout(revealTimer);
             var appendedChapter = false;
             if (xhr.status >= 200 && xhr.status < 300) {
                 // 从返回的 HTML 中提取正文内容
@@ -2956,11 +3041,8 @@ function initScript() {
                 tempDiv.innerHTML = html;
                 var chapterContent = tempDiv.querySelector('#eb-content');
                 
-                // 移除加载指示器
-                var loaderEl = document.getElementById('scrollLoader');
-                if (loaderEl) loaderEl.remove();
-                
                 if (chapterContent) {
+                    loader.remove();
                     // 提取章节标题
                     var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
                     if (!chapterTitle) {
@@ -2975,15 +3057,6 @@ function initScript() {
                     chapterSection.className = 'continuous-chapter';
                     chapterSection.setAttribute('data-chapter-index', nextIdx);
                     chapterSection.setAttribute('data-chapter-title', chapterTitle || '');
-                    var separator = document.createElement('div');
-                    separator.className = 'chapter-separator';
-                    separator.innerHTML = '<div class="chapter-sep-title"></div><div class="chapter-sep-index"></div>';
-                    var chapterPresentation = window.EpubReaderLayout.continuousChapterPresentation(
-                        chapterTitle, nextIdx, Boolean(window.EpubPDFConfig), i18n.t.bind(i18n)
-                    );
-                    separator.querySelector('.chapter-sep-title').textContent = chapterPresentation.title;
-                    separator.querySelector('.chapter-sep-index').textContent = chapterPresentation.index;
-                    chapterSection.appendChild(separator);
                     
                     // 追加章节内容
                     var childNodes = chapterContent.childNodes;
@@ -3008,28 +3081,27 @@ function initScript() {
                     }
                 }
             }
-            isLoadingChapter = false;
-            if (appendedChapter) {
-                refreshContinuousAnnotations();
-                ensureContinuousScrollBuffer();
+            if (!appendedChapter) {
+                failContinuousLoad(loader);
+                return;
             }
+            isLoadingChapter = false;
+            refreshContinuousAnnotations();
+            ensureContinuousScrollBuffer();
         };
-        xhr.onerror = function() {
+        xhr.onerror = xhr.ontimeout = function() {
             if (requestId !== activeContinuousChapterRequest) return;
             continuousChapterXhr = null;
-            var loaderEl = document.getElementById('scrollLoader');
-            if (loaderEl) loaderEl.remove();
-            isLoadingChapter = false;
+            clearTimeout(revealTimer);
+            failContinuousLoad(loader);
         };
         xhr.send();
     }
     
     function loadPrevChapter() {
         if (!loadPreviousOnScroll) return;
-        var currentIdx = parseInt(chapter_index, 10);
-        
         // 找到最先已加载章节的前一章
-        var minLoaded = currentIdx;
+        var minLoaded = Infinity;
         for (var key in loadedChapters) {
             if (loadedChapters.hasOwnProperty(key)) {
                 var k = parseInt(key, 10);
@@ -3038,30 +3110,27 @@ function initScript() {
         }
         var prevIdx = minLoaded - 1;
         
-        if (prevIdx < 0 || loadedChapters[prevIdx]) return;
+        if (!isFinite(prevIdx) || prevIdx < 0 || loadedChapters[prevIdx]) return;
+        if (isLoadingChapter || document.getElementById('scrollLoaderTop')) return;
         
         isLoadingChapter = true;
         
-        // 在内容顶部插入加载指示器
-        var loader = document.createElement('div');
-        loader.className = 'continuous-scroll-loader';
-        loader.id = 'scrollLoaderTop';
-        loader.innerHTML = '<span class="chapter-loading-label"></span><span class="loading-dot"></span><span class="loading-dot"></span><span class="loading-dot"></span>';
-        loader.querySelector('.chapter-loading-label').textContent = i18n.t('reader.loadingPreviousChapter');
-        if (content.firstChild) {
-            content.insertBefore(loader, content.firstChild);
-        } else {
-            content.appendChild(loader);
-        }
-        
+        var loader = createContinuousLoader('scrollLoaderTop', 'reader.loadingPreviousChapter', loadPrevChapter);
+        content.insertBefore(loader, content.firstChild);
+        var revealTimer = setTimeout(function() {
+            if (loader.isConnected) updateContinuousLoaders();
+        }, 150);
+
         var xhr = new XMLHttpRequest();
         activeContinuousChapterRequest += 1;
         var requestId = activeContinuousChapterRequest;
         continuousChapterXhr = xhr;
         xhr.open('GET', getChapterUrl(prevIdx), true);
+        xhr.timeout = 15000;
         xhr.onload = function() {
             if (requestId !== activeContinuousChapterRequest) return;
             continuousChapterXhr = null;
+            clearTimeout(revealTimer);
             var appendedChapter = false;
             if (xhr.status >= 200 && xhr.status < 300) {
                 var html = xhr.responseText;
@@ -3069,10 +3138,9 @@ function initScript() {
                 tempDiv.innerHTML = html;
                 var chapterContent = tempDiv.querySelector('#eb-content');
                 
-                var loaderEl = document.getElementById('scrollLoaderTop');
-                if (loaderEl) loaderEl.remove();
-                
                 if (chapterContent) {
+                    var viewportAnchor = EpubViewportAnchor.capture(content);
+                    loader.remove();
                     var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
                     if (!chapterTitle) {
                         var pageTitle = tempDiv.querySelector('title');
@@ -3087,23 +3155,12 @@ function initScript() {
                     chapterSection.setAttribute('data-chapter-index', prevIdx);
                     chapterSection.setAttribute('data-chapter-title', chapterTitle || '');
                     
-                    // 章节分隔符放在新内容的末尾
-                    var separator = document.createElement('div');
-                    separator.className = 'chapter-separator';
-                    separator.innerHTML = '<div class="chapter-sep-title"></div><div class="chapter-sep-index"></div>';
-                    var chapterPresentation = window.EpubReaderLayout.continuousChapterPresentation(
-                        chapterTitle, prevIdx, Boolean(window.EpubPDFConfig), i18n.t.bind(i18n)
-                    );
-                    separator.querySelector('.chapter-sep-title').textContent = chapterPresentation.title;
-                    separator.querySelector('.chapter-sep-index').textContent = chapterPresentation.index;
                     
                     var childNodes = chapterContent.childNodes;
                     for (var i = 0; i < childNodes.length; i++) {
                         chapterSection.appendChild(childNodes[i].cloneNode(true));
                     }
-                    chapterSection.appendChild(separator);
                     
-                    var viewportAnchor = EpubViewportAnchor.capture(content);
                     // 插入到内容最前面
                     if (content.firstChild) {
                         content.insertBefore(chapterSection, content.firstChild);
@@ -3124,15 +3181,18 @@ function initScript() {
                     appendedChapter = true;
                 }
             }
+            if (!appendedChapter) {
+                failContinuousLoad(loader);
+                return;
+            }
             isLoadingChapter = false;
-            if (appendedChapter) refreshContinuousAnnotations();
+            refreshContinuousAnnotations();
         };
-        xhr.onerror = function() {
+        xhr.onerror = xhr.ontimeout = function() {
             if (requestId !== activeContinuousChapterRequest) return;
             continuousChapterXhr = null;
-            var loaderEl = document.getElementById('scrollLoaderTop');
-            if (loaderEl) loaderEl.remove();
-            isLoadingChapter = false;
+            clearTimeout(revealTimer);
+            failContinuousLoad(loader);
         };
         xhr.send();
     }
