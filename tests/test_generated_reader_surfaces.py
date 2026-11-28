@@ -383,10 +383,9 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         start = script.index('function navigateReaderChapter(')
         navigation = script[start:script.index('\n    function applyReaderChapterResponse(', start)]
 
-        self.assertEqual(navigation.count('activeReaderChapterRequest += 1;'), 2)
         self.assertLess(
-            navigation.rindex('activeReaderChapterRequest += 1;'),
-            navigation.index('chapterPrefetch.take('),
+            navigation.index('activeReaderChapterRequest += 1;'),
+            navigation.index('if (isContinuousScroll)'),
         )
         self.assertIn('if (readerChapterXhr) readerChapterXhr.abort();', navigation)
 
@@ -2433,10 +2432,10 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
 
         self.assertNotRegex(script, r"showNotification\(\s*['\"]")
         self.assertNotRegex(script, r"confirm\(\s*['\"]")
-        self.assertIn("i18n.t('reader.loadingNextChapter'", script)
-        self.assertIn("i18n.t('reader.chapterLoadFailed'", script)
+        self.assertIn("'reader.loadingNextChapter'", script)
+        self.assertIn('data-i18n="reader.chapterLoadFailed"', Path("epub_browser/reader_pages.py").read_text())
         self.assertIn("i18n.t('settings.saved'", script)
-        self.assertIn('continuousChapterPresentation(', script)
+        self.assertNotIn('continuousChapterPresentation(', script)
         self.assertIn('i18n.t.bind(i18n)', script)
         self.assertIn("i18n.t('settings.continuousScrollTip'", script)
 
@@ -2479,7 +2478,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         toc_start = script.index("a.addEventListener('click', function(e) {")
         toc_end = script.index('\n                    });', toc_start)
         book_toc = script[toc_start:toc_end]
-        self.assertIn('navigateReaderChapter(this.href, { history: true });', book_toc)
+        self.assertIn('navigateReaderChapter(this.href, { history: true, link: this });', book_toc)
         self.assertIn('if (navigated) e.preventDefault();', book_toc)
 
     def test_ajax_reader_navigation_handles_continuous_and_pagination_modes(self):
@@ -2497,7 +2496,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         toc_start = script.index("a.addEventListener('click', function(e) {")
         toc_end = script.index('\n                    });', toc_start)
         book_toc = script[toc_start:toc_end]
-        self.assertIn('navigateReaderChapter(this.href, { history: true });', book_toc)
+        self.assertIn('navigateReaderChapter(this.href, { history: true, link: this });', book_toc)
         self.assertIn('if (navigated) e.preventDefault();', book_toc)
         self.assertNotIn('window.scrollTo({top: targetTop, behavior:', book_toc)
 

@@ -63,6 +63,9 @@ _BOOK_SEARCH_BODY = '''
 # variables, box shadows, or rounded corners. Keep this minimal on purpose:
 # it is a fallback, not a second full-featured reader.
 _KINDLE_READER_CSS = """\
+#kChapterLoading{display:none;position:fixed;top:3.5em;left:15%;right:15%;text-align:center;
+  z-index:20;padding:.35em;margin:0}
+
 body{margin:0;padding:0;background-color:#fff!important;color:#111!important;font-family:Georgia,"Times New Roman",serif;font-size:16px;line-height:1.65}
 body.sepia{background-color:#f3e9d2!important;color:#3c2f1a!important}
 body.dark{background-color:#161616!important;color:#c9c9c9!important}
@@ -150,6 +153,29 @@ body.dark .k-toc .sec{color:#9a9a9a}
 """
 
 _KINDLE_READER_JS = r"""
+var kLoadingTimer;
+function kSetChapterLoading(pending) {
+  var status = document.getElementById('kChapterLoading');
+  if (!status) return;
+  window.clearTimeout(kLoadingTimer);
+  status.style.display = 'none';
+  if (pending) {
+    kLoadingTimer = window.setTimeout(function () { status.style.display = 'block'; }, 150);
+  }
+}
+if (document.getElementById('kChapterLoading')) {
+  window.onpageshow = function () { kSetChapterLoading(false); };
+  document.onclick = function (event) {
+    event = event || window.event;
+    if (!event || event.defaultPrevented || event.button || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+    var link = event.target;
+    while (link && link.tagName !== 'A') link = link.parentNode;
+    if (!link || (link.target && link.target !== '_self')) return;
+    if (/^kindle_chapter(?:_[0-9]+)?\.html(?:#.*)?$/.test(link.getAttribute('href') || '')) {
+      kSetChapterLoading(true);
+    }
+  };
+}
 function getCookie(key) {
   var cookies = document.cookie.split('; ');
   for (var i = 0; i < cookies.length; i++) {
@@ -431,6 +457,7 @@ _KINDLE_CHAPTER_JS = """
     var link = dir < 0 ? previous : next;
     if (link) {
       save();
+      kSetChapterLoading(true);
       window.location.href = link.href + (dir < 0 ? '#kEnd' : '');
     }
   }
@@ -598,11 +625,14 @@ function kPdfShow(index) {
   var image = document.getElementById('kPdfPage');
   var error = document.getElementById('kPdfError');
   if (image) {
+    kSetChapterLoading(true);
     image.onload = function () {
+      kSetChapterLoading(false);
       if (error) error.style.display = 'none';
       kPdfCenterImage();
     };
     image.onerror = function () {
+      kSetChapterLoading(false);
       if (error) error.style.display = 'block';
     };
     image.alt = kPdfPageAlt(index);
@@ -1085,6 +1115,7 @@ def _kindle_i18n_messages(language, tools=None):
     keys = {
         "library": "library.title",
         "contents": "reader.tableOfContents",
+        "loadingContent": "reader.loadingContent",
         "settings": "reader.settings",
         "done": "reader.closeSettings",
         "pageMode": "settings.paginationMode",
@@ -1801,6 +1832,9 @@ if (window.EpubBrowserCacheBoundary) {
 <script src="/assets/reader-layout.js" defer></script>
 <script>window.EpubBrowserBookFeatureAssets={book_feature_assets};</script>
 <script src="/assets/book-feature-loader.js" defer></script>
+<div class="chapter-navigation-status" id="bookNavigationStatus" hidden>
+    <span role="status" data-i18n="reader.loadingContent">Loading content</span>
+</div>
 <script src="/assets/book.js?v=13" defer></script>
 {book_search_script}
 {ai_reading_script}
@@ -2113,6 +2147,7 @@ function kChapterJump() {{
   var input = document.getElementById('kChapterJump');
   var chapter = parseInt(input ? input.value : '', 10);
   if (chapter >= 1 && chapter <= {len(self.chapters)}) {{
+    kSetChapterLoading(true);
     window.location.href = 'kindle_chapter_' + (chapter - 1) + '.html';
   }}
   return false;
@@ -2170,6 +2205,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
 </section>
 </main>
 {render_kindle_dock(self.urls, locale or "en", tools=tools)}
+<p class="k-surface" id="kChapterLoading" role="status" data-i18n="loadingContent">{html.escape(kindle_labels["loadingContent"])}</p>
 <script>
 {_KINDLE_READER_JS}
 {kindle_locale_script(lambda code: _kindle_i18n_messages(code, tools), use_initial_locale=locale is not None)}
@@ -2227,6 +2263,7 @@ function kPdfTocJump() {{
   var input = document.getElementById('kPdfTocPage');
   var page = parseInt(input ? input.value : '', 10);
   if (page >= 1 && page <= {page_count}) {{
+    kSetChapterLoading(true);
     window.location.href = 'kindle_chapter.html#page-' + page;
   }}
   return false;
@@ -2290,6 +2327,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
 </section>
 </main>
 {render_kindle_dock(self.urls, locale or "en")}
+<p class="k-surface" id="kChapterLoading" role="status" data-i18n="loadingContent">{html.escape(kindle_labels["loadingContent"])}</p>
 <script>
 {_KINDLE_READER_JS}
 {kindle_locale_script(_kindle_i18n_messages, use_initial_locale=locale is not None)}
@@ -2428,6 +2466,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <p data-i18n="bookmarkHelp">{html.escape(kindle_labels["bookmarkHelp"])}</p>
     <a class="k-control" href="#" onclick="kPdfToggleSettings();return false;" data-i18n="done">{done}</a>
 </div>
+<p class="k-surface" id="kChapterLoading" role="status" data-i18n="loadingContent">{html.escape(kindle_labels["loadingContent"])}</p>
 <script>
 {_KINDLE_READER_JS}
 {locale_script}
@@ -2530,6 +2569,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
         {next_link.replace('id="kNext" class="next"', 'class="k-control"')}
     </div>
 </div>
+<p class="k-surface" id="kChapterLoading" role="status" data-i18n="loadingContent">{html.escape(kindle_labels["loadingContent"])}</p>
 <script>
 {_KINDLE_READER_JS}
 {kindle_locale_script(_kindle_i18n_messages, use_initial_locale=locale is not None)}
@@ -3014,6 +3054,11 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
             {ai_followup_button}
         </div>
         <div class="eb-content-container" id="eb-content-container" data-id="eb-content-container">
+            <div class="chapter-navigation-status" id="chapterNavigationStatus" hidden>
+                <span role="status" id="chapterNavigationLoading" data-i18n="reader.loadingContent">Loading content</span>
+                <span role="status" id="chapterNavigationError" data-i18n="reader.chapterLoadFailed" hidden>Could not load this chapter. Please try again.</span>
+                <button type="button" id="chapterNavigationRetry" data-i18n="annotations.retry" hidden>Retry</button>
+            </div>
             <div class="content-loading is-visible" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
                 <div class="loading-spinner"></div>
             </div>

@@ -22,6 +22,8 @@ for (const mode of ['scrolling', 'pagination', 'continuous']) {
             scrollToPaginationTarget: t => calls.push(t), scrollToChapterTarget: t => calls.push(t),
             scrollToContinuousChapterTarget: t => calls.push(t),
             content: {querySelector: () => section}, activeReaderChapterRequest: 0, readerChapterXhr: null,
+            readerChapterLoadingTimer: null, readerChapterBusyLink: null, clearTimeout,
+            document: {getElementById: () => ({})}, syncContinuousNavigation() {},
             selectReadingChapter: () => {}, setBookTocActiveChapter: () => {},
             localStorage: {setItem: () => {}}, book_hash: 'demo', hasSearchFragment: () => false,
             announceReadingSessionChapter: () => {},
@@ -45,14 +47,14 @@ for (const mode of ['scrolling', 'pagination', 'continuous']) {
         const calls = [];
         const anchor = {id: '注', offsetLeft: 800, scrollIntoView: () => calls.push('anchor'),
             getBoundingClientRect: () => ({top: 500})};
-        const root = {querySelectorAll: () => [anchor], setAttribute: () => {}, focus: () => {}};
-        const context = vm.createContext({content: root, pageWidth: 400,
+        const root = {isConnected: true, querySelectorAll: () => [anchor], setAttribute: () => {}, focus: () => {}};
+        const context = vm.createContext({content: root, pageWidth: 400, activeReaderChapterRequest: 0,
             window: {requestAnimationFrame: f => f(), scrollY: 0, scrollTo: (...args) => calls.push(args)},
             showPage: page => calls.push(page), hasSearchFragment: () => false});
         const name = mode === 'pagination' ? 'scrollToPaginationTarget' :
             mode === 'continuous' ? 'scrollToContinuousChapterTarget' : 'scrollToChapterTarget';
         vm.runInContext(readerFunction('decodeChapterFragment') + readerFunction(name), context);
-        context[name]({hash: '#%E6%B3%A8'}, root);
+        context[name]({index: 2, hash: '#%E6%B3%A8'}, root);
         assert.ok(mode === 'pagination' ? calls.includes(2) :
             mode === 'scrolling' ? calls.includes('anchor') : calls.some(v => v[0]?.top === 420));
     });

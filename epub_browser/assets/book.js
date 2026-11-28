@@ -40,6 +40,29 @@ function deleteKeysByPrefix(prefix) {
 }
 
 function initScript() {
+    var navigationStatus = document.getElementById('bookNavigationStatus');
+    if (navigationStatus) {
+        var pendingLink = null;
+        var navigationTimer = null;
+        window.addEventListener('pageshow', function() {
+            clearTimeout(navigationTimer);
+            if (pendingLink) pendingLink.removeAttribute('aria-busy');
+            pendingLink = null;
+            navigationStatus.hidden = true;
+        });
+        document.addEventListener('click', function(event) {
+            if (event.defaultPrevented || event.button !== 0 ||
+                event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+            var link = event.target.closest('a.chapter-link, a#continueReadingBtn');
+            if (!link || link.hasAttribute('download') || (link.target && link.target !== '_self') ||
+                !link.getAttribute('href') || link.getAttribute('href').charAt(0) === '#') return;
+            clearTimeout(navigationTimer);
+            if (pendingLink) pendingLink.removeAttribute('aria-busy');
+            pendingLink = link;
+            link.setAttribute('aria-busy', 'true');
+            navigationTimer = setTimeout(function() { navigationStatus.hidden = false; }, 150);
+        });
+    }
     var path = window.location.pathname;
     var pathParts = path.split('/');
     pathParts = pathParts.filter(function(item) { return item !== ""; });
