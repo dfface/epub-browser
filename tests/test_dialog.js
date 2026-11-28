@@ -110,3 +110,29 @@ test('prompt preserves its draft on a failed async save and closes after retry',
   confirm.listeners.click();
   assert.equal(await pending,'My draft');
 });
+
+test('a confirmation above a shared panel returns focus to that panel', async () => {
+  const document = fakeDocument();
+  const api = loadDialog(document);
+  const trigger = document.createElement('button');
+  document.body.appendChild(trigger);
+  trigger.focus();
+
+  const panel = api.panel({ title: 'Local storage', closeText: 'Close' });
+  const clear = document.createElement('button');
+  panel.body.appendChild(clear);
+  clear.focus();
+
+  const pending = api.confirm({ title: 'Clear caches?', destructive: true });
+  const confirm = document.body.children.at(-1);
+  assert.equal(panel.modal.inert, true);
+  confirm.children[1].children.at(-1).children[0].listeners.click();
+  assert.equal(await pending, false);
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(panel.modal.inert, false);
+  assert.equal(document.activeElement, clear);
+
+  panel.closeButton.listeners.click();
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(document.activeElement, trigger);
+});

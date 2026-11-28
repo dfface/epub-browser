@@ -47,6 +47,8 @@ async function networkFirst(request, fallbackUrl) {
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) return;
 
+    if (event.request.headers.get('X-EPUB-Browser-Cache') === 'book') return;
+
     if (isMutableManifest(event.request)) {
         event.respondWith(networkFirst(event.request));
         return;

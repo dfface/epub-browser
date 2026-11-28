@@ -70,6 +70,7 @@ async function fetchWithWorker(worker, pathname) {
   const request = {
     method: 'GET',
     mode: 'cors',
+    headers: new Headers(),
     url: `https://library.test${pathname}`,
   };
   let response;
@@ -135,6 +136,7 @@ test('network responses are cloned before the page consumes their body', async (
   const request = {
     method: 'GET',
     mode: 'cors',
+    headers: new Headers(),
     url: 'https://library.test/book/demo/chapter_1.html',
   };
   let responsePromise;

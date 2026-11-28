@@ -23,7 +23,7 @@ from .server_chrome import (
     SERVER_LOCALE_SCRIPT,
     render_account_panel,
     render_vocabulary_assets,
-    render_vocabulary_navigation,
+    render_app_nav_links,
 )
 from .source_format import EPUB_FORMAT, PDF_FORMAT
 from .urls import SiteURLs, rewrite_root_urls
@@ -1180,7 +1180,7 @@ class ReaderPageRenderer:
         self, *, book_id, metadata: BookMetadata, chapters, toc, description,
         asset_manifest: PublishedAssets, deployment_mode, urls=None, reporter=None,
         kindle_support=False, ai_reading_enabled=True, pdf_pages=(),
-        pdf_encrypted=False, pdf_has_extractable_text=False,
+        pdf_encrypted=False, pdf_has_extractable_text=False, browser_cache_version="",
     ):
         if deployment_mode not in {"ssg", "server"}:
             raise ValueError(f"Unsupported deployment mode: {deployment_mode}")
@@ -1202,6 +1202,7 @@ class ReaderPageRenderer:
         self.reporter = reporter or Reporter(False)
         self.kindle_support = bool(kindle_support)
         self.ai_reading_enabled = ai_reading_enabled
+        self.browser_cache_version = browser_cache_version
         self._pdf_pages = pdf_pages
         self._pdf_encrypted = pdf_encrypted
         self._pdf_has_extractable_text = pdf_has_extractable_text
@@ -1216,6 +1217,7 @@ class ReaderPageRenderer:
         urls: SiteURLs,
         deployment_mode: str,
         navigation=None,
+        browser_cache_version="",
     ) -> "ReaderPageRenderer":
         """Adapt PDF page metadata to the shared reader."""
         if navigation is None:
@@ -1233,6 +1235,7 @@ class ReaderPageRenderer:
             asset_manifest=asset_manifest, urls=urls, deployment_mode=deployment_mode,
             pdf_pages=tuple(metadata.pages), pdf_encrypted=bool(metadata.encrypted),
             pdf_has_extractable_text=bool(metadata.has_extractable_text),
+            browser_cache_version=browser_cache_version,
         )
 
     @staticmethod
@@ -1302,6 +1305,9 @@ class ReaderPageRenderer:
             + json.dumps(urls, separators=(",", ":"))
             + ';</script>'
         )
+
+    def _browser_cache_version_attribute(self):
+        return html.escape(getattr(self, "browser_cache_version", ""), quote=True)
 
     def render_index(self, initial_book_review=None):
         """创建章节索引页面"""
@@ -1512,6 +1518,7 @@ class ReaderPageRenderer:
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
     <link rel="stylesheet" href="/assets/book.css?v=13">
+    <link rel="stylesheet" href="/assets/book-cache.css">
     <link rel="stylesheet" href="/assets/toc-tree.css">
     {book_search_stylesheet}
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
@@ -1532,13 +1539,7 @@ class ReaderPageRenderer:
 <header class="app-header">
     <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
         <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
-        <div class="app-nav-links">
-            <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-layer-group" aria-hidden="true"></i><span data-i18n="book.shelf">Shelf</span></button>
-            <button type="button" class="app-nav-link" id="bookAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="book.annotations">Annotations</span></button>
-            {render_vocabulary_navigation(self.book_hash) if self.deployment_mode == "server" else ""}
-            {reading_insights_navigation}
-            {ai_reading_navigation}
-        </div>
+        {render_app_nav_links(self.deployment_mode, "bookAnnotationsBtn", book_id=self.book_hash, extra=reading_insights_navigation + ai_reading_navigation)}
         <div class="app-nav-actions">
             {server_locale_control}
             <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="book.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="book.theme">Theme</span></button>
@@ -1548,6 +1549,7 @@ class ReaderPageRenderer:
 </header>
 <div class="container">
     <div class="book-info-card" data-id="book-info-card">
+        <div class="book-info-summary">
             <div class="book-info-cover-wrap">
                 <div class="book-info-cover">
                     <img src="{html.escape(self.get_metadata().cover or '', quote=True)}" alt="">
@@ -1572,20 +1574,30 @@ class ReaderPageRenderer:
                 index_html += """<span class="book-tag">{}</span>""".format(tag_text)
         index_html += f"""
                 </div>
-                <div class="css-controls clearReadingProgress">
-                    <div class="continue-reading-control" id="continueReadingControl">
-                        <a class="css-btn primary" id="continueReadingBtn" href="#" aria-label="Start reading" data-i18n-aria-label="book.startReading"><i class="fas fa-book-open"></i><span id="continueReadingBtnText" data-i18n="book.startReading">Start reading</span></a>
-                        <button type="button" class="continue-reading-menu-toggle" id="continueReadingMenuToggle" aria-label="More reading actions" data-i18n-aria-label="book.moreReadingActions" aria-expanded="false" aria-controls="clearReadingProgressMenu" hidden><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
-                        <div class="continue-reading-menu" id="clearReadingProgressMenu" hidden>
-                            <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" data-i18n-aria-label="book.clearReadingProgress" hidden><i class="fas fa-eraser" aria-hidden="true"></i><span data-i18n="book.clear">Clear</span></button>
-                        </div>
-                    </div>
-                    {ai_book_chat_button}
-                    <button type="button" class="css-btn secondary" id="toggleShelfBtn" aria-pressed="false"><i class="fas fa-layer-group" aria-hidden="true"></i><span id="toggleShelfBtnText" aria-live="polite" data-i18n="book.addToShelf">Add to Shelf</span></button>
-                    {book_search_trigger}
-                    {book_review_trigger}
+            </div>
+        </div>
+        <div class="book-action-bar" role="group" aria-label="Book actions" data-i18n-aria-label="book.actions">
+            <div class="continue-reading-control" id="continueReadingControl">
+                <a class="css-btn primary" id="continueReadingBtn" href="#" aria-label="Start reading" data-i18n-aria-label="book.startReading"><i class="fas fa-book-open"></i><span id="continueReadingBtnText" data-i18n="book.startReading">Start reading</span></a>
+                <button type="button" class="continue-reading-menu-toggle" id="continueReadingMenuToggle" aria-label="More reading actions" data-i18n-aria-label="book.moreReadingActions" aria-expanded="false" aria-controls="clearReadingProgressMenu" hidden><i class="fas fa-chevron-down" aria-hidden="true"></i></button>
+                <div class="continue-reading-menu" id="clearReadingProgressMenu" hidden>
+                    <button type="button" class="continue-reading-menu-item" id="clearReadingProgressBtn" aria-label="Clear reading progress" data-i18n-aria-label="book.clearReadingProgress" hidden><i class="fas fa-eraser" aria-hidden="true"></i><span data-i18n="book.clear">Clear</span></button>
                 </div>
             </div>
+            <div class="book-secondary-actions">
+                <button type="button" class="css-btn secondary" id="toggleShelfBtn" aria-pressed="false"><i class="fas fa-layer-group" aria-hidden="true"></i><span id="toggleShelfBtnText" aria-live="polite" data-i18n="book.addToShelf">Add to Shelf</span></button>
+                {ai_book_chat_button}
+                {book_search_trigger}
+                {book_review_trigger}
+                <button type="button" class="css-btn secondary" data-book-cache-trigger
+                    data-book-id="{book_id_attribute}" data-book-title="{book_title_attribute}"
+                    data-book-format="{'pdf' if is_pdf_book else 'epub'}"
+                    data-book-version="{self._browser_cache_version_attribute()}"
+                    data-chapter-count="{len(self.chapters)}" aria-haspopup="dialog" hidden>
+                    <i class="fas fa-download" aria-hidden="true"></i><span data-i18n="bookCache.save">Cache on this device</span>
+                </button>
+            </div>
+        </div>
     </div>
     {book_review_display}
     {book_review_initial_data}
@@ -1835,6 +1847,9 @@ if (window.EpubBrowserCacheBoundary) {
 <div class="chapter-navigation-status" id="bookNavigationStatus" hidden>
     <span role="status" data-i18n="reader.loadingContent">Loading content</span>
 </div>
+<script src="/assets/book-cache.js" defer></script>
+<script src="/assets/book-cache-ui.js" defer></script>
+<script src="/assets/app-nav.js" defer></script>
 <script src="/assets/book.js?v=13" defer></script>
 {book_search_script}
 {ai_reading_script}
@@ -2933,6 +2948,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <link rel="stylesheet" href="/assets/theme.css">
     <link rel="stylesheet" href="/assets/notification.css">
     <link rel="stylesheet" href="/assets/dialog.css">
+    <link rel="stylesheet" href="/assets/book-cache.css">
     <link rel="stylesheet" href="/assets/chapter.css?v=18">
     <link rel="stylesheet" href="/assets/bookmarks.css">
     <link rel="stylesheet" href="/assets/toc-tree.css">
@@ -3010,13 +3026,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <header class="chapter-top-bar app-header">
         <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
             <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
-            <div class="app-nav-links">
-                <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-layer-group" aria-hidden="true"></i><span data-i18n="reader.shelf">Shelf</span></button>
-                <button type="button" class="app-nav-link" id="chapterAnnotationsBtn" data-annotation-hub data-book-hash="{book_id_attribute}" aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="reader.annotations">Annotations</span></button>
-                {render_vocabulary_navigation(self.book_hash) if self.deployment_mode == "server" else ""}
-                {reading_insights_navigation}
-                {ai_reading_navigation}
-            </div>
+            {render_app_nav_links(self.deployment_mode, "chapterAnnotationsBtn", book_id=self.book_hash, extra=reading_insights_navigation + ai_reading_navigation)}
             <div class="app-nav-actions">
                 {server_locale_control}
                 <button class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" type="button" aria-label="Theme" data-i18n-aria-label="reader.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="reader.theme">Theme</span></button>
@@ -3062,7 +3072,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
             <div class="content-loading is-visible" id="contentLoading" aria-live="polite" aria-label="Loading content" data-i18n-aria-label="reader.loadingContent">
                 <div class="loading-spinner"></div>
             </div>
-            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" dir="auto" data-eb-styles data-chapter-index="{chapter_index}" data-chapter-title="{chapter_title_attribute}" data-book-hash="{book_id_attribute}" data-total-chapters="{len(self.chapters)}"{highlight_assets}>
+            <article class="eb-content" id="eb-content" lang="{html.escape(self.lang or 'en', quote=True)}" dir="auto" data-eb-styles data-chapter-index="{chapter_index}" data-chapter-title="{chapter_title_attribute}" data-book-hash="{book_id_attribute}" data-book-version="{self._browser_cache_version_attribute()}" data-total-chapters="{len(self.chapters)}"{highlight_assets}>
             {content}
             </article>
         </div>
@@ -3469,6 +3479,9 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <script src="/assets/vendor/glightbox/glightbox.min.js" defer></script>
     <script src="/assets/lightbox-adapter.js" defer></script>
     <script src="/assets/vendor/web-highlighter/web-highlighter.min.js" defer></script>
+    <script src="/assets/book-cache.js" defer></script>
+    <script src="/assets/book-cache-ui.js" defer></script>
+    <script src="/assets/app-nav.js" defer></script>
     <script src="/assets/chapter-prefetch.js" defer></script>
     <script src="/assets/chapter-window.js" defer></script>
     <script src="/assets/viewport-anchor.js" defer></script>

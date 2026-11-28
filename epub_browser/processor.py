@@ -46,6 +46,7 @@ from .epub_sanitization import (
     sanitize_svg_content,
     server_book_public_path_allowed,
 )
+from .identity import source_sha256
 from .models import ConvertedBook
 from .reader_pages import ReaderPageRenderer
 from .reporting import Reporter
@@ -859,6 +860,8 @@ class EPUBProcessor(ReaderPageRenderer):
 
     def create_web_interface(self):
         """创建网页界面"""
+        if self.deployment_mode == "ssg":
+            self.browser_cache_version = f"{SERVER_OUTPUT_REVISION}:{source_sha256(self.epub_path)}"
         os.makedirs(self.web_dir, exist_ok=True)
 
         # Server mode deliberately keeps page chrome out of the conversion

@@ -23,7 +23,7 @@ from .server_chrome import (
     SERVER_LOCALE_SCRIPT,
     render_account_panel,
     render_vocabulary_assets,
-    render_vocabulary_navigation,
+    render_app_nav_links,
 )
 from .urls import SiteURLs, rewrite_root_urls
 from .version import render_footer
@@ -847,10 +847,6 @@ def render_library_shell(
                 <i class="fas fa-download" aria-hidden="true"></i> <span data-i18n="bookshelf.import">Import</span>
             </button>
             <input type="file" id="importShelfFile" accept=".json" style="display: none;">""" if deployment_mode == "ssg" else ""
-    install_control = """
-            <button type="button" class="app-nav-link" id="pwa-install-btn" style="display: none;">
-                <i class="fas fa-download" aria-hidden="true"></i><span data-i18n="library.install">Install</span>
-            </button>""" if deployment_mode == "ssg" else ""
     # Legacy Kindle WebKit entry (opt-in via --kindle, SSG and Server): steer
     # real e-Ink Kindles to the dependency-free minimal library instead of the
     # full SPA; Kindle Fire (Silk) and ?full=1 keep the full UI. Runs before
@@ -968,6 +964,7 @@ def render_library_shell(
 <link rel="stylesheet" href="/assets/notification.css">
 <link rel="stylesheet" href="/assets/dialog.css">
 <link rel="stylesheet" href="/assets/library.css?v=13">
+<link rel="stylesheet" href="/assets/book-cache.css">
 <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
 <link rel="stylesheet" href="/assets/loading.css?v=15">
 <link rel="stylesheet" href="/assets/bookshelf.css">
@@ -992,14 +989,7 @@ def render_library_shell(
     <header class="app-header">
     <nav class="app-nav app-nav-primary" aria-label="Primary navigation" data-i18n-aria-label="library.navigation">
         <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt="" aria-hidden="true"><span data-i18n="common.brand">EPUB Browser</span></a>
-        <div class="app-nav-links">
-            <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-layer-group" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
-            <button type="button" class="app-nav-link" id="annotationsBtn" data-annotation-hub aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
-            {render_vocabulary_navigation() if deployment_mode == "server" else ""}
-            {reading_insights_navigation}
-            {ai_reading_navigation}
-            {install_control}
-        </div>
+        {render_app_nav_links(deployment_mode, "annotationsBtn", extra=reading_insights_navigation + ai_reading_navigation)}
         <div class="app-nav-actions">
             {SERVER_LOCALE_CONTROL}
             <button type="button" class="theme-toggle app-nav-action app-nav-theme" id="themeToggle" aria-label="Theme" data-i18n-aria-label="library.theme"><i class="fas fa-moon" aria-hidden="true"></i><span class="app-nav-action-label" data-i18n="library.theme">Theme</span></button>
@@ -1158,6 +1148,9 @@ def render_library_shell(
     <script>window.EpubBrowserLibraryFeatureAssets={library_feature_assets};</script>
     <script src="/assets/library-feature-loader.js" defer></script>
     <script src="/assets/book-sort.js" defer></script>
+    <script src="/assets/book-cache.js" defer></script>
+    <script src="/assets/book-cache-ui.js" defer></script>
+    <script src="/assets/app-nav.js" defer></script>
     <script src="/assets/library.js?v=13" defer></script>
 {ai_reading_script}
 {server_progress_script}

@@ -25,6 +25,29 @@ def render_vocabulary_navigation(book_id: str = "") -> str:
     )
 
 
+def render_app_nav_links(deployment_mode, annotation_id, *, book_id="", extra=""):
+    """Use the same navigation order while retaining each page's book context."""
+    book_context = f' data-book-hash="{escape(book_id, quote=True)}"' if book_id else ""
+    vocabulary = render_vocabulary_navigation(book_id) if deployment_mode == "server" else ""
+    install = """<button type="button" class="app-nav-link" id="pwa-install-btn" hidden>
+        <i class="fas fa-download" aria-hidden="true"></i><span data-i18n="library.install">Install</span>
+    </button>""" if deployment_mode == "ssg" else ""
+    return f"""
+    <div class="app-nav-links" data-app-nav-links>
+        <button type="button" class="app-nav-link" id="bookshelfBtn" aria-haspopup="dialog" aria-controls="bookshelfModal"><i class="fas fa-layer-group" aria-hidden="true"></i><span data-i18n="library.shelf">Shelf</span></button>
+        <button type="button" class="app-nav-link" id="{annotation_id}" data-annotation-hub{book_context} aria-haspopup="dialog"><i class="fas fa-highlighter" aria-hidden="true"></i><span data-i18n="library.annotations">Annotations</span></button>
+        <button type="button" class="app-nav-link" data-book-cache-manage aria-haspopup="dialog" hidden><i class="fas fa-database" aria-hidden="true"></i><span data-i18n="bookCache.storage">Local storage</span></button>
+        {vocabulary}
+        {extra}
+        {install}
+        <details class="app-nav-more" hidden>
+            <summary class="app-nav-link"><i class="fas fa-ellipsis" aria-hidden="true"></i><span data-i18n="library.moreActions">More</span></summary>
+            <div class="app-nav-more-panel"></div>
+        </details>
+    </div>
+    """
+
+
 def render_vocabulary_assets(assets: PublishedAssets, *, include_dictionary=True) -> str:
     dictionary = (
         f'<link rel="stylesheet" href="{assets.url_for("annotation-hub.css")}">'

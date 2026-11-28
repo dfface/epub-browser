@@ -600,20 +600,19 @@ test('reader source TOC preserves groups, deep levels and distinct chapter fragm
     { title: 'Deep target', kind: 'chapter', level: 5, chapter_index: 0, chapter_file: 'chapter_0.html', anchor: 'one' },
     { title: 'Second target', kind: 'chapter', level: 1, chapter_index: 0, chapter_file: 'chapter_0.html', anchor: 'two' },
   ];
-  let request;
   const context = {
     window: { location: { pathname: '/book/id/chapter_0.html' }, EpubBrowserURL: { publicPath: x => x },
       EpubReaderLayout: { chapterNavigationPresentation, initBookTocTree: () => ({reveal() {}}) } },
     document: { getElementById: () => list, createElement: element, dispatchEvent() {} },
-    XMLHttpRequest: function() { request = this; this.open = () => {}; this.send = () => {}; },
+    requestBookContent(url, onSuccess) {
+      assert.equal(url, '/book/id/toc.json');
+      onSuccess(JSON.stringify(data));
+    },
     localStorage: {getItem: () => null, setItem() {}},
     i18n: { t: x => x }, CustomEvent: function() {},
     setBookTocActiveChapter() {}, visibleChapterIndex: 0,
   };
   vm.runInNewContext(source.slice(start, end) + '\nloadBookHomeToc();', context);
-  request.status = 200;
-  request.responseText = JSON.stringify(data);
-  request.onload();
   assert.deepEqual(list.children.map(x => x.attributes['data-toc-level']), ['0', '1', '5', '1']);
   assert.deepEqual(list.children.map(x => x.style['--toc-depth']), ['0', '1', '5', '1']);
   assert.equal(list.children[0].children[0].tag, 'span');

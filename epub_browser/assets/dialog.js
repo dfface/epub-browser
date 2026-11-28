@@ -8,14 +8,127 @@
         return root.EpubBrowserI18n ? root.EpubBrowserI18n.t('dialog.' + key) : key;
     }
 
+    var layers = [];
+    var serial = 0;
+
+    function bind(node, key, value, params) {
+        if (key) {
+            node.setAttribute('data-i18n', key);
+            if (params) node.setAttribute('data-i18n-params', JSON.stringify(params));
+            node.textContent = root.EpubBrowserI18n ? root.EpubBrowserI18n.t(key, params) : value || key;
+        } else {
+            node.textContent = value || '';
+        }
+    }
+
+    function createShell(options) {
+        var modal = document.createElement('div');
+        var backdrop = document.createElement('div');
+        var dialog = document.createElement('section');
+        var header = document.createElement('div');
+        var title = document.createElement('h2');
+        title.id = 'appDialogTitle' + (++serial);
+        if (options.titleDirection) title.dir = options.titleDirection;
+        bind(title, options.titleKey, text(options.title, localized('title')));
+        modal.className = 'app-dialog-modal';
+        modal.setAttribute('role', options.destructive ? 'alertdialog' : 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', title.id);
+        modal.tabIndex = -1;
+        backdrop.className = 'app-dialog-backdrop';
+        dialog.className = 'app-dialog';
+        header.className = 'app-dialog-header';
+        header.appendChild(title);
+        dialog.appendChild(header);
+        modal.appendChild(backdrop);
+        modal.appendChild(dialog);
+        return { modal: modal, backdrop: backdrop, dialog: dialog, header: header };
+    }
+
+    function mount(shell, options) {
+        var modal = shell.modal;
+        var previousFocus = document.activeElement;
+        function onKeydown(event) {
+            if (layers[layers.length - 1] !== modal) return;
+            if (event.key === 'Escape') {
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                options.dismiss();
+            } else if (event.key === 'Tab') {
+                var focusable = Array.from(modal.querySelectorAll(
+                    'a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]'
+                )).filter(function(node) { return node.tabIndex >= 0 && node.getClientRects().length; });
+                var index = focusable.indexOf(document.activeElement);
+                if (index < 0 || (event.shiftKey ? index === 0 : index === focusable.length - 1)) {
+                    event.preventDefault();
+                    (focusable[event.shiftKey ? focusable.length - 1 : 0] || modal).focus();
+                }
+            } else if (options.keydown) {
+                options.keydown(event);
+            }
+        }
+        var underlying = layers[layers.length - 1];
+        if (underlying) underlying.inert = true;
+        layers.push(modal);
+        document.body.appendChild(modal);
+        shell.backdrop.addEventListener('click', options.dismiss);
+        document.addEventListener('keydown', onKeydown, true);
+        (options.initialFocus || modal).focus();
+        return {
+            remove: function() {
+                modal.remove();
+                layers.splice(layers.indexOf(modal), 1);
+                var top = layers[layers.length - 1];
+                if (top) top.inert = false;
+                document.removeEventListener('keydown', onKeydown, true);
+                setTimeout(function() {
+                    // A caller may already have opened another dialog.
+                    if (layers[layers.length - 1] !== top) return;
+                    var target = typeof options.returnFocus === 'function'
+                        ? options.returnFocus() : options.returnFocus || previousFocus;
+                    if (target && typeof target.focus === 'function') target.focus();
+                }, 0);
+            }
+        };
+    }
+
+    function panel(options) {
+        var shell = createShell(options);
+        shell.dialog.className += ' app-dialog-panel';
+        if (options.fullscreen) shell.modal.className += ' app-dialog-fullscreen';
+        var body = document.createElement('div');
+        body.className = 'app-dialog-body';
+        shell.dialog.appendChild(body);
+        var close = document.createElement('button');
+        close.type = 'button';
+        close.className = 'app-dialog-button app-dialog-close';
+        var closeKey = options.closeTextKey || (options.closeText ? null : 'dialog.close');
+        if (closeKey) close.setAttribute('data-i18n-aria-label', closeKey);
+        close.setAttribute('aria-label', closeKey && root.EpubBrowserI18n
+            ? root.EpubBrowserI18n.t(closeKey) : options.closeText || closeKey);
+        var icon = document.createElement('i');
+        icon.className = 'fas fa-times';
+        icon.setAttribute('aria-hidden', 'true');
+        close.appendChild(icon);
+        shell.header.appendChild(close);
+        function dismiss() {
+            if (close.disabled) return;
+            layer.remove();
+            if (options.onClose) options.onClose();
+        }
+        close.addEventListener('click', dismiss);
+        var layer = mount(shell, {
+            initialFocus: close, returnFocus: options.returnFocus, dismiss: dismiss
+        });
+        return { modal: shell.modal, body: body, closeButton: close };
+    }
+
     function open(options) {
         return new Promise(function(resolve) {
             var previousFocus = document.activeElement;
-            var modal = document.createElement('div');
-            var backdrop = document.createElement('div');
-            var dialog = document.createElement('section');
-            var header = document.createElement('div');
-            var title = document.createElement('h2');
+            var shell = createShell(options);
+            var modal = shell.modal;
+            var dialog = shell.dialog;
             var message = document.createElement('p');
             var details = null;
             var footer = document.createElement('div');
@@ -23,24 +136,6 @@
             var confirm = document.createElement('button');
             var input = null;
             var pending = false, closed = false;
-            function bind(node, key, value, params) {
-                if (key) {
-                    node.setAttribute('data-i18n',key);
-                    if(params)node.setAttribute('data-i18n-params',JSON.stringify(params));
-                    node.textContent=root.EpubBrowserI18n ? root.EpubBrowserI18n.t(key,params) : value || key;
-                } else node.textContent=value || '';
-            }
-
-
-            modal.className = 'app-dialog-modal';
-            modal.setAttribute('role', options.destructive ? 'alertdialog' : 'dialog');
-            modal.setAttribute('aria-modal', 'true');
-            modal.setAttribute('aria-labelledby', 'appDialogTitle');
-            backdrop.className = 'app-dialog-backdrop';
-            dialog.className = 'app-dialog';
-            header.className = 'app-dialog-header';
-            title.id = 'appDialogTitle';
-            bind(title,options.titleKey,text(options.title,localized('title')));
             message.className = 'app-dialog-message';
             message.id = 'appDialogMessage';
             bind(message,options.messageKey,options.message,options.messageParams);
@@ -52,8 +147,6 @@
             confirm.className = 'app-dialog-button app-dialog-confirm' + (options.destructive ? ' app-dialog-destructive' : '');
             bind(confirm,options.confirmTextKey,text(options.confirmText,localized('confirm')));
 
-            header.appendChild(title);
-            dialog.appendChild(header);
             if (options.message || options.messageKey) {
                 dialog.appendChild(message);
                 modal.setAttribute('aria-describedby', message.id);
@@ -104,22 +197,11 @@
             footer.appendChild(cancel);
             footer.appendChild(confirm);
             dialog.appendChild(footer);
-            modal.appendChild(backdrop);
-            modal.appendChild(dialog);
-            document.body.appendChild(modal);
 
             function close(result) {
                 if(pending || closed)return;closed=true;
-                var restoreFocus = function() {
-                    var target=typeof options.returnFocus==='function'?options.returnFocus():options.returnFocus || previousFocus;
-                    if(target && typeof target.focus==='function')target.focus();
-                };
-                document.removeEventListener('keydown', onKeydown, true);
-                modal.remove();
                 resolve(result);
-                if (typeof root.setTimeout === 'function') root.setTimeout(restoreFocus, 0);
-                else if (typeof setTimeout === 'function') setTimeout(restoreFocus, 0);
-                else restoreFocus();
+                layer.remove();
             }
 
             function submit() {
@@ -140,38 +222,25 @@
                 });
             }
 
-            function onKeydown(event) {
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    if(event.stopImmediatePropagation)event.stopImmediatePropagation();
-                    close(options.input ? null : false);
-                } else if (event.key === 'Enter' && input && document.activeElement === input) {
-                    event.preventDefault();
-                    submit();
-                } else if (event.key === 'Tab') {
-                    var focusable = [cancel, confirm];
-                    if (input) focusable.unshift(input);
-                    var index = focusable.indexOf(document.activeElement);
-                    if (event.shiftKey && index <= 0) {
-                        event.preventDefault();
-                        focusable[focusable.length - 1].focus();
-                    } else if (!event.shiftKey && index === focusable.length - 1) {
-                        event.preventDefault();
-                        focusable[0].focus();
-                    }
-                }
-            }
-
             cancel.addEventListener('click', function() { close(options.input ? null : false); });
             confirm.addEventListener('click', submit);
-            backdrop.addEventListener('click', function() { close(options.input ? null : false); });
-            document.addEventListener('keydown', onKeydown, true);
-            (input || (options.destructive ? cancel : confirm)).focus();
+            var layer = mount(shell, {
+                returnFocus: options.returnFocus || previousFocus,
+                dismiss: function() { close(options.input ? null : false); },
+                keydown: function(event) {
+                    if (event.key === 'Enter' && input && document.activeElement === input) {
+                        event.preventDefault();
+                        submit();
+                    }
+                },
+                initialFocus: input || (options.destructive ? cancel : confirm)
+            });
             if (input && options.selectOnOpen) input.select();
         });
     }
 
     root.EpubDialog = {
+        panel: panel,
         confirm: function(options) {
             return open(options || {});
         },

@@ -248,45 +248,62 @@
     });
     var entry = documentEntries.get(config.documentUrl);
     if (!entry) {
-      var task = pdfjs.getDocument({
-        url: config.documentUrl,
-        cMapUrl: null,
-        standardFontDataUrl: null,
-        wasmUrl: null,
-        iccUrl: null,
-        useWorkerFetch: false,
-        useWasm: false,
-        isImageDecoderSupported: false,
-        isOffscreenCanvasSupported: false,
-        enableXfa: false,
-        // PDFs in the wild frequently contain recoverable operator/resource
-        // errors. PDF.js defaults to recovery mode; keep that behavior so one
-        // imperfect object cannot turn an otherwise readable page white.
-        stopAtErrors: false,
-        disableRange: false,
-        disableStream: true,
-        disableAutoFetch: true,
-        rangeChunkSize: 65536
-      });
       entry = {
         url: config.documentUrl,
-        task: task,
+        task: null,
         document: null,
         users: new Set(),
         releaseToken: null,
         destroyed: false,
         textCache: null
       };
-      task.onPassword = function(updatePassword) {
-        var password = root.prompt(translate('pdf.passwordRequired'));
-        if (password === null) {
-          destroyEntry(entry);
-          return;
-        }
-        updatePassword(password);
-        password = '';
-      };
-      entry.promise = Promise.resolve(task.promise).then(function(document) {
+      function begin(bytes) {
+        if (entry.destroyed) throw new Error('PDF loading cancelled');
+        var source = bytes ? { data: bytes } : { url: config.documentUrl };
+        var task = pdfjs.getDocument(Object.assign(source, {
+          cMapUrl: null,
+          standardFontDataUrl: null,
+          wasmUrl: null,
+          iccUrl: null,
+          useWorkerFetch: false,
+          useWasm: false,
+          isImageDecoderSupported: false,
+          isOffscreenCanvasSupported: false,
+          enableXfa: false,
+          // PDFs in the wild frequently contain recoverable operator/resource
+          // errors. PDF.js defaults to recovery mode; keep that behavior so one
+          // imperfect object cannot turn an otherwise readable page white.
+          stopAtErrors: false,
+          disableRange: false,
+          disableStream: true,
+          disableAutoFetch: true,
+          rangeChunkSize: 65536
+        }));
+        entry.task = task;
+        task.onPassword = function(updatePassword) {
+          var password = root.prompt(translate('pdf.passwordRequired'));
+          if (password === null) {
+            destroyEntry(entry);
+            return;
+          }
+          updatePassword(password);
+          password = '';
+        };
+        return task.promise;
+      }
+
+      var cache = root.EpubBrowserBookCache;
+      var article = cache && root.document.getElementById('eb-content');
+      var bookId = article && article.getAttribute('data-book-hash');
+      var book = bookId && { id: bookId, version: article.getAttribute('data-book-version') };
+      if (cache && book && absoluteURL(cache.documentURL(book)).href === config.documentUrl) {
+        entry.promise = cache.get(book, 'pdf').then(function(blob) {
+          return blob ? blob.arrayBuffer().then(function(buffer) { return new Uint8Array(buffer); }, function() { return null; }) : null;
+        }).then(begin);
+      } else {
+        entry.promise = Promise.resolve(begin());
+      }
+      entry.promise = entry.promise.then(function(document) {
         entry.document = document;
         return document;
       });

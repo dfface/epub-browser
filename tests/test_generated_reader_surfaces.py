@@ -2396,11 +2396,10 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
     def test_book_card_reflows_on_narrow_screens_without_optional_content(self):
         styles = Path('epub_browser/assets/book.css').read_text(encoding='utf-8')
 
-        self.assertIn(
-            '@media (max-width: 480px) {\n'
-            '    .book-info-card {\n'
-            '        flex-direction: column;',
+        self.assertRegex(
             styles,
+            r'@media \(max-width: 480px\)\s*\{\s*\.book-info-card\s*\{[^}]*\}\s*'
+            r'\.book-info-summary\s*\{\s*flex-direction: column;',
         )
         self.assertIn('        width: 100%;\n        min-width: 0;', styles)
         self.assertIn('        max-width: 100%;\n        white-space: normal;', styles)
@@ -2448,7 +2447,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         navigation = script[start:end]
 
         self.assertIn("link.search = '';", script)
-        self.assertIn("xhr.open('GET', url, true);", navigation)
+        self.assertIn("requestBookContent(url, function(html)", navigation)
         self.assertIn("tempDiv.querySelector('#eb-content')", navigation)
         self.assertIn("chapterContent.getAttribute('data-chapter-index')", navigation)
         self.assertIn("chapterContent.getAttribute('data-book-hash')", navigation)
@@ -2476,7 +2475,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         self.assertIn('navigateReaderChapter(next, { history: true });', keyboard)
 
         toc_start = script.index("a.addEventListener('click', function(e) {")
-        toc_end = script.index('\n                    });', toc_start)
+        toc_end = script.index('li.appendChild(a);', toc_start)
         book_toc = script[toc_start:toc_end]
         self.assertIn('navigateReaderChapter(this.href, { history: true, link: this });', book_toc)
         self.assertIn('if (navigated) e.preventDefault();', book_toc)
@@ -2494,7 +2493,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         self.assertIn('scrollToPaginationTarget(target);', script)
 
         toc_start = script.index("a.addEventListener('click', function(e) {")
-        toc_end = script.index('\n                    });', toc_start)
+        toc_end = script.index('li.appendChild(a);', toc_start)
         book_toc = script[toc_start:toc_end]
         self.assertIn('navigateReaderChapter(this.href, { history: true, link: this });', book_toc)
         self.assertIn('if (navigated) e.preventDefault();', book_toc)
@@ -2620,7 +2619,7 @@ a:focus { outline: 2px solid blue; transition: none !important; }</style><div cl
         self.assertIn('closeReaderDrawers(false);', navigation)
         self.assertLess(
             navigation.index('closeReaderDrawers(false);'),
-            navigation.index('var xhr = new XMLHttpRequest();'),
+            navigation.index('readerChapterXhr = requestBookContent('),
         )
 
     def test_pagination_boundary_chapter_navigation_uses_ajax(self):
@@ -3913,6 +3912,10 @@ assert.deepEqual(
         self.assertIn('app-nav-theme', breadcrumb)
         self.assertIn('id="bookshelfBtn"', breadcrumb)
         self.assertIn('id="annotationsBtn"', breadcrumb)
+        self.assertIn('data-app-nav-links', breadcrumb)
+        self.assertIn('data-book-cache-manage', breadcrumb)
+        self.assertRegex(breadcrumb, r'<details[^>]*class="app-nav-more" hidden>')
+        self.assertNotIn('data-book-cache-manage', html[html.index('</nav>'):])
         self.assertNotIn('id=libraryBookCount', breadcrumb)
         self.assertNotIn('id=libraryTagCount', breadcrumb)
         self.assertIn('class="library-overview"', html)
@@ -4033,6 +4036,8 @@ assert.deepEqual(
             self.assertIsNotNone(shelf)
             self.assertNotRegex(shelf.group(0), r'\bstyle=(?:["\'])?display:\s*none')
             self.assertRegex(nav, r'data-annotation-hub')
+            self.assertIn('data-app-nav-links', nav)
+            self.assertIn('data-book-cache-manage', nav)
             self.assertRegex(nav, r'class=(?:["\'])?app-nav-brand')
             self.assertRegex(nav, r'class=(?:["\'])?app-nav-brand[^>]*\bhref=(?:["\'])?/(?:["\' >])')
             self.assertNotRegex(nav, r'class=(?:["\'])?app-nav-link[^>]*\bhref=(?:["\'])?/(?:["\' >])')
@@ -4376,7 +4381,7 @@ assert.deepEqual(
         html = self._library_html()
         nav = html[html.index('<nav'):html.index('</nav>')]
         self.assertIn('id="pwa-install-btn"', nav)
-        script = Path('epub_browser/assets/library.js').read_text(encoding='utf-8')
+        script = Path('epub_browser/assets/app-nav.js').read_text(encoding='utf-8')
         self.assertIn("getElementById('pwa-install-btn')", script)
         self.assertNotIn('readingControls.appendChild(installBtn)', script)
 
@@ -5102,7 +5107,7 @@ assert.deepEqual(
         self.assertIn('book-review-display-copy.is-collapsed', review_styles)
         self.assertIn('book-review-display', review_styles)
         self.assertIn('.book-review-visually-hidden', review_styles)
-        self.assertNotIn('@media (max-width: 768px)', review_styles)
+        self.assertRegex(review_styles, r'@media \(max-width: 768px\)\s*\{\s*\.book-review-display\s*\{\s*margin: 0;')
 
     def test_server_review_initial_data_is_runtime_only_and_escaped(self):
         with tempfile.TemporaryDirectory() as directory:

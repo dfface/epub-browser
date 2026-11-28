@@ -391,6 +391,7 @@ class SSGPublisher:
                 asset_manifest=assets,
                 urls=self.urls,
                 deployment_mode="ssg",
+                browser_cache_version=prepared.source_fingerprint,
             )
             self._atomic_write_text(working / "index.html", renderer.render_index())
             toc = renderer._build_toc_data()

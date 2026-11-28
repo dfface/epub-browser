@@ -320,6 +320,10 @@ function initScript() {
     var nextPageBtn = document.getElementById('nextPage');
     var contentContainer = document.querySelector('.eb-content-container');
     var content = document.getElementById('eb-content');
+    var cacheBook = {
+        id: content.getAttribute('data-book-hash'),
+        version: content.getAttribute('data-book-version')
+    };
     var pageJumpToggle = document.getElementById('pageJumpToggle');
     var pageJumpPopover = document.getElementById('paginationPageJumpPopover');
     var pageJumpRange = document.getElementById('paginationPageJumpRange');
@@ -1225,8 +1229,29 @@ function initScript() {
         }
     }
 
+    function requestBookContent(url, done, failed, options) {
+        if (window.EpubBrowserBookCache) {
+            return window.EpubBrowserBookCache.request(cacheBook, url, done, failed, options);
+        }
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.timeout = 15000;
+        xhr.onload = function() {
+            if (xhr.status < 200 || xhr.status >= 300 || done(xhr.responseText) === false) failed();
+        };
+        xhr.onerror = xhr.ontimeout = failed;
+        xhr.send();
+        return xhr;
+    }
+
     var chapterPrefetch = window.EpubChapterPrefetch
-        ? window.EpubChapterPrefetch.create({ urlFor: getChapterUrl })
+        ? window.EpubChapterPrefetch.create({
+            urlFor: getChapterUrl,
+            request: function(url, done) {
+                var request = requestBookContent(url, done, function() { done(null); }, { prefetch: true });
+                return function() { request.abort(); };
+            }
+        })
         : null;
 
     function scheduleNextChapterPrefetch() {
@@ -1296,10 +1321,6 @@ function initScript() {
         var cached = chapterPrefetch ? chapterPrefetch.take(target.index) : null;
         if (cached && applyReaderChapterResponse(cached, target, options)) return true;
 
-        var xhr = new XMLHttpRequest();
-        readerChapterXhr = xhr;
-        xhr.open('GET', url, true);
-        xhr.timeout = 15000;
         if (options.link) {
             readerChapterBusyLink = options.link;
             readerChapterBusyLink.setAttribute('aria-busy', 'true');
@@ -1323,13 +1344,11 @@ function initScript() {
             retry.hidden = false;
             retry.onclick = function() { navigateReaderChapter(url, options); };
         }
-        xhr.onload = function() {
+        readerChapterXhr = requestBookContent(url, function(html) {
             if (requestId !== activeReaderChapterRequest) return;
-            finish(xhr.status >= 200 && xhr.status < 300 &&
-                applyReaderChapterResponse(xhr.responseText, target, options));
-        };
-        xhr.onerror = xhr.ontimeout = function() { finish(false); };
-        xhr.send();
+            if (!applyReaderChapterResponse(html, target, options)) return false;
+            finish(true);
+        }, function() { finish(false); });
         return true;
     }
 
@@ -1857,77 +1876,70 @@ function initScript() {
         var hash = path.split('/book/')[1].split('/')[0];
         var url = window.EpubBrowserURL.publicPath('/book/' + hash + '/toc.json');
         
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', url, true);
-        xhr.onload = function() {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                var data = JSON.parse(xhr.responseText);
-                list.innerHTML = '';
-                for (var i = 0; i < data.length; i++) {
-                    var item = data[i];
-                    var li = document.createElement('li');
-                    var depth = Math.max(0, Number(item.level) || 0);
-                    li.className = 'toc-item toc-level-' + Math.min(depth, 3);
-                    li.setAttribute('data-toc-level', depth);
-                    li.style.setProperty('--toc-depth', depth);
-                    if (item.kind === 'section') {
-                        li.classList.add('toc-section');
-                        var sectionTitle = document.createElement('span');
-                        sectionTitle.className = 'chapter-section-title';
-                        sectionTitle.textContent = item.title;
-                        li.appendChild(sectionTitle);
-                        list.appendChild(li);
-                        continue;
-                    }
-                    li.setAttribute('data-chapter-index', item.chapter_index);
-                    var a = document.createElement('a');
-                    var href = window.EpubBrowserURL.publicPath('/book/' + hash + '/' + item.chapter_file);
-                    if (item.anchor) href += '#' + item.anchor;
-                    a.href = href;
-                    a.setAttribute('data-chapter-index', item.chapter_index);
-                    var title = document.createElement('span');
-                    title.className = 'chapter-title';
-                    var presentation = window.EpubReaderLayout.chapterNavigationPresentation(
-                        item, Boolean(window.EpubPDFConfig), i18n.t.bind(i18n)
-                    );
-                    title.textContent = presentation.title;
-                    a.appendChild(title);
-                    if (presentation.outlineLabels.length) {
-                        var outlineLabels = document.createElement('span');
-                        outlineLabels.className = 'chapter-outline-labels';
-                        outlineLabels.textContent = presentation.outlineLabels.join(' · ');
-                        a.appendChild(outlineLabels);
-                    }
-                    a.addEventListener('click', function(e) {
-                        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-                        var navigated = navigateReaderChapter(this.href, { history: true, link: this });
-                        if (navigated) e.preventDefault();
-                    });
-                    li.appendChild(a);
+        requestBookContent(url, function(text) {
+            var data;
+            try { data = JSON.parse(text); } catch (_) { return false; }
+            if (!Array.isArray(data)) return false;
+            list.innerHTML = '';
+            for (var i = 0; i < data.length; i++) {
+                var item = data[i];
+                var li = document.createElement('li');
+                var depth = Math.max(0, Number(item.level) || 0);
+                li.className = 'toc-item toc-level-' + Math.min(depth, 3);
+                li.setAttribute('data-toc-level', depth);
+                li.style.setProperty('--toc-depth', depth);
+                if (item.kind === 'section') {
+                    li.classList.add('toc-section');
+                    var sectionTitle = document.createElement('span');
+                    sectionTitle.className = 'chapter-section-title';
+                    sectionTitle.textContent = item.title;
+                    li.appendChild(sectionTitle);
                     list.appendChild(li);
+                    continue;
                 }
-                bookTocTree = window.EpubReaderLayout.initBookTocTree(list, {
-                    bookId: hash,
-                    storage: localStorage,
-                    label: i18n.t('reader.toggleTocSection')
+                li.setAttribute('data-chapter-index', item.chapter_index);
+                var a = document.createElement('a');
+                var href = window.EpubBrowserURL.publicPath('/book/' + hash + '/' + item.chapter_file);
+                if (item.anchor) href += '#' + item.anchor;
+                a.href = href;
+                a.setAttribute('data-chapter-index', item.chapter_index);
+                var title = document.createElement('span');
+                title.className = 'chapter-title';
+                var presentation = window.EpubReaderLayout.chapterNavigationPresentation(
+                    item, Boolean(window.EpubPDFConfig), i18n.t.bind(i18n)
+                );
+                title.textContent = presentation.title;
+                a.appendChild(title);
+                if (presentation.outlineLabels.length) {
+                    var outlineLabels = document.createElement('span');
+                    outlineLabels.className = 'chapter-outline-labels';
+                    outlineLabels.textContent = presentation.outlineLabels.join(' · ');
+                    a.appendChild(outlineLabels);
+                }
+                a.addEventListener('click', function(e) {
+                    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+                    var navigated = navigateReaderChapter(this.href, { history: true, link: this });
+                    if (navigated) e.preventDefault();
                 });
-                // ai-reading-hub may have loaded before this asynchronous TOC.
-                // Notify it explicitly as well as allowing its observer fallback.
-                if (window.EpubBrowserAIReadingHub && window.EpubBrowserAIReadingHub.refreshChapterIndicators) {
-                    window.EpubBrowserAIReadingHub.refreshChapterIndicators(list);
-                }
-                document.dispatchEvent(new CustomEvent('epub-browser:chapter-toc-loaded', { detail: { container: list } }));
-                setBookTocActiveChapter(visibleChapterIndex, true);
-            } else {
-                list.innerHTML = '<li class="toc-item"></li>';
-                list.firstChild.textContent = i18n.t('reader.tocLoadFailed');
+                li.appendChild(a);
+                list.appendChild(li);
             }
-        };
-        xhr.onerror = function() {
+            bookTocTree = window.EpubReaderLayout.initBookTocTree(list, {
+                bookId: hash,
+                storage: localStorage,
+                label: i18n.t('reader.toggleTocSection')
+            });
+            // ai-reading-hub may have loaded before this asynchronous TOC.
+            // Notify it explicitly as well as allowing its observer fallback.
+            if (window.EpubBrowserAIReadingHub && window.EpubBrowserAIReadingHub.refreshChapterIndicators) {
+                window.EpubBrowserAIReadingHub.refreshChapterIndicators(list);
+            }
+            document.dispatchEvent(new CustomEvent('epub-browser:chapter-toc-loaded', { detail: { container: list } }));
+            setBookTocActiveChapter(visibleChapterIndex, true);
+        }, function() {
             list.innerHTML = '<li class="toc-item"></li>';
             list.firstChild.textContent = i18n.t('reader.tocLoadFailed');
-        };
-        xhr.send();
+        });
     }
 
     function setBookTocActiveChapter(index, keepVisible, focusLink) {
@@ -3001,7 +3013,7 @@ function initScript() {
 
     function loadNextChapter() {
         var totalChapters = parseInt(content.getAttribute('data-total-chapters'), 10) || 999;
-        
+
         // 找到最后已加载章节的下一章
         var maxLoaded = -1;
         for (var key in loadedChapters) {
@@ -3011,93 +3023,76 @@ function initScript() {
             }
         }
         var nextIdx = maxLoaded + 1;
-        
+
         if (nextIdx >= totalChapters || loadedChapters[nextIdx]) return;
         if (isLoadingChapter || document.getElementById('scrollLoader')) return;
-        
+
         isLoadingChapter = true;
-        
+
         var loader = createContinuousLoader('scrollLoader', 'reader.loadingNextChapter', loadNextChapter);
         content.appendChild(loader);
         var revealTimer = setTimeout(function() {
             if (loader.isConnected) updateContinuousLoaders();
         }, 150);
 
-        var xhr = new XMLHttpRequest();
         activeContinuousChapterRequest += 1;
         var requestId = activeContinuousChapterRequest;
-        continuousChapterXhr = xhr;
-        xhr.open('GET', getChapterUrl(nextIdx), true);
-        xhr.timeout = 15000;
-        xhr.onload = function() {
+        continuousChapterXhr = requestBookContent(getChapterUrl(nextIdx), function(html) {
             if (requestId !== activeContinuousChapterRequest) return;
-            continuousChapterXhr = null;
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            var chapterContent = tempDiv.querySelector('#eb-content');
+            if (!chapterContent || chapterContent.getAttribute('data-book-hash') !== cacheBook.id ||
+                chapterContent.getAttribute('data-chapter-index') !== String(nextIdx)) return false;
             clearTimeout(revealTimer);
-            var appendedChapter = false;
-            if (xhr.status >= 200 && xhr.status < 300) {
-                // 从返回的 HTML 中提取正文内容
-                var html = xhr.responseText;
-                var tempDiv = document.createElement('div');
-                tempDiv.innerHTML = html;
-                var chapterContent = tempDiv.querySelector('#eb-content');
-                
-                if (chapterContent) {
-                    loader.remove();
-                    // 提取章节标题
-                    var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
-                    if (!chapterTitle) {
-                        var pageTitle = tempDiv.querySelector('title');
-                        if (pageTitle) {
-                            chapterTitle = pageTitle.textContent.split(' - ')[0].trim();
-                        }
-                    }
-                    
-                    // 添加章节分隔符和可淘汰的章节容器
-                    var chapterSection = document.createElement('section');
-                    chapterSection.className = 'continuous-chapter';
-                    chapterSection.setAttribute('data-chapter-index', nextIdx);
-                    chapterSection.setAttribute('data-chapter-title', chapterTitle || '');
-                    
-                    // 追加章节内容
-                    var childNodes = chapterContent.childNodes;
-                    for (var i = 0; i < childNodes.length; i++) {
-                        chapterSection.appendChild(childNodes[i].cloneNode(true));
-                    }
-                    var viewportAnchor = EpubViewportAnchor.capture(content);
-                    content.appendChild(chapterSection);
-                    prepareChapterCodeBlocks(chapterSection);
-                    highlightCodeBlocks(chapterSection);
-                    dispatchChapterContentLifecycle('added', chapterSection);
-                    
-                    loadedChapters[nextIdx] = true;
-                    pruneContinuousWindow('next', nextIdx);
-                    EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
-                    EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
-                    appendedChapter = true;
-                    
-                    // 对新增内容重新绑定 Fancybox
-                    if (typeof Fancybox !== 'undefined') {
-                        if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
-                    }
+            continuousChapterXhr = null;
+            loader.remove();
+            // 提取章节标题
+            var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
+            if (!chapterTitle) {
+                var pageTitle = tempDiv.querySelector('title');
+                if (pageTitle) {
+                    chapterTitle = pageTitle.textContent.split(' - ')[0].trim();
                 }
             }
-            if (!appendedChapter) {
-                failContinuousLoad(loader);
-                return;
+
+            // 添加章节分隔符和可淘汰的章节容器
+            var chapterSection = document.createElement('section');
+            chapterSection.className = 'continuous-chapter';
+            chapterSection.setAttribute('data-chapter-index', nextIdx);
+            chapterSection.setAttribute('data-chapter-title', chapterTitle || '');
+
+            // 追加章节内容
+            var childNodes = chapterContent.childNodes;
+            for (var i = 0; i < childNodes.length; i++) {
+                chapterSection.appendChild(childNodes[i].cloneNode(true));
+            }
+            var viewportAnchor = EpubViewportAnchor.capture(content);
+            content.appendChild(chapterSection);
+            prepareChapterCodeBlocks(chapterSection);
+            highlightCodeBlocks(chapterSection);
+            dispatchChapterContentLifecycle('added', chapterSection);
+
+            loadedChapters[nextIdx] = true;
+            pruneContinuousWindow('next', nextIdx);
+            EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
+            EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
+
+            // 对新增内容重新绑定 Fancybox
+            if (typeof Fancybox !== 'undefined') {
+                if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
             }
             isLoadingChapter = false;
             refreshContinuousAnnotations();
             ensureContinuousScrollBuffer();
-        };
-        xhr.onerror = xhr.ontimeout = function() {
+        }, function() {
             if (requestId !== activeContinuousChapterRequest) return;
             continuousChapterXhr = null;
             clearTimeout(revealTimer);
             failContinuousLoad(loader);
-        };
-        xhr.send();
+        });
     }
-    
+
     function loadPrevChapter() {
         if (!loadPreviousOnScroll) return;
         // 找到最先已加载章节的前一章
@@ -3109,94 +3104,78 @@ function initScript() {
             }
         }
         var prevIdx = minLoaded - 1;
-        
+
         if (!isFinite(prevIdx) || prevIdx < 0 || loadedChapters[prevIdx]) return;
         if (isLoadingChapter || document.getElementById('scrollLoaderTop')) return;
-        
+
         isLoadingChapter = true;
-        
+
         var loader = createContinuousLoader('scrollLoaderTop', 'reader.loadingPreviousChapter', loadPrevChapter);
         content.insertBefore(loader, content.firstChild);
         var revealTimer = setTimeout(function() {
             if (loader.isConnected) updateContinuousLoaders();
         }, 150);
 
-        var xhr = new XMLHttpRequest();
         activeContinuousChapterRequest += 1;
         var requestId = activeContinuousChapterRequest;
-        continuousChapterXhr = xhr;
-        xhr.open('GET', getChapterUrl(prevIdx), true);
-        xhr.timeout = 15000;
-        xhr.onload = function() {
+        continuousChapterXhr = requestBookContent(getChapterUrl(prevIdx), function(html) {
             if (requestId !== activeContinuousChapterRequest) return;
-            continuousChapterXhr = null;
+            var tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            var chapterContent = tempDiv.querySelector('#eb-content');
+            if (!chapterContent || chapterContent.getAttribute('data-book-hash') !== cacheBook.id ||
+                chapterContent.getAttribute('data-chapter-index') !== String(prevIdx)) return false;
             clearTimeout(revealTimer);
-            var appendedChapter = false;
-            if (xhr.status >= 200 && xhr.status < 300) {
-                var html = xhr.responseText;
-                var tempDiv = document.createElement('div');
-                tempDiv.innerHTML = html;
-                var chapterContent = tempDiv.querySelector('#eb-content');
-                
-                if (chapterContent) {
-                    var viewportAnchor = EpubViewportAnchor.capture(content);
-                    loader.remove();
-                    var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
-                    if (!chapterTitle) {
-                        var pageTitle = tempDiv.querySelector('title');
-                        if (pageTitle) {
-                            chapterTitle = pageTitle.textContent.split(' - ')[0].trim();
-                        }
-                    }
-                    
-                    // 创建可淘汰的章节容器
-                    var chapterSection = document.createElement('section');
-                    chapterSection.className = 'continuous-chapter';
-                    chapterSection.setAttribute('data-chapter-index', prevIdx);
-                    chapterSection.setAttribute('data-chapter-title', chapterTitle || '');
-                    
-                    
-                    var childNodes = chapterContent.childNodes;
-                    for (var i = 0; i < childNodes.length; i++) {
-                        chapterSection.appendChild(childNodes[i].cloneNode(true));
-                    }
-                    
-                    // 插入到内容最前面
-                    if (content.firstChild) {
-                        content.insertBefore(chapterSection, content.firstChild);
-                    } else {
-                        content.appendChild(chapterSection);
-                    }
-                    prepareChapterCodeBlocks(chapterSection);
-                    highlightCodeBlocks(chapterSection);
-                    dispatchChapterContentLifecycle('added', chapterSection);
-                    
-                    loadedChapters[prevIdx] = true;
-                    pruneContinuousWindow('previous', prevIdx);
-                    if (typeof Fancybox !== 'undefined') {
-                        if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
-                    }
-                    EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
-                    EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
-                    appendedChapter = true;
+            continuousChapterXhr = null;
+            var viewportAnchor = EpubViewportAnchor.capture(content);
+            loader.remove();
+            var chapterTitle = chapterContent.getAttribute('data-chapter-title') || '';
+            if (!chapterTitle) {
+                var pageTitle = tempDiv.querySelector('title');
+                if (pageTitle) {
+                    chapterTitle = pageTitle.textContent.split(' - ')[0].trim();
                 }
             }
-            if (!appendedChapter) {
-                failContinuousLoad(loader);
-                return;
+
+            // 创建可淘汰的章节容器
+            var chapterSection = document.createElement('section');
+            chapterSection.className = 'continuous-chapter';
+            chapterSection.setAttribute('data-chapter-index', prevIdx);
+            chapterSection.setAttribute('data-chapter-title', chapterTitle || '');
+
+
+            var childNodes = chapterContent.childNodes;
+            for (var i = 0; i < childNodes.length; i++) {
+                chapterSection.appendChild(childNodes[i].cloneNode(true));
             }
+
+            // 插入到内容最前面
+            if (content.firstChild) {
+                content.insertBefore(chapterSection, content.firstChild);
+            } else {
+                content.appendChild(chapterSection);
+            }
+            prepareChapterCodeBlocks(chapterSection);
+            highlightCodeBlocks(chapterSection);
+            dispatchChapterContentLifecycle('added', chapterSection);
+
+            loadedChapters[prevIdx] = true;
+            pruneContinuousWindow('previous', prevIdx);
+            if (typeof Fancybox !== 'undefined') {
+                if (typeof Fancybox !== 'undefined') Fancybox.bind('#eb-content img', {});
+            }
+            EpubViewportAnchor.restoreAfterLayout(viewportAnchor);
+            EpubViewportAnchor.restoreOnImageLoad(viewportAnchor, chapterSection);
             isLoadingChapter = false;
             refreshContinuousAnnotations();
-        };
-        xhr.onerror = xhr.ontimeout = function() {
+        }, function() {
             if (requestId !== activeContinuousChapterRequest) return;
             continuousChapterXhr = null;
             clearTimeout(revealTimer);
             failContinuousLoad(loader);
-        };
-        xhr.send();
+        });
     }
-    
+
     function saveContinuousScrollProgress() {
         // 保存全局阅读进度：基于已加载的所有章节计算当前阅读百分比
         var totalChapters = parseInt(content.getAttribute('data-total-chapters'), 10);

@@ -1,0 +1,71 @@
+[data-book-cache-trigger][hidden],
+[data-book-cache-manage][hidden] {
+    display: none;
+}
+
+.book-cache-name {
+    margin: 0;
+    overflow-wrap: anywhere;
+    font-weight: 650;
+}
+
+.book-cache-status,
+.book-cache-detail {
+    color: var(--text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.book-cache-status {
+    margin: .3rem 0 0;
+}
+
+.book-cache-progress {
+    width: 100%;
+    margin-top: .75rem;
+    accent-color: var(--primary);
+}
+
+.book-cache-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-top: 1rem;
+}
+
+.book-cache-actions:empty,
+.book-cache-list:empty {
+    display: none;
+}
+
+.book-cache-list {
+    list-style: none;
+    padding: 0;
+    margin: .75rem 0 0;
+}
+
+.book-cache-list li {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: .5rem;
+    padding: .65rem 0;
+    border-top: 1px solid var(--border);
+}
+
+.book-cache-list li > div {
+    flex: 1 1 10rem;
+    min-width: 0;
+}
+
+.book-cache-detail {
+    font-size: .875rem;
+}
+
+.app-dialog-fullscreen .book-cache-list li {
+    margin-top: .5rem;
+    padding: .85rem;
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius-lg);
+    background: var(--card-bg);
+}

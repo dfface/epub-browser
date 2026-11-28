@@ -547,3 +547,89 @@ body.reader-drawer-open .reader-toolbar.top-controls {
         display: none;
     }
 }
+
+/* Preserve one ordered set of action buttons and fold it only when it exceeds
+   the actual space left beside the brand and utility controls. */
+.app-nav-links[data-app-nav-links] {
+    position: relative;
+    overflow: visible;
+}
+
+[data-app-nav-links] > .app-nav-link,
+.app-nav-more {
+    flex: 0 0 auto;
+}
+
+.app-nav-more {
+    align-self: center;
+}
+
+[data-app-nav-links] > [hidden],
+.app-nav-more-panel > [hidden] {
+    display: none;
+}
+
+.app-nav-more > summary {
+    list-style: none;
+}
+
+.app-nav-more > summary::-webkit-details-marker {
+    display: none;
+}
+
+.app-nav-more[open] > summary {
+    background: var(--hover);
+    color: var(--text);
+}
+
+.app-nav-more-panel {
+    position: absolute;
+    z-index: 2;
+    inset-block-start: calc(100% + 4px);
+    inset-inline-end: 0;
+    display: grid;
+    width: min(15rem, calc(100vw - 24px));
+    padding: 6px;
+    border: 1px solid var(--border);
+    border-radius: var(--border-radius-xl);
+    background: var(--card-bg);
+    box-shadow: var(--shadow-md);
+}
+
+.app-nav-more-panel .app-nav-link {
+    justify-content: flex-start;
+    white-space: normal;
+    line-height: 1.25;
+    text-align: start;
+}
+
+.app-nav-ruler {
+    position: absolute;
+    inset: 0 auto auto 0;
+    display: flex;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.app-nav-ruler > * {
+    flex: 0 0 auto;
+}
+
+@media (max-width: 768px) {
+    .app-nav-links[data-app-nav-links] {
+        overflow-x: auto;
+        padding-block-end: 4px;
+    }
+}
+
+@media (max-width: 420px) {
+    [data-app-nav-links] > .app-nav-link,
+    .app-nav-ruler > .app-nav-link,
+    .app-nav-more > summary {
+        gap: 6px;
+        padding-inline: 8px;
+    }
+}
