@@ -989,6 +989,8 @@
   "settings.keyboardNavigation": "التنقل بلوحة المفاتيح",
   "settings.arrowKeyNavigation": "استخدام مفتاحي السهم الأيسر والأيمن للتنقل",
   "settings.spaceKeyNavigation": "استخدام مفتاح المسافة للصفحة أو الفصل التالي",
+  "reader.expandAll": "توسيع الكل",
+  "reader.collapseAll": "طي الكل",
   "reader.toggleTocSection": "توسيع القسم أو طيه",
   "reader.locateCurrentChapter": "تحديد الفصل الحالي",
   "reader.locateCurrentSection": "تحديد القسم الحالي",

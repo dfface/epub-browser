@@ -4,6 +4,7 @@ import html
 import json
 import os
 import posixpath
+from pathlib import Path
 import urllib.parse
 from datetime import datetime
 from typing import Optional, TYPE_CHECKING
@@ -35,6 +36,12 @@ if TYPE_CHECKING:
 
 _READER_FONT_SIZES_REM = (0.9, 1.1, 1.3, 1.5, 1.7, 1.9, 2.2, 2.5, 2.8, 3.2, 3.6, 4.0)
 _DEFAULT_READER_FONT_LEVEL = 3
+
+# Shared action artwork for the book page and chapter navigation drawer.
+_TOC_BULK_BUTTON_HTML = '''<button type="button" class="toc-toggle-all" id="bookTocToggleAll" data-toc-action="collapse" aria-label="Collapse all" title="Collapse all" data-i18n-aria-label="reader.collapseAll" data-i18n-title="reader.collapseAll" hidden>
+    <span class="toc-action-icon" aria-hidden="true"></span>
+</button>'''
+
 
 # Shared by the Server EPUB book dialog and chapter drawer.
 _BOOK_SEARCH_BODY = '''
@@ -357,8 +364,26 @@ body.dark .k-book-action{background:#eee;color:#111;border-color:#eee}
   padding-left:12px;padding-right:8px;font-weight:bold;background:#e9e9e9}
 body.sepia .k-book .k-toc a[aria-current]{background:#e6d8ba}
 body.dark .k-book .k-toc a[aria-current]{background:#333}
-.k-book .k-toc .sec{padding-top:13px;font-weight:bold}
+.k-book .k-toc .sec{padding-top:0;font-weight:bold}
 .k-book .k-toc li:last-child a{border-bottom:0}
+.k-toc-heading{display:table;table-layout:fixed;box-sizing:border-box;width:100%;
+  padding:10px 14px;border-bottom:1px solid #999}
+.k-book .k-toc-heading h2{display:table-cell;vertical-align:middle;padding:0 12px 0 0;
+  border:0;word-wrap:break-word}
+.k-toc-heading-action{display:table-cell;width:43%;vertical-align:middle;text-align:right}
+.k-toc-bulk{box-sizing:border-box;max-width:100%;min-width:44px;min-height:44px;
+  margin:0;padding:8px 0 8px 8px;border:0;border-radius:0;background:transparent;
+  color:inherit;font:inherit;font-size:.875em;line-height:1.4;cursor:pointer;word-wrap:break-word}
+.k-toc-bulk:focus,.k-book .k-toc .toc-branch-toggle:focus{outline:2px solid;outline-offset:0}
+.k-book .k-toc li a{border-bottom-color:#ccc}
+body.dark .k-book .k-toc li a{border-bottom-color:#555}
+body.sepia .k-book .k-toc li a{border-bottom-color:#b8b0a0}
+.k-book .k-toc li{position:relative}
+.k-book .k-toc ul[data-toc-collapsible="true"] li[data-toc-level]{padding-left:44px}
+.k-book .k-toc .toc-branch-toggle{position:absolute;left:0;top:3px;width:44px;height:44px;
+  padding:0;line-height:44px;text-align:center;background:transparent;color:inherit;border:0;border-radius:0;font-size:16px;cursor:pointer}
+.k-book .k-toc .sec .chapter-section-title{display:block;box-sizing:border-box;min-height:44px;padding:13px 0}
+
 /* Shared empty TOC state for EPUB and PDF book pages. EPUB jumps by chapter
    number, PDF by page number; both use the same layout and controls. */
 .k-toc-empty{margin:0;padding:18px 14px 10px;text-align:center;color:#555}
@@ -1102,6 +1127,35 @@ _KINDLE_READER_SERVER_RESUME_JS = """\
 """
 
 
+def _kindle_toc_heading(labels):
+    return (
+        '<div class="k-toc-heading">'
+        f'<h2 data-i18n="contents">{html.escape(labels["contents"])}</h2>'
+        '<div class="k-toc-heading-action">'
+        '<button type="button" class="k-toc-bulk" id="kTocToggleAll" '
+        'style="display:none" data-i18n="reader.collapseAll">'
+        f'{html.escape(labels["reader.collapseAll"])}</button>'
+        '</div></div>'
+    )
+
+
+def _kindle_toc_script():
+    # Inline the same dependency-free ES5 controller; Kindle stays self-contained.
+    source = (Path(__file__).parent / "assets" / "toc-tree.js").read_text(encoding="utf-8")
+    return source + """
+var kTocList = document.querySelector('.k-toc ul');
+var kTocTree = kTocList ? EpubTocTree.initBookTocTree(kTocList, {
+  bulkToggle: document.getElementById('kTocToggleAll'),
+  label: kTranslate('reader.toggleTocSection'),
+  translate: function(key) { return kTranslate(key); }
+}) : null;
+if (!kTocTree || document.getElementById('kTocToggleAll').hidden) {
+  document.querySelector('.k-toc-heading-action').style.display = 'none';
+}
+kLocalize(document);
+"""
+
+
 def _kindle_i18n_messages(language, tools=None):
     """Resolve Kindle chrome strings independently of book metadata."""
     language = normalize_locale(language, "en")
@@ -1138,6 +1192,9 @@ def _kindle_i18n_messages(language, tools=None):
         "noContentsBook": "book.noContents",
         "goToChapter": "book.goToChapter",
         "pageLoadError": "pdf.pageLoadError",
+        "reader.expandAll": "reader.expandAll",
+        "reader.collapseAll": "reader.collapseAll",
+        "reader.toggleTocSection": "reader.toggleTocSection",
     }
     labels = dict(dictionary, **{name: bundle.get(key) or english[key] for name, key in keys.items()})
     if tools is not None:
@@ -1590,9 +1647,6 @@ class ReaderPageRenderer:
             </div>
             <div class="book-secondary-actions">
                 <button type="button" class="css-btn secondary" id="toggleShelfBtn" aria-pressed="false"><i class="fas fa-layer-group" aria-hidden="true"></i><span id="toggleShelfBtnText" aria-live="polite" data-i18n="book.addToShelf">Add to Shelf</span></button>
-                {ai_book_chat_button}
-                {book_search_trigger}
-                {book_review_trigger}
                 <button type="button" class="css-btn secondary" data-book-cache-trigger
                     data-book-id="{book_id_attribute}" data-book-title="{book_title_attribute}"
                     data-book-format="{'pdf' if is_pdf_book else 'epub'}"
@@ -1600,6 +1654,9 @@ class ReaderPageRenderer:
                     data-chapter-count="{len(self.chapters)}" aria-haspopup="dialog" hidden>
                     <i class="fas fa-download" aria-hidden="true"></i><span data-i18n="bookCache.save">Cache on this device</span>
                 </button>
+                {ai_book_chat_button}
+                {book_search_trigger}
+                {book_review_trigger}
             </div>
         </div>
     </div>
@@ -1610,7 +1667,10 @@ class ReaderPageRenderer:
     <div class="toc-container" data-id="toc-container"{ai_reading_indicators}>
         <div class="toc-header">
             <h2 data-i18n="book.tableOfContents">Table of contents</h2>
-            <div class="chapter-count" data-i18n="book.totalChapters" data-i18n-params='{{"count": {len(self.chapters)}}}'>Total: {len(self.chapters)}</div>
+            <div class="book-toc-header-actions">
+                {_TOC_BULK_BUTTON_HTML}
+                <div class="chapter-count" data-i18n="book.totalChapters" data-i18n-params='{{"count": {len(self.chapters)}}}'>Total: {len(self.chapters)}</div>
+            </div>
         </div>
 """
         # Build the rows separately so EPUB and PDF share one empty state when
@@ -1845,6 +1905,7 @@ if (window.EpubBrowserCacheBoundary) {
 <script src="/assets/dialog.js" defer></script>
 <script src="/assets/version-check.js" defer></script>
 <script src="/assets/reading-progress.js" defer></script>
+<script src="/assets/toc-tree.js" defer></script>
 <script src="/assets/reader-layout.js" defer></script>
 <script>window.EpubBrowserBookFeatureAssets={book_feature_assets};</script>
 <script src="/assets/book-feature-loader.js" defer></script>
@@ -2098,22 +2159,20 @@ document.addEventListener('DOMContentLoaded', function() {{
         toc_items = []
         for item in toc_data:
             if item.get('kind') == 'chapter':
-                level = int(item.get('level') or 0)
-                if level > 3:
-                    level = 3
+                level = max(0, int(item.get('level') or 0))
                 chapter_file = f"kindle_chapter_{item.get('chapter_index')}.html"
                 title = html.escape(
                     metadata_text(item.get('title', '')), quote=False
                 )
                 toc_items.append(
-                    f'<li class="lvl-{level}"><a href="{chapter_file}" '
+                    f'<li class="lvl-{min(level, 3)}" data-toc-level="{level}" style="margin-left:{level * 16}px"><a href="{chapter_file}" '
                     f'data-k-toc-chapter="{int(item["chapter_index"])}">{title}</a></li>'
                 )
             else:
                 title = html.escape(
                     metadata_text(item.get('title', '')), quote=False
                 )
-                toc_items.append(f'<li class="sec">{title}</li>')
+                toc_items.append(f'<li class="sec" data-toc-level="{max(0, int(item.get("level") or 0))}" style="margin-left:{max(0, int(item.get("level") or 0)) * 16}px"><span class="chapter-section-title">{title}</span></li>')
         toc_html = "\n".join(toc_items)
         go_to_chapter = html.escape(kindle_labels["goToChapter"], quote=True)
         chapter_count = len(self.chapters)
@@ -2158,6 +2217,7 @@ function kSetResume(chapter) {{
     var index = Number(entries[i].getAttribute('data-k-toc-chapter'));
     if (index === chapter && !current) {{
       current = entries[i];
+      if (kTocTree) kTocTree.reveal(current.parentNode);
       current.setAttribute('aria-current', 'location');
     }} else entries[i].removeAttribute('aria-current');
   }}
@@ -2220,7 +2280,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
     <div lang="{locale or 'en'}" data-k-ui-language>{action}</div>
 </div>
 <section class="k-surface">
-    <h2 data-i18n="contents">{html.escape(kindle_labels["contents"])}</h2>
+    {_kindle_toc_heading(kindle_labels)}
     {toc_body}
 </section>
 </main>
@@ -2229,6 +2289,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
 <script>
 {_KINDLE_READER_JS}
 {kindle_locale_script(lambda code: _kindle_i18n_messages(code, tools), use_initial_locale=locale is not None)}
+{_kindle_toc_script()}
 {resume_script}
 {kindle_server_resume_script}</script>
 </body>
@@ -2254,7 +2315,7 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
         for entry in self._pdf_outline_toc():
             page_label = str(entry["page"])
             outline_rows.append(
-                f'<li class="lvl-0" data-k-pdf-page="{page_label}">'
+                f'<li class="lvl-0" data-toc-level="0" data-k-pdf-page="{page_label}">'
                 f'<a href="kindle_chapter.html#page-{page_label}">'
                 f'{html.escape(metadata_text(entry["title"]), quote=False)}'
                 f'<span class="k-pdf-toc-page">{page_label}</span></a></li>'
@@ -2343,7 +2404,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <div lang="{locale or 'en'}" data-k-ui-language>{action}</div>
 </div>
 <section class="k-surface">
-    <h2 data-i18n="contents">{html.escape(kindle_labels["contents"])}</h2>
+    {_kindle_toc_heading(kindle_labels)}
     {toc_body}
 </section>
 </main>
@@ -2352,6 +2413,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
 <script>
 {_KINDLE_READER_JS}
 {kindle_locale_script(_kindle_i18n_messages, use_initial_locale=locale is not None)}
+{_kindle_toc_script()}
 {resume_script}
 {jump_script}</script>
 </body>
@@ -2991,6 +3053,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
         <div class="toc-header">
             <h3 data-i18n="bookmarks.navigationTitle">Navigation</h3>
             <div class="toc-header-actions">
+                {_TOC_BULK_BUTTON_HTML}
                 <button class="toc-current-chapter" id="bookHomeLocateCurrent" type="button" aria-label="Locate current chapter" data-i18n-aria-label="reader.locateCurrentChapter">
                     <i class="fas fa-crosshairs" aria-hidden="true"></i>
                 </button>
@@ -3496,7 +3559,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <script src="/assets/viewport-anchor.js" defer></script>
     <script src="/assets/continuous-buffer.js" defer></script>
     <script src="/assets/reading-progress.js" defer></script>
-    <script src="/assets/reader-layout.js" defer></script>
+    <script src="/assets/toc-tree.js" defer></script>
+<script src="/assets/reader-layout.js" defer></script>
     {pdf_chapter_script}
     {book_search_script}
     <script src="/assets/mobile-toolbar.js" defer></script>

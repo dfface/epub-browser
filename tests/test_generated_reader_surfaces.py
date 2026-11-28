@@ -23,6 +23,55 @@ from epub_browser.urls import SiteURLs
 
 
 class GeneratedReaderSurfaceTests(unittest.TestCase):
+    def test_bulk_toc_action_is_available_on_shared_book_and_reader_pages(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(Path('epub_browser/assets'), directory).publish()
+            for mode in ('ssg', 'server'):
+                epub = ReaderPageRenderer(
+                    book_id='fixture',
+                    metadata=BookMetadata(title='Test', authors=(), tags=(),
+                                          cover=None, language='en', epub_identifier=None),
+                    chapters=[{'title': 'One', 'path': 'one.xhtml'}], toc=[],
+                    description='', asset_manifest=assets, deployment_mode=mode)
+                pdf = ReaderPageRenderer.from_pdf_metadata(
+                    book_id='pdf', metadata=PDFMetadata(
+                        title='PDF', authors=(), tags=(), language='en',
+                        pages=(PDFPageMetadata(1, 600, 800),), encrypted=False,
+                        has_extractable_text=False, cover=None),
+                    cover_path=None, asset_manifest=assets, urls=SiteURLs(),
+                    deployment_mode=mode)
+                for renderer in (epub, pdf):
+                    chapter = (renderer.create_pdf_chapter_template(0, 'document.pdf')
+                               if renderer is pdf else
+                               renderer.create_chapter_template('<p>One</p>', '', 0, 'One'))
+                    for page in (renderer.render_index(), chapter):
+                        with self.subTest(mode=mode, format=renderer.source_format):
+                            self.assertEqual(page.count('id="bookTocToggleAll"'), 1)
+                            self.assertIn('data-i18n-title="reader.collapseAll" hidden', page)
+                            self.assertIn('class="toc-action-icon"', page)
+
+    def test_kindle_toc_preserves_deep_branches_and_shares_bulk_behavior(self):
+        with tempfile.TemporaryDirectory() as directory:
+            assets = AssetPublisher(Path('epub_browser/assets'), directory).publish()
+            renderer = ReaderPageRenderer(
+                book_id='fixture', metadata=BookMetadata(
+                    title='Test', authors=(), tags=(), cover=None,
+                    language='en', epub_identifier=None),
+                chapters=[{'title': 'One', 'path': 'one.xhtml'}], toc=[],
+                description='', asset_manifest=assets, deployment_mode='ssg')
+            for mode in ('ssg', 'server'):
+                renderer.deployment_mode = mode
+                page = renderer.create_kindle_index_page(toc_data=[
+                    {'kind': 'section', 'level': 0, 'title': 'Part'},
+                    {'kind': 'section', 'level': 4, 'title': 'Group'},
+                    {'kind': 'chapter', 'level': 5, 'title': 'One', 'chapter_index': 0},
+                ])
+                self.assertIn('data-toc-level="5"', page)
+                self.assertIn('id="kTocToggleAll"', page)
+                self.assertIn('kTocTree.reveal(current.parentNode)', page)
+                self.assertNotIn('Object.assign', page)
+                self.assertNotIn('addEventListener', page)
+
     def test_source_toc_indentation_keeps_every_depth_distinct(self):
         chromium = shutil.which('chromium') or '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
         if not Path(chromium).exists():

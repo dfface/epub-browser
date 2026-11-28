@@ -989,6 +989,8 @@
   "settings.keyboardNavigation": "Navigazione da tastiera",
   "settings.arrowKeyNavigation": "Usa le frecce sinistra e destra per navigare",
   "settings.spaceKeyNavigation": "Usa Spazio per passare alla pagina o al capitolo successivo",
+  "reader.expandAll": "Espandi tutto",
+  "reader.collapseAll": "Comprimi tutto",
   "reader.toggleTocSection": "Espandi o comprimi sezione",
   "reader.locateCurrentChapter": "Trova il capitolo corrente",
   "reader.locateCurrentSection": "Trova la sezione corrente",

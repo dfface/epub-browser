@@ -72,12 +72,13 @@ body:has(#eb-content) { -webkit-tap-highlight-color:transparent; }
 #bookHomeFloating .reader-book-details:hover { background:transparent; color:var(--app-action); }
 @media(hover:hover) and (pointer:fine) {
     #bookHomeFloating .toc-item a { min-height:40px; box-sizing:border-box; }
-    #bookHomeTocList > [data-toc-level] { margin-inline-start:calc(var(--toc-depth) * 12px); padding-inline-start:30px; }
+    #bookHomeTocList > [data-toc-level] { margin-inline-start:calc(var(--toc-depth) * 12px); }
+    #bookHomeTocList[data-toc-collapsible="true"] > [data-toc-level] { padding-inline-start:30px; }
     #bookHomeTocList .toc-branch-toggle { width:30px; }
 }
 @media(pointer:coarse) {
     #bookHomeFloating .toc-item a { min-height:44px; box-sizing:border-box; }
-    #bookHomeTocList > [data-toc-level] { padding-inline-start:44px; }
+    #bookHomeTocList[data-toc-collapsible="true"] > [data-toc-level] { padding-inline-start:44px; }
     #bookHomeTocList .toc-branch-toggle { width:44px; }
 }
 @media(max-width:600px) { #bookHomeFloating { width:calc(100vw - 24px); } }

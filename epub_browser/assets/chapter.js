@@ -1880,7 +1880,29 @@ function initScript() {
             var data;
             try { data = JSON.parse(text); } catch (_) { return false; }
             if (!Array.isArray(data)) return false;
+            var pdfNavigation = Boolean(window.EpubPDFConfig);
+            var pageCount = data.length;
+            data = window.EpubReaderLayout.bookNavigationEntries(data, pdfNavigation);
             list.innerHTML = '';
+            if (pdfNavigation && !data.length) {
+                var empty = document.createElement('li');
+                empty.className = 'pdf-toc-empty';
+                empty.innerHTML = '<p data-i18n="pdf.noContents"></p><form class="pdf-toc-jump">' +
+                    '<input type="number" min="1" required inputmode="numeric" data-i18n-placeholder="pdf.goToPage" data-i18n-aria-label="pdf.goToPage">' +
+                    '<button type="submit" data-i18n="reader.jump"></button></form>';
+                empty.querySelector('input').max = pageCount;
+                empty.querySelector('form').onsubmit = function(event) {
+                    event.preventDefault();
+                    var page = Number(empty.querySelector('input').value);
+                    if (page >= 1 && page <= pageCount && Math.floor(page) === page) {
+                        navigateReaderChapter(window.EpubBrowserURL.publicPath('/book/' + hash + '/chapter_' + (page - 1) + '.html'), { history: true });
+                    }
+                };
+                list.appendChild(empty);
+                i18n.translateDocument(list);
+            }
+            var locator = document.getElementById('bookHomeLocateCurrent');
+            if (locator) locator.disabled = pdfNavigation && !data.length;
             for (var i = 0; i < data.length; i++) {
                 var item = data[i];
                 var li = document.createElement('li');
@@ -1910,6 +1932,14 @@ function initScript() {
                 );
                 title.textContent = presentation.title;
                 a.appendChild(title);
+                if (pdfNavigation) {
+                    var pageLabel = document.createElement('span');
+                    pageLabel.className = 'pdf-toc-page';
+                    pageLabel.setAttribute('data-i18n', 'pdf.page');
+                    pageLabel.setAttribute('data-i18n-params', JSON.stringify({number: item.page_label}));
+                    pageLabel.textContent = i18n.t('pdf.page', {number: item.page_label});
+                    a.appendChild(pageLabel);
+                }
                 if (presentation.outlineLabels.length) {
                     var outlineLabels = document.createElement('span');
                     outlineLabels.className = 'chapter-outline-labels';
@@ -1927,7 +1957,10 @@ function initScript() {
             bookTocTree = window.EpubReaderLayout.initBookTocTree(list, {
                 bookId: hash,
                 storage: localStorage,
-                label: i18n.t('reader.toggleTocSection')
+                label: i18n.t('reader.toggleTocSection'),
+                bulkToggle: document.getElementById('bookTocToggleAll'),
+                iconOnly: true,
+                translate: function(key) { return i18n.t(key); }
             });
             // ai-reading-hub may have loaded before this asynchronous TOC.
             // Notify it explicitly as well as allowing its observer fallback.
@@ -1958,6 +1991,14 @@ function initScript() {
                     active = candidates[i];
                     activeDepth = depth;
                 }
+            }
+        }
+        if (window.EpubPDFConfig) {
+            // Outline entries describe a range until the next outline marker.
+            var pdfEntries = list.querySelectorAll('.toc-item[data-chapter-index]');
+            active = pdfEntries[0];
+            for (var p = 0; p < pdfEntries.length; p++) {
+                if (Number(pdfEntries[p].getAttribute('data-chapter-index')) <= Number(index)) active = pdfEntries[p];
             }
         }
         if (!active) return;

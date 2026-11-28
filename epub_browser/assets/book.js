@@ -73,7 +73,10 @@ function initScript() {
         bookPageTocTree = window.EpubReaderLayout.initBookTocTree(bookTocList, {
             bookId: book_hash,
             storage: localStorage,
-            label: bookT('reader.toggleTocSection')
+            label: bookT('reader.toggleTocSection'),
+            bulkToggle: document.getElementById('bookTocToggleAll'),
+            iconOnly: true,
+            translate: bookT
         });
     }
 
