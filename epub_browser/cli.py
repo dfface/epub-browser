@@ -116,8 +116,14 @@ def _new_parser() -> argparse.ArgumentParser:
     ssg.add_argument("--output-dir", "-o", required=True)
     ssg.add_argument("--base-path", default="/", type=_parse_base_path)
     ssg.add_argument("--site-name", default="", help="Override the site name")
-    ssg.add_argument("--site-logo", type=Path, help="Local PNG, JPEG or WebP logo")
-    ssg.add_argument("--site-favicon", type=Path, help="Local PNG, JPEG or WebP favicon")
+    ssg.add_argument(
+        "--site-logo", type=Path, metavar="FILE",
+        help="Path to a local logo image file (PNG, JPEG or WebP)",
+    )
+    ssg.add_argument(
+        "--site-favicon", type=Path, metavar="FILE",
+        help="Path to a local favicon image file (PNG, JPEG or WebP)",
+    )
     ssg.add_argument("--hide-version-info", action="store_true", help="Hide footer credits, version and update notices")
     _add_logging_options(ssg)
     _add_book_id_storage(ssg)
