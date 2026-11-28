@@ -110,6 +110,16 @@ assert config.output_dir.name == 'dist'
             ["ssg", "books", "--output-dir", "dist", "--base-path", "/reader/"]
         )
 
+    def test_ssg_accepts_optional_site_branding(self):
+        config = parse_cli([
+            "ssg", "books", "-o", "out", "--site-name", "My Library",
+            "--site-logo", "logo.png", "--site-favicon", "icon.webp", "--hide-version-info",
+        ])
+        self.assertEqual(config.site_name, "My Library")
+        self.assertEqual(str(config.site_logo), "logo.png")
+        self.assertEqual(str(config.site_favicon), "icon.webp")
+        self.assertTrue(config.hide_version_info)
+
     def test_ssg_kindle_support_is_opt_in_flag(self):
         config = parse_cli(["ssg", "books", "--output-dir", "dist", "--kindle"])
         self.assertTrue(config.kindle)

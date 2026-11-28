@@ -6,10 +6,12 @@ import hashlib
 import json
 import posixpath
 import re
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from .locales import SUPPORTED_LOCALES
+from .branding import Branding
 from .urls import SiteURLs
 
 
@@ -91,6 +93,7 @@ class PublishedAssets:
     """The logical-to-public URL map for one generated library release."""
 
     assets: dict[str, str]
+    branding: Branding = Branding()
 
     def url_for(self, logical_name: str) -> str:
         return self.assets[logical_name]
@@ -115,9 +118,10 @@ class AssetPublisher:
         self.excluded_paths = frozenset(excluded_paths)
         self.excluded_prefixes = tuple(excluded_prefixes)
 
-    def publish(self) -> PublishedAssets:
+    def publish(self, *, site_name="", brand_images=None, hide_version_info=False) -> PublishedAssets:
         assets = self._copy_immutable_assets()
-        published = PublishedAssets(assets)
+        images = {kind: self.publish_brand_image(kind, data) for kind, data in (brand_images or {}).items()}
+        published = PublishedAssets(assets, Branding(site_name, **images, hide_version_info=hide_version_info))
         self._write_i18n_manifest(published)
         self._write_lookup_manifest(published)
         self._write_web_manifests(published)
@@ -174,6 +178,20 @@ class AssetPublisher:
             target.write_bytes(contents)
         return assets
 
+    def publish_brand_image(self, kind: str, contents: bytes) -> str:
+        url = self._immutable_url(f'branding/{kind}.png', contents)
+        target = self.output_dir / self.urls.filesystem_relative(url)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as handle:
+            temporary = Path(handle.name)
+            try:
+                handle.write(contents)
+                handle.close()
+                temporary.replace(target)
+            finally:
+                temporary.unlink(missing_ok=True)
+        return url
+
     def _is_excluded(self, logical_path: str) -> bool:
         return (
             logical_path in {'sw.js', *WEB_MANIFEST_SOURCES.values()} | self.excluded_paths
@@ -224,7 +242,7 @@ class AssetPublisher:
                 manifest['lang'] = locale
                 for screenshot in manifest.get('screenshots', ()):
                     screenshot['label'] = wide_label if screenshot.get('form_factor') == 'wide' else narrow_label
-            manifest = self._rewrite_asset_urls(manifest, published)
+            manifest = apply_manifest_branding(self._rewrite_asset_urls(manifest, published), published.branding)
             target = self.output_dir / 'assets' / output_name
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
@@ -245,8 +263,13 @@ class AssetPublisher:
         source = self.source_dir / 'sw.js'
         if not source.is_file():
             return
+        release_material = dict(published.assets)
+        branding = published.branding
+        brand_urls = tuple(url for url in (branding.logo, branding.favicon) if url)
+        if branding.name or brand_urls or branding.hide_version_info:
+            release_material['site_branding'] = (branding.name, branding.hide_version_info, *brand_urls)
         release_id = hashlib.sha256(
-            json.dumps(published.assets, sort_keys=True, separators=(',', ':')).encode('utf-8')
+            json.dumps(release_material, sort_keys=True, separators=(',', ':')).encode('utf-8')
         ).hexdigest()[:12]
         mutable_manifests = [
             self.urls.public(f'/assets/{name}') for name in WEB_MANIFEST_SOURCES
@@ -256,6 +279,7 @@ class AssetPublisher:
             index_url,
             *(url for name, url in published.assets.items()
               if not name.startswith("vendor/highlight/")),
+            *brand_urls,
             *mutable_manifests,
         ]
         worker = source.read_text(encoding='utf-8')
@@ -275,3 +299,9 @@ def rewrite_asset_urls(html: str, published: PublishedAssets) -> str:
         return published.assets.get(logical_name, match.group(0))
 
     return re.sub(r'/assets/([A-Za-z0-9_./-]+)(?:\?v=\d+)?', replace, html)
+
+
+def apply_manifest_branding(manifest, branding):
+    if branding.name:
+        manifest.update(name=branding.name, short_name=branding.name)
+    return manifest

@@ -1309,6 +1309,10 @@ class ReaderPageRenderer:
     def _browser_cache_version_attribute(self):
         return html.escape(getattr(self, "browser_cache_version", ""), quote=True)
 
+    @property
+    def branding(self):
+        return self.asset_manifest.branding
+
     def render_index(self, initial_book_review=None):
         """创建章节索引页面"""
         is_pdf_book = getattr(self, 'source_format', EPUB_FORMAT) == PDF_FORMAT
@@ -1507,8 +1511,8 @@ class ReaderPageRenderer:
     <meta name="description" content="{book_title_attribute} - EPUB Browser">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
-    <title>{book_title_text}</title>
+    <meta name="apple-mobile-web-app-title" content="{self.branding.name_text}">
+    {self.branding.title(book_title_text)}
     {render_i18n_runtime_and_inline(deployment_mode=self.deployment_mode)}
     <script>window.EpubBrowserI18n.init();</script>
     {ai_feature_assets}
@@ -1523,8 +1527,8 @@ class ReaderPageRenderer:
     {book_search_stylesheet}
     <link rel="stylesheet" href="/assets/breadcrumb.css?v=3">
     <link rel="stylesheet" href="/assets/loading.css?v=15">
-    <link rel="icon" type="image/png" href="/assets/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    {self.branding.icon()}
+    <link rel="apple-touch-icon" href="{self.branding.touch_icon}">
     <link rel="stylesheet" href="/assets/bookshelf.css">
     {server_account_stylesheet}
     {book_review_assets}
@@ -1538,7 +1542,7 @@ class ReaderPageRenderer:
         index_html += f"""
 <header class="app-header">
     <nav class="app-nav" aria-label="Book navigation" data-i18n-aria-label="book.navigation">
-        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+        {self.branding.nav()}
         {render_app_nav_links(self.deployment_mode, "bookAnnotationsBtn", book_id=self.book_hash, extra=reading_insights_navigation + ai_reading_navigation)}
         <div class="app-nav-actions">
             {server_locale_control}
@@ -1798,7 +1802,7 @@ class ReaderPageRenderer:
     </div>
 </div>
 {server_account_panel}
-{render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else '')}"""
+{render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else '', branding=self.branding)}"""
 
         cache_boundary_script = (
             '<script src="/assets/cache-boundary.js" defer></script>'
@@ -2200,7 +2204,8 @@ if (!kindleRequestedChapter && kindleSavedChapter) kSetResume(Number(kindleSaved
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{book_title_text}</title>
+{self.branding.title(book_title_text)}
+{self.branding.icon(optional=True)}
 <style>
 {_KINDLE_READER_CSS}
 {_KINDLE_BOOK_CSS}
@@ -2321,7 +2326,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{book_title_text}</title>
+{self.branding.title(book_title_text)}
+{self.branding.icon(optional=True)}
 <style>
 {_KINDLE_READER_CSS}
 {_KINDLE_BOOK_CSS}
@@ -2375,7 +2381,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{book_title_text}</title>
+{self.branding.title(book_title_text)}
+{self.branding.icon(optional=True)}
 <style>
 {_KINDLE_READER_CSS}
 {_KINDLE_PDF_CSS}
@@ -2428,7 +2435,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>{book_title_text}</title>
+{self.branding.title(book_title_text)}
+{self.branding.icon(optional=True)}
 <style>
 {_KINDLE_READER_CSS}
 {_KINDLE_PDF_CSS}
@@ -2535,7 +2543,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="format-detection" content="telephone=no">
-<title>{chapter_title_text} - {book_title_text}</title>
+{self.branding.title(chapter_title_text + " - " + book_title_text)}
+{self.branding.icon(optional=True)}
 <style>
 {_KINDLE_READER_CSS}
 {_KINDLE_CHAPTER_CSS}
@@ -2935,8 +2944,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <meta name="description" content="{chapter_title_attribute} - {book_title_attribute} - EPUB Browser">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="EPUB Browser">
-    <title>{chapter_title_text} - {book_title_text}</title>
+    <meta name="apple-mobile-web-app-title" content="{self.branding.name_text}">
+    {self.branding.title(chapter_title_text + " - " + book_title_text)}
     {reading_session_context}
     {render_i18n_runtime_and_inline(deployment_mode=self.deployment_mode)}
     <script>window.EpubBrowserI18n.init();</script>
@@ -2960,8 +2969,8 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
     <link rel="stylesheet" href="/assets/annotation-hub.css">
     {server_account_stylesheet}
     <link rel="stylesheet" href="/assets/vendor/glightbox/glightbox.min.css">
-    <link rel="icon" type="image/png" href="/assets/favicon.png">
-    <link rel="apple-touch-icon" href="/assets/icon-192.png">
+    {self.branding.icon()}
+    <link rel="apple-touch-icon" href="{self.branding.touch_icon}">
     <link rel="stylesheet" href="/assets/bookshelf.css">
 """
         chapter_html += """
@@ -3025,7 +3034,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
 
     <header class="chapter-top-bar app-header">
         <nav class="app-nav" aria-label="Reading navigation" data-i18n-aria-label="reader.navigation">
-            <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt=""><span data-i18n="common.brand">EPUB Browser</span></a>
+            {self.branding.nav()}
             {render_app_nav_links(self.deployment_mode, "chapterAnnotationsBtn", book_id=self.book_hash, extra=reading_insights_navigation + ai_reading_navigation)}
             <div class="app-nav-actions">
                 {server_locale_control}
@@ -3436,7 +3445,7 @@ if (!isNaN(kPdfTocSaved)) kPdfTocMark(kPdfTocSaved + 1);
         </div>
     </div>
     {server_account_panel}
-    {render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else '')}
+    {render_footer(datetime.now().year, release_api_url='/api/version' if self.deployment_mode == 'server' else '', branding=self.branding)}
 """
         cache_boundary_script = (
             '<script src="/assets/cache-boundary.js" defer></script>'

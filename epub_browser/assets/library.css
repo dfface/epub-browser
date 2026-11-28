@@ -41,6 +41,7 @@ body {
 }
 
 .library-overview-kicker {
+    overflow-wrap: anywhere;
     margin: 0 0 2px;
     color: var(--button-bg);
     font-size: .72rem;

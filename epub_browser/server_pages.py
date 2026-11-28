@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
 
+from .branding import Branding
 from .asset_publisher import PublishedAssets
 from .pdf_processor import PDFMetadata, PDFPageMetadata, pdf_kindle_supported
 from .reader_pages import ReaderPageRenderer, pdf_page_navigation
@@ -68,6 +69,7 @@ class ServerPageRenderer:
         metadata_overrides=None,
         kindle=False,
         ai_reading_enabled=True,
+        branding=Branding(),
     ):
         self.public_dir = Path(public_dir)
         self.book_id = str(book_id)
@@ -75,6 +77,7 @@ class ServerPageRenderer:
         self.source_format = source_format
         self.metadata_overrides = dict(metadata_overrides or {})
         self.kindle = bool(kindle)
+        self.branding = branding
         self.ai_reading_enabled = bool(ai_reading_enabled)
         if self.source_format not in {EPUB_FORMAT, PDF_FORMAT}:
             raise ServerPageError("Unsupported book format")
@@ -177,7 +180,7 @@ class ServerPageRenderer:
             return ReaderPageRenderer.from_server_content_cache(
                 book_id=self.book_id,
                 metadata=metadata,
-                asset_manifest=PublishedAssets(self._asset_manifest()),
+                asset_manifest=PublishedAssets(self._asset_manifest(), self.branding),
                 urls=self.urls,
                 kindle_support=self.kindle,
                 ai_reading_enabled=self.ai_reading_enabled,
@@ -199,7 +202,7 @@ class ServerPageRenderer:
             book_id=self.book_id,
             metadata=metadata,
             cover_path=derived.cover_path,
-            asset_manifest=PublishedAssets(self._asset_manifest()),
+            asset_manifest=PublishedAssets(self._asset_manifest(), self.branding),
             urls=self.urls,
             deployment_mode="server",
             navigation=(derived.chapters, derived.toc),

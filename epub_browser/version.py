@@ -3,6 +3,8 @@ import threading
 import time
 from urllib.request import Request, urlopen
 
+from .branding import Branding
+
 
 VERSION = "2.19.0"
 
@@ -74,8 +76,12 @@ class ReleaseLookup:
             return dict(release)
 
 
-def render_footer(year, release_api_url=LATEST_RELEASE_API_URL):
+def render_footer(year, release_api_url=LATEST_RELEASE_API_URL, *, branding=Branding()):
     """Render the shared application footer for every generated page."""
+    product = (f'<span>{branding.name_text}</span>' if branding.name
+               else '<span data-i18n="footer.product">EPUB Library</span>')
+    if branding.hide_version_info:
+        return f'<footer class="eb-footer" data-id="eb-footer"><p>{product} &copy; {year}</p></footer>'
     return f"""<footer class="eb-footer" data-id="eb-footer" data-version-check data-current-version="{VERSION}" data-release-api="{release_api_url}">
-    <p><span data-i18n="footer.product">EPUB Library</span> &copy; {year} | <span data-i18n="footer.poweredBy">Powered by</span> <a href="{REPOSITORY_URL}" target="_blank" rel="noopener noreferrer">epub-browser</a><!-- i18n-allow-literal: product name --> <span data-i18n="footer.poweredBySuffix">&middot;</span> <span class="eb-footer-version" aria-label="Version {VERSION}" data-i18n-aria-label="common.version" data-i18n-params='{{"version":"{VERSION}"}}'>v{VERSION}</span><span class="eb-footer-update" data-version-update hidden><span aria-hidden="true"> &middot; </span><a target="_blank" rel="noopener noreferrer"></a></span></p>
+    <p>{product} &copy; {year} | <span data-i18n="footer.poweredBy">Powered by</span> <a href="{REPOSITORY_URL}" target="_blank" rel="noopener noreferrer">epub-browser</a><!-- i18n-allow-literal: product name --> <span data-i18n="footer.poweredBySuffix">&middot;</span> <span class="eb-footer-version" aria-label="Version {VERSION}" data-i18n-aria-label="common.version" data-i18n-params='{{"version":"{VERSION}"}}'>v{VERSION}</span><span class="eb-footer-update" data-version-update hidden><span aria-hidden="true"> &middot; </span><a target="_blank" rel="noopener noreferrer"></a></span></p>
 </footer>"""

@@ -479,6 +479,11 @@ body.reader-drawer-open .reader-toolbar.top-controls {
         gap: 10px;
     }
 
+    .app-nav-brand {
+        justify-content: center;
+        min-width: 44px;
+    }
+
     .app-nav-brand span,
     .app-nav-action-label,
     .app-nav #adminMenu span,
@@ -505,10 +510,6 @@ body.reader-drawer-open .reader-toolbar.top-controls {
         gap: 6px 10px;
         width: 100%;
         padding: 8px 12px 7px;
-    }
-
-    .app-nav-brand {
-        min-height: 44px;
     }
 
     .app-nav-brand-mark,
@@ -632,4 +633,14 @@ body.reader-drawer-open .reader-toolbar.top-controls {
         gap: 6px;
         padding-inline: 8px;
     }
+}
+
+.app-nav-brand {
+    max-width: min(28vw, 17rem);
+}
+
+.app-nav-brand > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }

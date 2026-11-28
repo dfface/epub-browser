@@ -13,6 +13,7 @@ from typing import Callable, Optional, Sequence
 
 from tqdm import tqdm
 
+from .branding import MAX_BRAND_IMAGE_BYTES, normalize_brand_image, validate_site_name
 from .asset_publisher import (
     AssetPublisher,
     PublishedAssets,
@@ -92,6 +93,15 @@ class SSGPublisher:
         self.show_progress = sys.stderr.isatty() if show_progress is None else show_progress
 
     def build(self) -> Path:
+        try:
+            site_name = validate_site_name(self.config.site_name)
+            brand_images = {}
+            for kind, path in (("logo", self.config.site_logo), ("favicon", self.config.site_favicon)):
+                if path is not None:
+                    with path.expanduser().open("rb") as source:
+                        brand_images[kind] = normalize_brand_image(source.read(MAX_BRAND_IMAGE_BYTES + 1), kind)
+        except (ValueError, OSError) as error:
+            raise SSGBuildError(f"Invalid site branding: {error}") from error
         sources = self._discover_sources()
         self._validate_output_target(sources)
         orphan_sidecars = discover_orphan_sidecars(self.config.sources, sources)
@@ -115,7 +125,10 @@ class SSGPublisher:
                 urls=self.urls,
                 excluded_paths=SERVER_ONLY_ASSET_PATHS,
                 excluded_prefixes=excluded_prefixes,
-            ).publish()
+            ).publish(
+                site_name=site_name, brand_images=brand_images,
+                hide_version_info=self.config.hide_version_info,
+            )
             books = self._convert_all(prepared, staging, assets)
             publish_library_shell(
                 staging, books, assets, self.urls, kindle=self.config.kindle

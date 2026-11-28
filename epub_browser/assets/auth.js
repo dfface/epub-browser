@@ -57,6 +57,7 @@
     var aiJobsRetrying = Object.create(null);
     var aiJobsRetryRequests = Object.create(null);
     var activeAdminSection = 'overview';
+    var loadSiteBranding;
     var adminHasUnsavedChanges = false;
     var aiProfileTranslationKeys = {
       auto: 'admin.ai.profile.auto',
@@ -986,7 +987,7 @@
 
     var adminSections = [
       'overview', 'general', 'users', 'oidc', 'dictionaries', 'ai-configuration',
-      'ai-permissions', 'ai-jobs', 'tags', 'upload', 'books', 'webhooks'
+      'ai-permissions', 'ai-jobs', 'tags', 'upload', 'books', 'webhooks', 'branding'
     ];
     var activeAccountSection = 'profile';
 
@@ -1058,6 +1059,7 @@
         panel.hidden = panel.getAttribute('data-admin-panel') !== section || !adminPanelIsAvailable(panel);
       });
       resetSettingsScroll('adminPanel');
+      if (section === 'branding' && loadSiteBranding) loadSiteBranding();
       if (activeTab && typeof activeTab.scrollIntoView === 'function') {
         activeTab.scrollIntoView({ block: 'nearest', inline: 'center' });
       }
@@ -3756,7 +3758,175 @@
       showWebhookSecret('');
     }
 
+    function updateFilePickerLabel(input) {
+      var control = input && input.closest && input.closest('.account-file-control');
+      if (!control) return;
+      var output = control.querySelector('[data-account-file-name]');
+      var file = input.files && input.files[0];
+      control.classList.toggle('has-file', Boolean(file));
+      if (file) output.removeAttribute('data-i18n');
+      else output.setAttribute('data-i18n', 'admin.noDictionaryFile');
+      output.textContent = file ? file.name : t('admin.noDictionaryFile');
+    }
+
+    function bindSiteBranding() {
+      var form = element('siteBrandingForm');
+      if (!form) return;
+      var fields = form.elements;
+      var group = form.querySelector('fieldset');
+      var message = element('siteBrandingMessage');
+      var defaultImages = {
+        logo: form.querySelector('[data-brand-preview="logo"]').getAttribute('src'),
+        favicon: form.querySelector('[data-brand-preview="favicon"]').getAttribute('src')
+      };
+      var endpoint = '/api/admin/branding';
+      var saved = null;
+      var objectUrls = {};
+      var messageKey = '';
+      var kinds = ['logo', 'favicon'];
+
+      function status(key, type) {
+        messageKey = key ? 'admin.branding.' + key : '';
+        setTextMessage(message, messageKey, type);
+      }
+
+      function defaultField(kind) {
+        return kind === 'logo' ? fields.defaultLogo : fields.defaultFavicon;
+      }
+
+      function preview() {
+        var name = element('siteBrandingPreviewName');
+        var custom = fields.siteName.value.trim();
+        if (custom) name.removeAttribute('data-i18n');
+        else name.setAttribute('data-i18n', 'common.brand');
+        name.textContent = custom || t('common.brand');
+        kinds.forEach(function(kind) {
+          updateFilePickerLabel(fields[kind]);
+          var image = form.querySelector('[data-brand-preview="' + kind + '"]');
+          image.src = objectUrls[kind] || (!defaultField(kind).checked && saved && saved[kind]) || defaultImages[kind];
+        });
+      }
+
+      function clearFile(kind) {
+        if (objectUrls[kind]) root.URL.revokeObjectURL(objectUrls[kind]);
+        delete objectUrls[kind];
+        fields[kind].value = '';
+      }
+
+      function setSaved(branding) {
+        saved = branding;
+        fields.siteName.value = saved.name;
+        fields.hideVersionInfo.checked = saved.hide_version_info;
+        kinds.forEach(function(kind) {
+          clearFile(kind);
+          defaultField(kind).checked = false;
+        });
+        preview();
+      }
+
+      loadSiteBranding = function() {
+        if (saved || messageKey === 'admin.branding.loading' || !sessionState || !sessionState.user || sessionState.user.role !== 'admin') return;
+        status('loading');
+        authenticatedFetch(endpoint).then(function(result) {
+          if (!result.ok) throw new Error();
+          return readJson(result);
+        }).then(function(data) {
+          setSaved(data.branding);
+          group.disabled = false;
+          status('');
+        }).catch(function() { status('loadError', 'error'); });
+      };
+
+      function encode(file) {
+        return new Promise(function(resolve, reject) {
+          var reader = new FileReader();
+          reader.onload = function() { resolve(reader.result.split(',')[1]); };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      form.addEventListener('input', function(event) {
+        if (event.target === fields.siteName) preview();
+      });
+      kinds.forEach(function(kind) {
+        var image = form.querySelector('[data-brand-preview="' + kind + '"]');
+        image.addEventListener('error', function() {
+          if (objectUrls[kind] && image.getAttribute('src') === objectUrls[kind]) {
+            clearFile(kind);
+            status('invalid', 'error');
+            preview();
+          }
+        });
+        fields[kind].addEventListener('change', function() {
+          if (objectUrls[kind]) root.URL.revokeObjectURL(objectUrls[kind]);
+          delete objectUrls[kind];
+          var file = fields[kind].files[0];
+          if (file && (file.size > 1048576 || !file.size)) {
+            clearFile(kind);
+            status('invalid', 'error');
+          } else if (file) {
+            defaultField(kind).checked = false;
+            objectUrls[kind] = root.URL.createObjectURL(file);
+            status('');
+          }
+          preview();
+        });
+        defaultField(kind).addEventListener('change', function() {
+          if (defaultField(kind).checked) clearFile(kind);
+          preview();
+        });
+      });
+      element('siteBrandingDefaults').addEventListener('click', function() {
+        fields.siteName.value = '';
+        fields.hideVersionInfo.checked = false;
+        kinds.forEach(function(kind) {
+          clearFile(kind);
+          defaultField(kind).checked = true;
+        });
+        preview();
+        status('defaultsReady');
+      });
+      form.addEventListener('submit', function(event) {
+        event.preventDefault();
+        if (group.disabled) return;
+        var payload = {
+          name: fields.siteName.value.trim(),
+          hide_version_info: fields.hideVersionInfo.checked
+        };
+        group.disabled = true;
+        status('saving');
+        Promise.all(kinds.map(function(kind) {
+          var file = fields[kind].files[0];
+          if (defaultField(kind).checked) payload[kind] = null;
+          if (file) return encode(file).then(function(value) { payload[kind] = value; });
+        })).then(function() {
+          return authenticatedFetch(endpoint, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+          });
+        }).then(function(result) {
+          if (!result.ok) {
+            status(result.status === 400 ? 'invalid' : 'saveError', 'error');
+            return;
+          }
+          return readJson(result).then(function(data) {
+            setSaved(data.branding);
+            status('saved', 'success');
+          });
+        }).catch(function() {
+          status('saveError', 'error');
+        }).finally(function() { group.disabled = false; });
+      });
+      if (root.EpubBrowserI18n) root.EpubBrowserI18n.onLocaleChange(function() {
+        preview();
+        if (messageKey) message.textContent = t(messageKey);
+      });
+    }
+
     function bindUi() {
+      bindSiteBranding();
       var menu = element('accountMenu');
       var close = element('accountClose');
       var adminMenu = element('adminMenu');
@@ -4142,17 +4312,8 @@
         var dictionaryFormatInputs = dictionaryForm.querySelectorAll('input[name="dictionary_format"]');
         var dictionaryFileInputs = [dictionaryForm.elements.mdict_archive, dictionaryForm.elements.stardict_archive];
         var dictionaryNameInput = dictionaryForm.elements.display_name;
-        function updateDictionaryFileLabel(input) {
-          if (!input) return;
-          var output = dictionaryForm.querySelector('[data-dictionary-file-name="' + input.name + '"]');
-          var control = input.closest ? input.closest('.dictionary-file-control') : null;
-          var file = input.files && input.files[0];
-          var label = file && file.name ? file.name : t('admin.noDictionaryFile');
-          if (output) output.textContent = label;
-          if (control) control.classList.toggle('has-file', Boolean(file));
-        }
         updateDictionaryFileLabels = function() {
-          dictionaryFileInputs.forEach(updateDictionaryFileLabel);
+          dictionaryFileInputs.forEach(updateFilePickerLabel);
         };
         setDictionaryFormat = function(format) {
           Array.prototype.forEach.call(dictionaryFormatInputs, function(input) {
@@ -4174,7 +4335,7 @@
         });
         dictionaryFileInputs.forEach(function(dictionaryFileInput) {
           dictionaryFileInput.addEventListener('change', function() {
-            updateDictionaryFileLabel(dictionaryFileInput);
+            updateFilePickerLabel(dictionaryFileInput);
             var file = dictionaryFileInput.files && dictionaryFileInput.files[0];
             var fileName = file && file.name ? file.name.replace(/\.(?:mdx|zip|tar(?:\.(?:gz|bz2))?|tgz|tbz2)$/i, '').trim() : '';
             if (!fileName || (dictionaryNameInput.value.trim() && dictionaryNameInput.value !== dictionaryAutoName)) return;

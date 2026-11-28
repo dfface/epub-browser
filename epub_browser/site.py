@@ -10,6 +10,7 @@ from typing import Optional, Sequence, Tuple
 from types import SimpleNamespace
 from urllib.parse import urlencode
 
+from .branding import Branding
 from .asset_publisher import PublishedAssets, rewrite_asset_urls
 from .book_sort import BOOK_SORT_LABEL, LIBRARY_SORT_OPTIONS, book_sort_options, library_sort
 from .i18n_bundles import get_bundle, render_i18n_runtime_and_inline
@@ -558,6 +559,7 @@ def render_kindle_library_page(
     query="",
     static_catalog_total=None,
     sort="manual",
+    branding=Branding(),
 ) -> str:
     """Render the shared Kindle bookshelf with local or account progress."""
     books_by_id = {book.book_id: book for book in books}
@@ -647,16 +649,23 @@ def render_kindle_library_page(
     sort_label = html.escape(get_bundle(locale).get(BOOK_SORT_LABEL) or get_bundle("en")[BOOK_SORT_LABEL])
     sort_options = book_sort_options(LIBRARY_SORT_OPTIONS, sort, locale)
     dashboard_css = _KINDLE_DASHBOARD_CSS if dashboard is not None else ""
+    brand_markup = ""
+    if branding.name or branding.logo:
+        logo = branding.mark("k-brand-mark") if branding.logo else ""
+        brand_markup = f'<div class="k-library-brand">{logo}{branding.brand_text}</div>'
     return f"""<!DOCTYPE html>
 <html lang="{locale}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title data-i18n="library">{copy("library")}</title>
+{branding.title(copy("library"), "library")}
+{branding.icon(optional=True)}
 <style>
 {_KINDLE_READER_CSS}
 .k-library{{box-sizing:border-box;max-width:720px;margin:0 auto;padding:14px 14px 76px;font:16px/1.4 Arial,sans-serif}}
 .k-library-head{{overflow:hidden;margin-bottom:10px}}
+.k-library-brand{{word-wrap:break-word}}
+.k-library-brand img{{width:32px;height:32px;vertical-align:middle;margin-inline-end:8px}}
 .k-library-head h1{{margin:4px 0;font:700 1.85em/1.25 Arial,sans-serif;letter-spacing:-.02em}}
 
 .k-library-tabs{{padding:4px;white-space:normal}}
@@ -728,6 +737,7 @@ body.sepia #kLanguage option{{background:#f3e9d2;color:#3c2f1a}}
 <main>
 <section id="kLibraryView" data-k-view{library_style}>
 <header class="k-library-head">
+{brand_markup}
 <h1 data-i18n="library">{copy("library")}</h1>
 </header>
 <nav class="k-library-tabs k-surface" id="kLibraryNav">
@@ -952,14 +962,14 @@ def render_library_shell(
 <meta name="description" content="EPUB Library - A web-based EPUB reader" data-i18n-content="library.description">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="EPUB Browser">
-<title data-i18n="library.pageTitle">EPUB Library</title>
+<meta name="apple-mobile-web-app-title" content="{site_name}">
+{site_title}
 {I18N_RUNTIME_BOOTSTRAP}
 <script>window.EpubBrowserI18n.init();</script>
 <noscript><link rel="manifest" href="/assets/manifest.en.json"></noscript>
 <link rel="stylesheet" href="/assets/vendor/fontawesome/css/all.min.css">
-<link rel="icon" type="image/png" href="/assets/favicon.png">
-<link rel="apple-touch-icon" href="/assets/icon-192.png">
+{site_icon}
+<link rel="apple-touch-icon" href="{site_touch_icon}">
 <link rel="stylesheet" href="/assets/theme.css">
 <link rel="stylesheet" href="/assets/notification.css">
 <link rel="stylesheet" href="/assets/dialog.css">
@@ -988,7 +998,7 @@ def render_library_shell(
     library_html += f"""
     <header class="app-header">
     <nav class="app-nav app-nav-primary" aria-label="Primary navigation" data-i18n-aria-label="library.navigation">
-        <a class="app-nav-brand" href="/" aria-label="EPUB Browser" data-i18n-aria-label="common.brand"><img class="app-nav-brand-mark" src="/assets/logo-mark-color.png" width="32" height="32" alt="" aria-hidden="true"><span data-i18n="common.brand">EPUB Browser</span></a>
+        {{site_nav}}
         {render_app_nav_links(deployment_mode, "annotationsBtn", extra=reading_insights_navigation + ai_reading_navigation)}
         <div class="app-nav-actions">
             {SERVER_LOCALE_CONTROL}
@@ -1000,7 +1010,7 @@ def render_library_shell(
     <div class="container">
     <section class="library-overview" aria-labelledby="libraryHeading">
         <div>
-            <p class="library-overview-kicker" data-i18n="common.brand">EPUB Browser</p>
+            <p class="library-overview-kicker">{{site_brand}}</p>
             <h1 id="libraryHeading" data-i18n="library.title">Library</h1>
         </div>
         <div class="library-summary" aria-label="Library information" data-i18n-aria-label="library.information">
@@ -1135,7 +1145,7 @@ def render_library_shell(
     </div>
 </div>
 {server_account_panel}
-{render_footer(datetime.now().year, release_api_url='/api/version' if deployment_mode == 'server' else '')}
+{render_footer(datetime.now().year, release_api_url='/api/version' if deployment_mode == 'server' else '', branding=assets.branding)}
 """
     library_html += """
     <script src="/assets/cache-boundary.js" defer></script>
@@ -1172,6 +1182,13 @@ def render_library_shell(
     </script>
     </body>
 </html>"""
+    branding = assets.branding
+    library_html = library_html.replace("{site_title}", branding.title("EPUB Library", "library.pageTitle"))
+    library_html = library_html.replace("{site_name}", branding.name_text)
+    library_html = library_html.replace("{site_brand}", branding.brand_text)
+    library_html = library_html.replace("{site_nav}", branding.nav())
+    library_html = library_html.replace("{site_icon}", branding.icon())
+    library_html = library_html.replace("{site_touch_icon}", branding.touch_icon)
     library_html = library_html.replace("{kindle_entry_script}", kindle_entry_script)
     library_html = library_html.replace("{server_progress_stylesheet}", server_progress_stylesheet)
     library_html = library_html.replace("{server_progress_panel}", server_progress_panel)
@@ -1269,7 +1286,7 @@ def publish_library_shell(
                 root / _kindle_static_page_name(page),
                 render_kindle_library_page(
                     catalog[offset:offset + KINDLE_PAGE_SIZE], urls,
-                    catalog_page=page, static_catalog_total=total,
+                    catalog_page=page, static_catalog_total=total, branding=assets.branding,
                 ),
             )
         for item, book in zip(metadata, ordered_books):
